@@ -37,4 +37,4 @@ Ogni modifica a un file `src/*.js` richiede di alzare `version` **sia nel file s
 
 ---
 
-Le estensioni **manga** (Mihon / Tachimanga) sono in un repo separato: [it-ext-repo](https://github.com/adam72881/it-ext-repo) («Manga ITA»).
+Le estensioni **manga** (Mihon / Tachimanga) sono in un repo separato: [manga-ita-extensions](https://github.com/adam72881/manga-ita-extensions) («Manga ITA»).
