@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.2",
+        "version": "1.0.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -166,7 +166,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getVideoList(url) {
-        var id = String(url); // slug~ep
+        // Mangayomi may hand us the full URL (baseUrl + "/<slug>~<ep>"),
+        // so pull out just the "<slug>~<ep>" token.
+        var raw = String(url);
+        var m = raw.match(/([^\/?#]+~\d+)(?:[?#].*)?$/);
+        var id = m ? m[1] : raw;
         var slug = id.split("~")[0];
         var ep = id.split("~")[1] || "1";
         var base = this.getBaseUrl();
