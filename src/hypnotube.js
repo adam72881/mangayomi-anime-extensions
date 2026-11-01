@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -20,10 +20,48 @@ const PREF_BASE = "hypnotube_base_url";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-// Ordine = finestra temporale del listato /videos/.
-const PERIODS = [
-    ["", "Recenti"], ["day", "Top oggi"], ["week", "Top settimana"],
-    ["month", "Top mese"], ["year", "Top anno"],
+// value = tratto di path dopo l'origine (paginazione: <base>pageN.html).
+const ORDERS = [
+    ["most-recent", "Recenti"],
+    ["most-viewed", "Più visti"],
+    ["top-rated", "Più votati"],
+    ["most-discussed", "Più commentati"],
+    ["longest", "Più lunghi"],
+    ["top-rated/week", "Più votati della settimana"],
+    ["top-rated/month", "Più votati del mese"],
+    ["random", "Casuale"],
+];
+
+// Minuti. Value vuoto = nessun filtro. Si applica sulla durata in lista.
+const DURATIONS = [
+    ["10", "10+ minuti"],
+    ["20", "20+ minuti"],
+    ["45", "45+ minuti"],
+];
+
+// Canali già presenti in CHANNELS, messi in cima al filtro.
+const PREFERRED_CHANNELS = [
+    "23/music-pmv",
+    "11/hypnosis",
+    "28/sissy-training",
+    "4/captions",
+    "6/chastity",
+    "2/asian",
+];
+
+// value con "/" = canale. Altrimenti è il testo di ricerca, codificato una sola volta.
+const PRINCIPALI = [
+    ["91/gooning", "Gooning"],
+    ["poppers", "Poppers"],
+    ["Blackedraw", "Blackedraw"],
+];
+
+const PRESETS = [
+    ["sissy hypno caption", "Sissy Hypno"],
+    ["egirl", "Egirl PMV"],
+    ["lingerie stockings heels", "Lingerie e Tacchi"],
+    ["chastity caption", "Chastity"],
+    ["bnwo", "BNWO"],
 ];
 
 // Categorie del sito ("channels"): value = "<id>/<slug>".
@@ -169,6 +207,97 @@ class DefaultExtension extends MProvider {
         return page > 1 ? base + "page" + page + ".html" : base;
     }
 
+    norm(s) {
+        return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    }
+
+    minutesOf(text) {
+        var m = String(text || "").trim().match(/(\d+):(\d+)(?::(\d+))?/);
+        if (!m) return null;
+        if (m[3] != null) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+        return parseInt(m[1], 10);
+    }
+
+    formatCount(raw) {
+        var n = parseInt(String(raw || "").replace(/[^\d]/g, ""), 10);
+        if (!isFinite(n)) return String(raw || "").trim();
+        if (n >= 1000000) {
+            var m = n / 1000000;
+            return (m >= 10 ? String(Math.round(m)) : String(Math.round(m * 10) / 10)) + "M";
+        }
+        if (n >= 1000) {
+            var k = n / 1000;
+            return (k >= 10 ? String(Math.round(k)) : String(Math.round(k * 10) / 10)) + "K";
+        }
+        return String(n);
+    }
+
+    // Un solo passaggio: spazio -> "+", il resto con encodeURIComponent.
+    formBody(query, type) {
+        var q = String(query || "").trim().replace(/\s+/g, " ");
+        var enc = "";
+        for (var i = 0; i < q.length; i++) {
+            var c = q.charAt(i);
+            enc += c === " " ? "+" : encodeURIComponent(c);
+        }
+        return "q=" + enc + "&type=" + type;
+    }
+
+    headerOf(res, name) {
+        var h = res && res.headers;
+        if (!h) return "";
+        if (typeof h.get === "function") {
+            var v = h.get(name);
+            return v ? String(v) : "";
+        }
+        var keys = Object.keys(h);
+        for (var i = 0; i < keys.length; i++) {
+            if (String(keys[i]).toLowerCase() === name) {
+                var val = h[keys[i]];
+                return Array.isArray(val) ? String(val[0] || "") : String(val || "");
+            }
+        }
+        return "";
+    }
+
+    maxPage(doc) {
+        var max = 1;
+        var links = doc.select('a[href*="page"]');
+        for (var i = 0; i < links.length; i++) {
+            var href = String(links[i].getHref || "");
+            var m = href.match(/page(\d+)\.html/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        return max;
+    }
+
+    channelByName(query) {
+        var n = this.norm(query);
+        if (!n) return "";
+        for (var i = 0; i < CHANNELS.length; i++) {
+            if (this.norm(CHANNELS[i][1]) === n) return CHANNELS[i][0];
+        }
+        for (var j = 0; j < PRINCIPALI.length; j++) {
+            if (PRINCIPALI[j][0].indexOf("/") > 0 && this.norm(PRINCIPALI[j][1]) === n) return PRINCIPALI[j][0];
+        }
+        return "";
+    }
+
+    orderedChannels() {
+        var rank = {};
+        for (var i = 0; i < PREFERRED_CHANNELS.length; i++) rank[PREFERRED_CHANNELS[i]] = i;
+        var front = [];
+        var rest = [];
+        for (var j = 0; j < CHANNELS.length; j++) {
+            var at = rank[CHANNELS[j][0]];
+            if (at == null) rest.push(CHANNELS[j]);
+            else front[at] = CHANNELS[j];
+        }
+        var out = [];
+        for (var k = 0; k < front.length; k++) if (front[k]) out.push(front[k]);
+        return out.concat(rest);
+    }
+
     parseList(doc) {
         var list = [];
         for (var item of doc.select("div.item-col")) {
@@ -180,37 +309,252 @@ class DefaultExtension extends MProvider {
             var img = item.selectFirst("img");
             var imageUrl = img ? img.attr("src") || img.attr("data-src") || "" : "";
             if (!name && img) name = img.attr("alt") || "";
+            if (!name) {
+                var titleEl = item.selectFirst("span.title");
+                if (titleEl) name = titleEl.text.trim();
+            }
             if (!name) continue;
+            var timeEl = item.selectFirst("span.time");
+            list.push({
+                name: name,
+                imageUrl: imageUrl,
+                link: link,
+                _minutes: timeEl ? this.minutesOf(timeEl.text) : null,
+            });
+        }
+        var next = doc.selectFirst('a[href*="page"]');
+        return { list: list, hasNextPage: !!next && list.length > 0 };
+    }
+
+    parsePlaylists(doc) {
+        var list = [];
+        for (var item of doc.select("div.playlist-item")) {
+            var a = item.selectFirst('a[href*="/playlist/"]');
+            if (!a) continue;
+            var link = a.getHref;
+            if (!link) continue;
+            var titleEl = item.selectFirst("h4.title");
+            var name = titleEl ? titleEl.text.trim() : (a.attr("title") || "");
+            if (!name || name === "Favorite") continue;
+            var img = item.selectFirst("img");
+            var imageUrl = img ? img.attr("src") || "" : "";
             list.push({ name: name, imageUrl: imageUrl, link: link });
         }
         var next = doc.selectFirst('a[href*="page"]');
         return { list: list, hasNextPage: !!next && list.length > 0 };
     }
 
+    applyDuration(parsed, minMinutes) {
+        var src = parsed.list || [];
+        var list = [];
+        if (!minMinutes) {
+            for (var i = 0; i < src.length; i++) {
+                list.push({ name: src[i].name, imageUrl: src[i].imageUrl, link: src[i].link });
+            }
+            return { list: list, hasNextPage: parsed.hasNextPage };
+        }
+        var known = false;
+        for (var j = 0; j < src.length; j++) {
+            if (src[j]._minutes == null) {
+                list.push(src[j]);
+                continue;
+            }
+            known = true;
+            if (src[j]._minutes >= minMinutes) list.push(src[j]);
+        }
+        if (known && !list.length) list = src.slice();
+        var out = [];
+        for (var k = 0; k < list.length; k++) {
+            out.push({ name: list[k].name, imageUrl: list[k].imageUrl, link: list[k].link });
+        }
+        return { list: out, hasNextPage: parsed.hasNextPage };
+    }
+
+    async listing(base, page, random) {
+        if (!random) return this.parseList(await this.doc(this.paged(base, page)));
+        var first = await this.doc(base);
+        var max = this.maxPage(first);
+        var n = 1 + Math.floor(Math.random() * max);
+        if (n === 1) return this.parseList(first);
+        return this.parseList(await this.doc(base + "page" + n + ".html"));
+    }
+
+    isGate(html) {
+        return /Checking access|JavaScript is required/.test(String(html || ""));
+    }
+
+    hasCards(html) {
+        return /class="item-col col/.test(String(html || "")) || /playlist-item/.test(String(html || ""));
+    }
+
+    // Il form risponde con l'URL già pronto (anche con spazi). Non ricodificarlo.
+    decodePath(path) {
+        path = String(path || "");
+        if (/%[0-9A-Fa-f]{2}/.test(path)) {
+            try { path = decodeURIComponent(path); } catch (e) {}
+        }
+        return path;
+    }
+
+    pathOf(loc) {
+        var base = this.getBaseUrl();
+        var path = "";
+        if (loc.indexOf(base) === 0) path = loc.slice(base.length);
+        else {
+            var m = String(loc).match(/https?:\/\/[^/]+(\/.*)$/);
+            path = m ? m[1] : String(loc || "");
+        }
+        if (/%[0-9A-Fa-f]{2}/.test(path)) {
+            try { path = decodeURIComponent(path); } catch (e) {}
+        }
+        return path;
+    }
+
+    returnPath(html) {
+        var m = String(html || "").match(/returnPath = "([^"]+)"/);
+        if (!m) return "";
+        return m[1].replace(/\\\//g, "/");
+    }
+
+    // Lo spazio nell'URL diventa %20 una volta sola, qui.
+    urlFor(path) {
+        if (path.indexOf("http") === 0) return path.replace(/ /g, "%20");
+        return this.getBaseUrl() + path.replace(/ /g, "%20");
+    }
+
+    async openGated(path) {
+        if (!path) return "";
+        if (path.charAt(0) !== "/") path = "/" + path;
+        var gateHeaders = this.headers();
+        gateHeaders["Content-Type"] = "application/json";
+        gateHeaders["Accept"] = "application/json";
+        gateHeaders["Origin"] = this.getBaseUrl();
+        await this.client.post(
+            this.getBaseUrl() + "/age-gate?return=" + encodeURIComponent(path),
+            gateHeaders,
+            { timeZone: "UTC", languages: ["en"] },
+        );
+        var getHeaders = this.headers();
+        getHeaders["Referer"] = this.getBaseUrl() + "/searchgate.php";
+        var res = await this.client.get(this.urlFor(path), getHeaders);
+        return res && res.body ? String(res.body) : "";
+    }
+
+    // POST del form, poi la pagina indicata dal server. Se quella pagina chiede
+    // il controllo di accesso, si esegue la stessa richiesta che fa lo script del sito.
+    async loadSearch(query, type, page, random) {
+        var headers = this.headers();
+        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        headers["Origin"] = this.getBaseUrl();
+        var posted = await this.client.post(
+            this.getBaseUrl() + "/searchgate.php",
+            headers,
+            this.formBody(query, type),
+        );
+        var html = posted && posted.body ? String(posted.body) : "";
+        var path = this.decodePath(this.pathOf(this.headerOf(posted, "location")) || this.returnPath(html));
+        if (!path) {
+            var canon = html.match(/rel="canonical"\s+href="([^"]+)"/);
+            if (canon) path = this.decodePath(this.pathOf(canon[1]));
+        }
+        if (path && (this.isGate(html) || !this.hasCards(html))) {
+            html = await this.openGated(path);
+            if (!this.returnPath(html)) {
+                var canon2 = html.match(/rel="canonical"\s+href="([^"]+)"/);
+                if (canon2) path = this.pathOf(canon2[1]);
+            }
+        }
+        var want = page > 1 ? page : 0;
+        if (random && path) {
+            var max = this.maxPage(new Document(html));
+            want = 1 + Math.floor(Math.random() * Math.max(1, max));
+        }
+        if (want > 1 && path) {
+            var base = path.charAt(path.length - 1) === "/" ? path : path + "/";
+            var pagePath = base + "page" + want + ".html";
+            var pageHeaders = this.headers();
+            pageHeaders["Referer"] = this.urlFor(base);
+            var pageRes = await this.client.get(this.urlFor(pagePath), pageHeaders);
+            var pageHtml = pageRes && pageRes.body ? String(pageRes.body) : "";
+            if (!this.hasCards(pageHtml)) pageHtml = await this.openGated(pagePath);
+            if (this.hasCards(pageHtml)) html = pageHtml;
+        }
+        return new Document(html);
+    }
+
     async getPopular(page) {
-        return this.parseList(await this.doc(this.paged("/videos/month/", page)));
+        return this.applyDuration(await this.listing("/most-viewed/", page, false), 0);
     }
 
     async getLatestUpdates(page) {
-        return this.parseList(await this.doc(this.paged("/videos/", page)));
+        return this.applyDuration(await this.listing("/most-recent/", page, false), 0);
     }
 
     async search(query, page, filters) {
-        var channel = this.filterValue(filters, "Categoria");
-        var period = this.filterValue(filters, "Ordine");
-        var base;
-        if (query && query.length) {
-            base = "/search/" + encodeURIComponent(query.trim()) + "/";
-        } else if (channel) {
-            base = "/channels/" + channel + "/";
-        } else {
-            base = "/videos/" + (period ? period + "/" : "");
+        var tipo = this.filterValue(filters, "Tipo") || "video";
+        if (tipo === "playlist") {
+            if (query && String(query).trim()) {
+                return this.parsePlaylists(await this.loadSearch(query, "playlists", page, false));
+            }
+            return this.parsePlaylists(await this.doc(this.paged("/playlists/", page)));
         }
-        return this.parseList(await this.doc(this.paged(base, page)));
+
+        var preset = this.filterValue(filters, "Preset sessione");
+        var principale = this.filterValue(filters, "Categorie principali");
+        var channel = this.filterValue(filters, "Categoria");
+        var order = this.filterValue(filters, "Ordine") || "most-recent";
+        var minMinutes = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
+        var random = order === "random";
+        var text = query && String(query).trim() ? String(query).trim() : "";
+        if (text) {
+            var mapped = this.channelByName(text);
+            if (mapped) {
+                channel = mapped;
+                text = "";
+            }
+        }
+
+        var parsed;
+        if (preset) {
+            parsed = this.parseList(await this.loadSearch(preset, "videos", page, random));
+        } else if (principale) {
+            if (principale.indexOf("/") > 0) {
+                parsed = await this.listing("/channels/" + principale + "/", page, random);
+            } else {
+                parsed = this.parseList(await this.loadSearch(principale, "videos", page, random));
+            }
+        } else if (text) {
+            parsed = this.parseList(await this.loadSearch(text, "videos", page, random));
+        } else if (channel) {
+            parsed = await this.listing("/channels/" + channel + "/", page, random);
+        } else {
+            var path = "/" + (random ? "most-recent" : order) + "/";
+            parsed = await this.listing(path, page, random);
+        }
+        return this.applyDuration(parsed, minMinutes);
     }
 
     async getDetail(url) {
         var doc = await this.doc(url);
+        if (String(url).indexOf("/playlist/") !== -1) {
+            var parsed = this.parseList(doc);
+            var h1 = doc.selectFirst("h1");
+            var chapters = [];
+            for (var i = 0; i < parsed.list.length; i++) {
+                chapters.push({
+                    name: "Episodio " + (i + 1) + " - " + parsed.list[i].name,
+                    url: parsed.list[i].link,
+                });
+            }
+            return {
+                link: url,
+                description: (h1 ? h1.text.trim() : "Playlist") + (chapters.length ? " · " + chapters.length + " video" : ""),
+                genre: [],
+                status: 1,
+                chapters: chapters,
+            };
+        }
+
         var description = "";
         var d = doc.selectFirst("div.main-description") || doc.selectFirst(".video-description");
         if (d) description = d.text.trim();
@@ -219,10 +563,29 @@ class DefaultExtension extends MProvider {
             if (meta) description = (meta.attr("content") || "").trim();
         }
 
+        var stats = doc.select(".stats-list .sub-label");
+        var duration = stats.length ? String(stats[0].text || "").trim() : "";
+        var views = stats.length > 1 ? String(stats[1].text || "").trim() : "";
+        var voteEl = doc.selectFirst("li.li-vote-percent");
+        var vote = voteEl ? String(voteEl.text || "").trim() : "";
+        var head = [];
+        if (duration) head.push("Durata " + duration);
+        if (vote) head.push("Voto " + (vote.indexOf("%") >= 0 ? vote : vote + "%"));
+        if (views) head.push(this.formatCount(views) + " visualizzazioni");
+        if (head.length) description = head.join(" · ") + "\n\n" + (description || "");
+
         var genre = [];
-        for (var g of doc.select('a[href*="/channels/"]')) {
-            var t = g.text.trim();
-            if (t && t.length > 0 && t.length < 30 && genre.indexOf(t) === -1) genre.push(t);
+        var blocks = doc.select("div.tags-block");
+        if (blocks.length) {
+            var tags = blocks[0].select("a");
+            for (var t = 0; t < tags.length && genre.length < 3; t++) {
+                var name = tags[t].text.trim();
+                if (name && genre.indexOf(name) === -1) genre.push(name);
+            }
+        }
+        for (var g of doc.select("a.link12")) {
+            var label = g.text.trim();
+            if (label && label !== "Categories" && genre.indexOf(label) === -1) genre.push(label);
         }
 
         return {
@@ -230,7 +593,7 @@ class DefaultExtension extends MProvider {
             description: description || "Nessuna descrizione.",
             genre: genre,
             status: 1,
-            chapters: [{ name: "Guarda il video", url: url }],
+            chapters: [{ name: "Episodio 1", url: url }],
         };
     }
 
@@ -270,10 +633,22 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "La categoria ha priorità sul testo. Ordine = finestra temporale del listato.",
+                name: "Preset, poi Categorie principali, poi il testo, poi la categoria. Durata e Casuale si applicano ai video.",
             },
-            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(PERIODS, "") },
-            { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(CHANNELS, "Tutte") },
+            {
+                type_name: "SelectFilter",
+                name: "Tipo",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Video", value: "video" },
+                    { type_name: "SelectOption", name: "Playlist", value: "playlist" },
+                ],
+            },
+            { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
+            { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
+            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
+            { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
+            { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(this.orderedChannels(), "Tutte") },
         ];
     }
 

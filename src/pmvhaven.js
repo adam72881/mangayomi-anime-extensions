@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.1",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -20,12 +20,59 @@ const PREF_BASE = "pmvhaven_base_url";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-// L'API ordina con prefisso "-" (decrescente).
+// L'API ordina con prefisso "-" (decrescente). week/month = più votati nella finestra.
 const ORDERS = [
     ["-uploadDate", "Recenti"],
     ["-views", "Più visti"],
+    ["-bayesianRating", "Più votati"],
+    ["-duration", "Più lunghi"],
+    ["week", "Più votati della settimana"],
+    ["month", "Più votati del mese"],
+    ["random", "Casuale"],
     ["uploadDate", "Più vecchi"],
     ["views", "Meno visti"],
+];
+
+const DURATIONS = [
+    ["600", "10+ minuti"],
+    ["1200", "20+ minuti"],
+    ["2700", "45+ minuti"],
+];
+
+// In cima al filtro, solo termini verificati con /api/videos/search?q=
+const FRONT_TAGS = [
+    ["gooning", "Gooning"],
+    ["Blackedraw", "Blackedraw"],
+    ["poppers", "Poppers"],
+    ["pmv", "PMV"],
+    ["hypno", "Hypno"],
+    ["sissy", "Sissy"],
+    ["egirl", "Egirl"],
+    ["blonde", "Blonde"],
+    ["bnwo", "BNWO"],
+    ["caption", "Caption"],
+    ["ahegao", "Ahegao"],
+    ["stockings", "Stockings"],
+    ["heels", "Heels"],
+    ["lingerie", "Lingerie"],
+    ["chastity", "Chastity"],
+    ["asian", "Asian"],
+    ["public", "Public"],
+];
+
+const PRINCIPALI = [
+    ["gooning", "Gooning"],
+    ["Blackedraw", "Blackedraw"],
+    ["poppers", "Poppers"],
+];
+
+// Lingerie e Tacchi usa solo "lingerie": la query con tre parole non è pertinente.
+const PRESETS = [
+    ["sissy hypno caption", "Sissy Hypno"],
+    ["pmv egirl blonde", "Egirl PMV"],
+    ["lingerie", "Lingerie e Tacchi"],
+    ["chastity caption", "Chastity"],
+    ["bnwo", "BNWO"],
 ];
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
@@ -101,10 +148,12 @@ const TAGS = [
     ["cum on tits", "Cum On Tits"],
     ["black dick", "Black Dick"],];
 const NAME2TAG = {};
-for (var _i = 0; _i < TAGS.length; _i++) {
-    NAME2TAG[TAGS[_i][0].toLowerCase()] = TAGS[_i][0];
-    NAME2TAG[TAGS[_i][1].toLowerCase()] = TAGS[_i][0];
+function rememberTag(pair) {
+    NAME2TAG[pair[0].toLowerCase()] = pair[0];
+    NAME2TAG[pair[1].toLowerCase()] = pair[0];
 }
+for (var _i = 0; _i < TAGS.length; _i++) rememberTag(TAGS[_i]);
+for (var _j = 0; _j < FRONT_TAGS.length; _j++) rememberTag(FRONT_TAGS[_j]);
 
 class DefaultExtension extends MProvider {
     constructor() {
@@ -145,20 +194,92 @@ class DefaultExtension extends MProvider {
         return JSON.parse(res.body);
     }
 
-    toList(json) {
-        var vids = json.videos || json.data || json.results || [];
+    toList(json, minSec) {
+        var vids = json.videos || [];
+        if (!vids.length && Array.isArray(json.data) && json.data[0] && json.data[0].title) vids = json.data;
         var list = [];
+        var raw = [];
         for (var i = 0; i < vids.length; i++) {
             var v = vids[i];
-            if (!v || !v._id) continue;
-            list.push({
-                name: v.title || "Senza titolo",
+            if (!v || !v._id || !v.title) continue;
+            var item = {
+                name: v.title,
                 imageUrl: v.thumbnailUrl || v.thumbnail || "",
                 link: v._id,
-            });
+            };
+            raw.push(item);
+            if (minSec && v.durationSeconds != null && Number(v.durationSeconds) < minSec) continue;
+            list.push(item);
         }
+        if (minSec && !list.length) list = raw;
         var hasNext = json.pagination ? !!json.pagination.hasNext : list.length > 0;
         return { list: list, hasNextPage: hasNext };
+    }
+
+    toPlaylists(json) {
+        var rows = json.data || json.playlists || [];
+        var list = [];
+        for (var i = 0; i < rows.length; i++) {
+            var p = rows[i];
+            if (!p || !p._id || !p.name) continue;
+            list.push({
+                name: p.name,
+                imageUrl: p.thumbnailUrl || p.thumbnail || "",
+                link: "playlist:" + p._id,
+            });
+        }
+        var hasNext = false;
+        if (json.meta) hasNext = !!(json.meta.hasMore || (json.meta.page && json.meta.totalPages && json.meta.page < json.meta.totalPages));
+        else if (json.pagination) hasNext = !!json.pagination.hasNext;
+        return { list: list, hasNextPage: hasNext };
+    }
+
+    totalPages(json) {
+        var p = json.pagination || json.meta || {};
+        var n = parseInt(p.totalPages, 10);
+        return n > 0 ? n : 1;
+    }
+
+    since(days) {
+        return new Date(Date.now() - days * 86400000).toISOString();
+    }
+
+    formatCount(raw) {
+        var n = Number(raw);
+        if (!isFinite(n)) return "";
+        if (n >= 1000000) {
+            var m = n / 1000000;
+            return (m >= 10 ? String(Math.round(m)) : String(Math.round(m * 10) / 10)) + "M";
+        }
+        if (n >= 1000) {
+            var k = n / 1000;
+            return (k >= 10 ? String(Math.round(k)) : String(Math.round(k * 10) / 10)) + "K";
+        }
+        return String(Math.round(n));
+    }
+
+    orderedTags() {
+        var seen = {};
+        var out = [];
+        function push(pair) {
+            var key = pair[0].toLowerCase();
+            if (seen[key]) return;
+            seen[key] = true;
+            out.push(pair);
+        }
+        for (var i = 0; i < FRONT_TAGS.length; i++) push(FRONT_TAGS[i]);
+        for (var j = 0; j < TAGS.length; j++) push(TAGS[j]);
+        return out;
+    }
+
+    async loadQuery(path, page, random) {
+        var join = path.indexOf("?") >= 0 ? "&" : "?";
+        if (!random) return this.api(path + join + "page=" + page);
+        var first = await this.api(path + join + "page=1");
+        var total = this.totalPages(first);
+        var n = 1 + Math.floor(Math.random() * total);
+        if (n === 1) return first;
+        return this.api(path + join + "page=" + n);
     }
 
     async getPopular(page) {
@@ -169,56 +290,131 @@ class DefaultExtension extends MProvider {
         return this.toList(await this.api("/api/videos?sort=-uploadDate&page=" + page));
     }
 
-    async search(query, page, filters) {
-        var tag = this.filterValue(filters, "Categoria");
-        var order = this.filterValue(filters, "Ordine");
+    orderQuery(order) {
+        var sort = order || "-uploadDate";
+        var extra = "";
+        if (sort === "week") {
+            sort = "-bayesianRating";
+            extra = "&uploadDateFrom=" + encodeURIComponent(this.since(7));
+        } else if (sort === "month") {
+            sort = "-bayesianRating";
+            extra = "&uploadDateFrom=" + encodeURIComponent(this.since(30));
+        } else if (sort === "random") {
+            sort = "-uploadDate";
+        }
+        return { sort: sort, extra: extra, random: order === "random" };
+    }
 
-        // Un tag genere cliccato arriva come testo: se è un tag noto, filtralo.
-        if (query && query.length) {
-            var qn = query.toLowerCase().trim();
-            if (NAME2TAG[qn]) {
-                tag = NAME2TAG[qn];
-                query = "";
+    async search(query, page, filters) {
+        var tipo = this.filterValue(filters, "Tipo") || "video";
+        var text = query && String(query).trim() ? String(query).trim() : "";
+        if (tipo === "playlist") {
+            var plist = text
+                ? "/api/playlists/search?q=" + encodeURIComponent(text)
+                : "/api/playlists?isPublic=true&sort=-createdAt&limit=24";
+            return this.toPlaylists(await this.loadQuery(plist, page, false));
+        }
+
+        var preset = this.filterValue(filters, "Preset sessione");
+        var principale = this.filterValue(filters, "Categorie principali");
+        var tag = this.filterValue(filters, "Categoria");
+        var order = this.filterValue(filters, "Ordine") || "-uploadDate";
+        var minSec = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
+        if (text) {
+            var known = NAME2TAG[text.toLowerCase()];
+            if (known) {
+                tag = known;
+                text = "";
             }
         }
-
-        if (query && query.length) {
-            return this.toList(
-                await this.api("/api/videos/search?q=" + encodeURIComponent(query.trim()) + "&page=" + page),
-            );
+        var q = preset || principale || text || tag || "";
+        var spec = this.orderQuery(order);
+        var random = spec.random;
+        var path;
+        // Senza un ordine esplicito la ricerca resta per rilevanza: sort=-uploadDate
+        // spinge in cima video recenti che non c'entrano col testo.
+        var explicitSort = order && order !== "-uploadDate" && order !== "random";
+        if (q) {
+            path = "/api/videos/search?q=" + encodeURIComponent(q);
+            if (explicitSort) path += "&sort=" + encodeURIComponent(spec.sort) + spec.extra;
+            if (minSec) path += "&durationMin=" + minSec;
+        } else {
+            path = "/api/videos?sort=" + encodeURIComponent(spec.sort) + spec.extra;
+            if (minSec) path += "&durationMin=" + minSec;
         }
-        if (tag) {
-            return this.toList(
-                await this.api("/api/videos?tags=" + encodeURIComponent(tag) + "&page=" + page),
-            );
-        }
-        return this.toList(
-            await this.api("/api/videos?sort=" + (order || "-uploadDate") + "&page=" + page),
-        );
+        var json = await this.loadQuery(path, page, random);
+        return this.toList(json, minSec);
     }
 
     async getDetail(url) {
-        var id = String(url).split("?")[0].split("#")[0].replace(/\/+$/, "")
+        var raw = String(url);
+        var id = raw.split("?")[0].split("#")[0].replace(/\/+$/, "")
             .split("/").filter(function (s) {
                 return s.length > 0;
             }).pop();
+        if (raw.indexOf("playlist:") !== -1 || String(id).indexOf("playlist:") === 0) {
+            var pid = String(id).replace(/^playlist:/, "");
+            var pl = await this.api("/api/playlists/" + pid + "?fetchAll=true");
+            var d = pl.data || pl;
+            var vids = d.videoDetails || [];
+            var chapters = [];
+            for (var i = 0; i < vids.length; i++) {
+                var item = vids[i];
+                if (!item || !item._id) continue;
+                var ch = {
+                    name: "Episodio " + (i + 1) + " - " + (item.title || "Video"),
+                    url: item._id,
+                };
+                if (item.uploadDate) ch.dateUpload = String(item.uploadDate);
+                chapters.push(ch);
+            }
+            var about = [];
+            if (d.ownerUsername || d.owner) about.push("Di " + (d.ownerUsername || d.owner));
+            if (d.description) about.push(String(d.description));
+            return {
+                link: "playlist:" + pid,
+                description: about.join("\n\n") || d.name || "Playlist",
+                genre: [],
+                status: 1,
+                chapters: chapters,
+            };
+        }
+
         var json = await this.api("/api/videos/" + id);
         var v = json.data || json.video || json;
 
-        var genre = Array.isArray(v.tags) ? v.tags.slice(0, 20) : [];
-        var parts = [];
-        if (v.uploader) parts.push("Di " + v.uploader);
-        if (v.views != null) parts.push(v.views + " visualizzazioni");
-        if (v.duration) parts.push(v.duration);
-        if (v.music && typeof v.music === "string" && v.music.trim())
-            parts.push("♪ " + v.music.trim());
+        var genre = [];
+        var main = Array.isArray(v.top5Tags) ? v.top5Tags.slice(0, 3) : [];
+        var rest = Array.isArray(v.tags) ? v.tags : [];
+        for (var g = 0; g < main.length && genre.length < 3; g++) {
+            if (main[g] && genre.indexOf(main[g]) === -1) genre.push(main[g]);
+        }
+        for (var r = 0; r < rest.length && genre.length < 20; r++) {
+            if (rest[r] && genre.indexOf(rest[r]) === -1) genre.push(rest[r]);
+        }
+
+        var head = [];
+        if (v.duration) head.push("Durata " + v.duration);
+        var likes = Number(v.likes);
+        var dislikes = Number(v.dislikes);
+        if (isFinite(likes) && isFinite(dislikes) && likes + dislikes > 0) {
+            head.push("Voto " + Math.round((100 * likes) / (likes + dislikes)) + "%");
+        }
+        if (v.views != null) head.push(this.formatCount(v.views) + " visualizzazioni");
+
+        var body = [];
+        if (v.description && String(v.description).trim()) body.push(String(v.description).trim());
+        if (v.uploader) body.push("Di " + v.uploader);
+        if (v.music && typeof v.music === "string" && v.music.trim()) body.push("♪ " + v.music.trim());
+        var description = head.join(" · ");
+        if (body.length) description = description ? description + "\n\n" + body.join("\n") : body.join("\n");
 
         return {
             link: id,
-            description: parts.join(" · ") || "PMVHaven",
+            description: description || "PMVHaven",
             genre: genre,
             status: 1,
-            chapters: [{ name: "Guarda il video", url: v.videoUrl || id }],
+            chapters: [{ name: "Episodio 1", url: v.videoUrl || id }],
         };
     }
 
@@ -265,10 +461,22 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "La ricerca per testo ha priorità. Senza testo: Ordine o Categoria.",
+                name: "Preset, poi Categorie principali, poi il testo o la categoria. La categoria usa la ricerca.",
             },
+            {
+                type_name: "SelectFilter",
+                name: "Tipo",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Video", value: "video" },
+                    { type_name: "SelectOption", name: "Playlist", value: "playlist" },
+                ],
+            },
+            { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
+            { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
             { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
-            { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(TAGS, "Tutte") },
+            { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
+            { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(this.orderedTags(), "Tutte") },
         ];
     }
 
