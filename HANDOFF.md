@@ -17,8 +17,8 @@ Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia i
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.5 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.4 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.6 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.5 |
 
 User-Agent fisso, in entrambi i moduli nuovi: iPhone Safari 17.
 
@@ -30,7 +30,7 @@ Verificato dall'utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Su
 
 Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `language=sub_ita|sub_eng|dub_ita`. Trama da `div.entry > p`, episodi da `#episodes-grid article.episode-item`, mp4 da `videoUrl` in `/watch/`. Non modificare.
 
-## HypnoTube — 1.1.5
+## HypnoTube — 1.1.6
 
 ### Cosa funziona
 
@@ -44,6 +44,7 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Scheda: `Episodio 1`, generi = primi 3 tag (`div.tags-block`) più `a.link12`. Il menu «Categories» non c'è. Stats in cima alla trama, esempio `Durata 07:04 · Voto 93% · 7.2M visualizzazioni`.
 - Playlist: `/playlists/`, Più visti `/playlists/views/`, Più votati `/playlists/rating/`, Casuale una pagina a caso. Scheda `/playlist/<id>/<slug>/` con `Episodio N - titolo` e miniatura se c'è un'immagine http.
 - `getVideoList` prende l'mp4 della pagina.
+- Scheda: `author` è il nome su `a.name_normal` (es. GoonRitual) e il primo genere è `@nome`. L'autore in app non è cliccabile; se il tag arriva a `search()`, `@nome` apre `/user/<slug>/` (prima ricerca account, type=members).
 
 ### Attesa e sessione (1.1.5)
 
@@ -67,7 +68,7 @@ Una lista aperta subito dopo una ricerca è tornata in 720 ms, senza i 10 second
 - Più lunghi sulle playlist: il sito non ha un URL (`/playlists/` ha solo Newest, Top Rated, Most Viewed). La voce resta l'elenco recenti.
 - Capitolo «Simili»: Mangayomi lo riprodurrebbe come episodio. I tag sono generi e, toccati, arrivano a `search()`.
 
-## PMVHaven — 1.1.4
+## PMVHaven — 1.1.5
 
 ### Cosa funziona
 
@@ -78,7 +79,8 @@ API pubblica, nessun login. `tags=` sulla lista non filtra in modo affidabile (`
 - Categorie principali: Gooning, Blackedraw, Poppers. In cima a Categoria i termini verificati (PMV, Hypno, Sissy, Egirl, Blonde, BNWO, Caption, Ahegao, Stockings, Heels, Lingerie, e gli altri già nel filtro).
 - Preset via `q=`: Sissy Hypno, Egirl PMV, Lingerie, Chastity, BNWO.
 - Durata minima: `durationMin` in secondi (10 / 20 / 45 minuti).
-- Scheda video: `Episodio 1`, trama che inizia con durata, voto like/(like+dislike) e visualizzazioni. Generi: primi 3 di `top5Tags`, poi gli altri tag. `getVideoList` → mp4.
+- Scheda video: `Episodio 1`, trama che inizia con durata, voto like/(like+dislike) e visualizzazioni. `author` è `uploader` e il primo genere è `@uploader` (niente «Di …» in trama: in Mangayomi l'autore è solo testo; il tag, se arriva a `search()`, usa lo stesso filtro). Poi i primi 3 di `top5Tags` e gli altri tag. `getVideoList` → mp4.
+- Barra `@nome`: `GET /api/videos?uploader=<nome>`, lo stesso filtro della pagina profilo (`/api/videos?uploader=<id>` dopo `/api/users/by-username/`). Verificato: nightlyload e Interceptor, i primi video sono i loro.
 - Playlist: link `/playlists/<id>`. Ordine: Più recenti `-createdAt`, Più vecchi, Più visti `-views`, Valutazione più alta `-bayesianRating`, Più apprezzati `-likes`, Casuale (pagine 1–10). Scheda: una sola richiesta `GET /api/playlists/<id>?page=1&limit=50`, episodi da `data.videoDetails`.
 
 ### Controllo righe grigie

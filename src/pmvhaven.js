@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.4",
+        "version": "1.1.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -351,6 +351,13 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         var tipo = this.filterValue(filters, "Tipo") || "video";
         var text = query && String(query).trim() ? String(query).trim() : "";
+        if (text.charAt(0) === "@") {
+            var who = text.slice(1).trim();
+            if (who) {
+                var byUser = await this.api("/api/videos?uploader=" + encodeURIComponent(who) + "&page=" + page);
+                return this.toList(byUser, 0);
+            }
+        }
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
         var tag = this.filterValue(filters, "Categoria");
@@ -508,7 +515,6 @@ class DefaultExtension extends MProvider {
             var who = this.cleanLine(d.ownerUsername);
             if (!who && typeof d.owner === "string") who = this.cleanLine(d.owner);
             var about = [];
-            if (who) about.push("Di " + who);
             var plot = this.cleanBlock(d.description);
             if (plot) about.push(plot);
             var detail = {
@@ -534,6 +540,8 @@ class DefaultExtension extends MProvider {
         }.bind(this);
         for (var g = 0; g < main.length && genre.length < 3; g++) pushGenre(main[g]);
         for (var r = 0; r < rest.length && genre.length < 20; r++) pushGenre(rest[r]);
+        var uploader = this.cleanLine(v.uploader);
+        if (uploader) genre.unshift("@" + uploader);
 
         var head = [];
         var duration = this.cleanLine(v.duration);
@@ -548,8 +556,6 @@ class DefaultExtension extends MProvider {
         var body = [];
         var plot = this.cleanBlock(v.description);
         if (plot) body.push(plot);
-        var uploader = this.cleanLine(v.uploader);
-        if (uploader) body.push("Di " + uploader);
         var music = this.cleanLine(v.music);
         if (music) body.push("♪ " + music);
         var description = head.join(" · ");

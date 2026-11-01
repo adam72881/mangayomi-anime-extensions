@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.5",
+        "version": "1.1.6",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -628,6 +628,33 @@ class DefaultExtension extends MProvider {
         return String(value || "");
     }
 
+    // @nome nella barra: ricerca account (type=members), poi la pagina /user/<slug>/.
+    async uploaderListing(name, page) {
+        var key = String(name || "").trim().toLowerCase();
+        var path = this._uploaderKey === key ? this._uploaderPath : "";
+        if (!path) {
+            var found = await this.loadSearch(name, "members", 1, false);
+            var links = found.select('a[href*="/user/"]');
+            var fallback = "";
+            for (var i = 0; i < links.length; i++) {
+                var href = String(links[i].getHref || "");
+                if (href.indexOf("/user/") === -1) continue;
+                var title = String(links[i].attr("title") || links[i].text.trim() || "").trim();
+                if (!fallback) fallback = href;
+                if (title.toLowerCase() === key) {
+                    path = href;
+                    break;
+                }
+            }
+            if (!path) path = fallback;
+            this._uploaderKey = key;
+            this._uploaderPath = path;
+        }
+        if (!path) return { list: [], hasNextPage: false };
+        var base = path.charAt(path.length - 1) === "/" ? path : path + "/";
+        return this.parseList(await this.doc(this.paged(base, page)));
+    }
+
     async playlistListing(base, page, random) {
         if (!random) return this.parsePlaylists(await this.doc(this.paged(base, page)));
         var first = await this.doc(base);
@@ -663,6 +690,10 @@ class DefaultExtension extends MProvider {
         var minMinutes = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
         var random = order === "random";
         var text = query && String(query).trim() ? String(query).trim() : "";
+        if (text.charAt(0) === "@") {
+            var who = text.slice(1).trim();
+            if (who) return this.applyDuration(await this.uploaderListing(who, page), minMinutes);
+        }
         if (text) {
             var mapped = this.channelByName(text);
             if (mapped) {
@@ -756,17 +787,22 @@ class DefaultExtension extends MProvider {
             var label = g.text.trim();
             if (label && label !== "Categories" && genre.indexOf(label) === -1) genre.push(label);
         }
+        var whoEl = doc.selectFirst("a.name_normal");
+        var author = whoEl ? String(whoEl.attr("title") || whoEl.text.trim() || "").trim() : "";
+        if (author) genre.unshift("@" + author);
 
         var og = doc.selectFirst('meta[property="og:image"]');
         var chapter = { name: "Episodio 1", url: raw };
         this.chapterThumb(chapter, og ? og.attr("content") : "");
-        return {
+        var detail = {
             link: raw,
             description: description || "Nessuna descrizione.",
             genre: genre,
             status: 1,
             chapters: [chapter],
         };
+        if (author) detail.author = author;
+        return detail;
     }
 
     async getVideoList(url) {
