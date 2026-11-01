@@ -14,14 +14,22 @@ https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/anim
 
 Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli aggiornamenti: refresh del repository e tocca aggiorna.
 
+## Ultime novità
+
+- **1 novembre 2026 — Repo dedicato.** Le estensioni hanno ora un repo tutto loro. Se avevi il vecchio indirizzo (`it-ext-repo/mangayomi/...`), sostituiscilo con quello qui sopra.
+- **PMVHaven 1.2.0** — un solo filtro Ordine per video e playlist; categoria **Mai visti** per nascondere i video già aperti.
+- **HypnoTube 1.1.8 / PMVHaven 1.1.9** — **Popular a sorpresa**: Popolari cambia ordine o categoria a ogni apertura (si spegne dalle impostazioni della sorgente).
+
+Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare: [HANDOFF](HANDOFF.md)
+
 ## Sorgenti
 
-| Sorgente | Sito | Lingua | Contenuto |
-|---|---|---|---|
-| **AnimeWorld** | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
-| **HentaiWorld** | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
-| **HypnoTube** | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
-| **PMVHaven** | pmvhaven.com | EN | PMV 18+: ordini, categorie, ricerca, playlist, profili, «Mai visti» |
+| Sorgente | Versione | Sito | Lingua | Contenuto |
+|---|---|---|---|---|
+| **AnimeWorld** | 1.2.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
+| **HentaiWorld** | 2.1.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
+| **HypnoTube** | 1.1.8 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
+| **PMVHaven** | 1.2.0 | pmvhaven.com | EN | PMV 18+: ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.
 
@@ -31,6 +39,7 @@ Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il cam
 |---|---|
 | `anime_index.json` | Indice che legge l'app |
 | `src/*.js` | Codice delle sorgenti (JavaScript, `DefaultExtension extends MProvider`) |
+| `CHANGELOG.md` | Novità di ogni versione |
 | `HANDOFF.md` | Stato del lavoro, dettagli tecnici e limiti dell'app |
 
 Ogni modifica a un file `src/*.js` richiede di alzare `version` **sia nel file sia in `anime_index.json`**, altrimenti l'app non scarica il codice nuovo.

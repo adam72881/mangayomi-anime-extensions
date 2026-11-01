@@ -3,6 +3,8 @@
 Stato al 1 novembre 2026, app **Mangayomi v0.9.95**. Continuare dai file in `src/`, non riscriverli.
 AnimeWorld e HentaiWorld non si toccano. Niente bypass di Cloudflare o anti-bot, niente User-Agent diverso da quello già nel file, niente filtri che escludono contenuti.
 
+Novità di ogni versione: [CHANGELOG.md](CHANGELOG.md).
+
 URL da incollare in Mangayomi (Impostazioni → Browse → repository anime):
 
 ```
