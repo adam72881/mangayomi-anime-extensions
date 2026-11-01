@@ -18,7 +18,7 @@ Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia i
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.7 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.7 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.8 |
 
 User-Agent fisso, in entrambi i moduli nuovi: iPhone Safari 17.
 
@@ -68,7 +68,7 @@ Una lista aperta subito dopo una ricerca è tornata in 720 ms, senza i 10 second
 - Più lunghi sulle playlist: il sito non ha un URL (`/playlists/` ha solo Newest, Top Rated, Most Viewed). La voce resta l'elenco recenti.
 - Capitolo «Simili»: Mangayomi lo riprodurrebbe come episodio. I tag sono generi e, toccati, arrivano a `search()`.
 
-## PMVHaven — 1.1.7
+## PMVHaven — 1.1.8
 
 ### Cosa funziona
 
@@ -102,7 +102,7 @@ API pubblica, nessun login. `tags=` sulla lista non filtra in modo affidabile (`
 ## Problemi aperti
 
 - Il filtro Profili (ultimi 3 di `getDetail`, il più recente per primo; su PMVHaven si combina con l'ordine video, su HypnoTube la pagina utente non ha un ordine) si aggiorna solo rientrando nella sorgente o con Reset: il foglio non richiama `getFilterList` a ogni apertura.
-- PMVHaven 1.1.7, Tipo = «Il mio profilo»: `GET /api/auth/session`, poi favoriti `/api/user/favorites` e repost in `/api/users/{id}/posts`, uniti senza doppioni e con i più recenti prima. Senza cookie di login la lista dice di entrare dalla WebView. I Mi piace a cuore non hanno un elenco.
+- PMVHaven 1.1.8, Tipo = «Il mio profilo»: i preferiti sono `GET /api/users/{id}/favorites` (la scheda del profilo; `/api/user/favorites` non è quella lista), uniti ai repost di `/api/users/{id}/posts`. Si accettano `id` e `_id`. Senza login la lista chiede la WebView.
 - La pagina 2 della ricerca HypnoTube non è stata rimisurata in questa consegna: le prove ripetute hanno fatto scattare l'age-gate sull'IP. La sequenza è quella della 1.1.1 (searchgate, poi `pageN.html`), con l'attesa solo tra le due richieste. Da riverificare da una rete pulita, una ricerca e una pagina N, a 10 secondi di distanza.
 - Un episodio già salvato nell'app con la data ISO vecchia resta grigio: l'aggiornamento della scheda non riscrive `dateUpload` se il capitolo esiste già. Togliere la serie dalla libreria e riaprirla.
 - HypnoTube non ha la data sul video dentro una playlist: quegli episodi non hanno `dateUpload`.

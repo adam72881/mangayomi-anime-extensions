@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.7",
+        "version": "1.1.8",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -408,34 +408,40 @@ class DefaultExtension extends MProvider {
         var favJson = {};
         var postJson = {};
         try {
-            favJson = await this.api("/api/user/favorites?page=1&limit=50&sortBy=added&sortOrder=desc");
+            // La scheda Preferiti del profilo chiama /api/users/{id}/favorites, non /api/user/favorites.
+            favJson = await this.api("/api/users/" + encodeURIComponent(id) + "/favorites?page=1&limit=50&sortBy=added&sortOrder=desc");
         } catch (e1) {}
         try {
             postJson = await this.api("/api/users/" + encodeURIComponent(id) + "/posts?page=1&limit=50");
         } catch (e2) {}
 
         var byId = {};
-        var favs = favJson.favorites || favJson.videos || [];
+        var favs = favJson.favorites || favJson.videos || favJson.items || [];
         if (!favs.length && Array.isArray(favJson.data)) favs = favJson.data;
+        if (!favs.length && favJson.data && Array.isArray(favJson.data.favorites)) favs = favJson.data.favorites;
         for (var i = 0; i < favs.length; i++) {
             var rawFav = favs[i] || {};
-            var fav = rawFav.video && rawFav.video._id ? rawFav.video : rawFav;
-            if (!fav._id) continue;
+            if (typeof rawFav === "string") rawFav = { _id: rawFav };
+            var nested = rawFav.video || rawFav.videoId;
+            var fav = nested && typeof nested === "object" ? nested : rawFav;
+            var favId = fav._id || fav.id || (typeof nested === "string" ? nested : "");
+            if (!favId) continue;
             var favAt = this.profileStamp(rawFav.favoritedAt || rawFav.addedAt || fav.uploadDate || fav.releaseDate);
-            byId[fav._id] = {
-                id: fav._id,
+            byId[favId] = {
+                id: favId,
                 name: this.cleanLine(fav.title) || "Video",
                 imageUrl: this.httpUrl(fav.thumbnailUrl || fav.thumbnail),
                 at: favAt,
             };
         }
         var posts = postJson.data || postJson.posts || [];
+        if (!posts.length && postJson.data && Array.isArray(postJson.data.posts)) posts = postJson.data.posts;
         for (var p = 0; p < posts.length; p++) {
             var post = posts[p] || {};
             if (!post.isRepost) continue;
-            var vid = post.videoId;
-            var video = vid && typeof vid === "object" ? vid : (post.video || {});
-            var vidId = video._id || (typeof vid === "string" ? vid : "");
+            var vid = post.videoId || post.video;
+            var video = vid && typeof vid === "object" ? vid : {};
+            var vidId = video._id || video.id || (typeof vid === "string" ? vid : "");
             if (!vidId) continue;
             var at = this.profileStamp(post.createdAt);
             var prev = byId[vidId];
