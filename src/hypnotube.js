@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.6",
+        "version": "1.1.7",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -17,6 +17,7 @@ const mangayomiSources = [
 
 const DEFAULT_BASE = "https://hypnotube.com";
 const PREF_BASE = "hypnotube_base_url";
+const PREF_PROFILES = "hypnotube_recent_profiles";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -171,6 +172,38 @@ class DefaultExtension extends MProvider {
 
     getPreference(key) {
         return new SharedPreferences().get(key);
+    }
+
+    rememberProfile(name) {
+        name = String(name || "").replace(/\s+/g, " ").trim();
+        if (!name) return;
+        try {
+            var prefs = new SharedPreferences();
+            var raw = prefs.getString(PREF_PROFILES, "") || "";
+            var list = [name];
+            var parts = String(raw).split("\n");
+            for (var i = 0; i < parts.length && list.length < 3; i++) {
+                var s = parts[i].trim();
+                if (s && s.toLowerCase() !== name.toLowerCase()) list.push(s);
+            }
+            prefs.setString(PREF_PROFILES, list.join("\n"));
+        } catch (e) {}
+    }
+
+    recentProfiles() {
+        var raw = "";
+        try { raw = new SharedPreferences().getString(PREF_PROFILES, "") || ""; } catch (e) {}
+        var out = [];
+        var seen = {};
+        var parts = String(raw).split("\n");
+        for (var i = 0; i < parts.length && out.length < 3; i++) {
+            var s = parts[i].trim();
+            var key = s.toLowerCase();
+            if (!s || seen[key]) continue;
+            seen[key] = true;
+            out.push(s);
+        }
+        return out;
     }
 
     getBaseUrl() {
@@ -667,6 +700,13 @@ class DefaultExtension extends MProvider {
     }
 
     async search(query, page, filters) {
+        var text0 = query && String(query).trim() ? String(query).trim() : "";
+        var profile = this.filterValue(filters, "Profili");
+        var who = text0.charAt(0) === "@" ? text0.slice(1).trim() : (profile ? String(profile).trim() : "");
+        if (who) {
+            var minForProfile = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
+            return this.applyDuration(await this.uploaderListing(who, page), minForProfile);
+        }
         var tipo = this.filterValue(filters, "Tipo") || "video";
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
@@ -690,10 +730,6 @@ class DefaultExtension extends MProvider {
         var minMinutes = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
         var random = order === "random";
         var text = query && String(query).trim() ? String(query).trim() : "";
-        if (text.charAt(0) === "@") {
-            var who = text.slice(1).trim();
-            if (who) return this.applyDuration(await this.uploaderListing(who, page), minMinutes);
-        }
         if (text) {
             var mapped = this.channelByName(text);
             if (mapped) {
@@ -801,7 +837,10 @@ class DefaultExtension extends MProvider {
             status: 1,
             chapters: [chapter],
         };
-        if (author) detail.author = author;
+        if (author) {
+            detail.author = author;
+            this.rememberProfile(author);
+        }
         return detail;
     }
 
@@ -837,6 +876,15 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    profileOptions() {
+        var values = [{ type_name: "SelectOption", name: "Nessuno", value: "" }];
+        var names = this.recentProfiles();
+        for (var i = 0; i < names.length; i++) {
+            values.push({ type_name: "SelectOption", name: names[i], value: names[i] });
+        }
+        return values;
+    }
+
     getFilterList() {
         return [
             {
@@ -852,6 +900,7 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Playlist", value: "playlist" },
                 ],
             },
+            { type_name: "SelectFilter", name: "Profili", state: 0, values: this.profileOptions() },
             { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
             { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
