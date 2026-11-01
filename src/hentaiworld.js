@@ -8,21 +8,32 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.3",
+        "version": "1.0.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
     },
 ];
 
-// HentaiWorld (hentaiworld.cc) ships its whole catalogue as one JSON
-// (/search-data.json); the per-episode streams come from /api/hdb/stream/<slug>~<ep>
-// as direct mp4 sources.
+// HentaiWorld (hentaiworld.cc): tutto il catalogo è in /search-data.json e gli
+// stream (mp4 diretti) arrivano da /api/hdb/stream/<slug>~<ep>.
 const DEFAULT_BASE = "https://hentaiworld.cc";
 const PREF_BASE = "hentaiworld_cc_base_url";
 const PER_PAGE = 30;
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+// Generi dal catalogo reale (forma canonica usata nel campo "genres").
+const GENRES = [
+    "Ahegao", "Anal", "Bdsm", "Big Boobs", "Blow Job", "Bondage", "Boob Job",
+    "Censored", "Comedy", "Cosplay", "Creampie", "Dark Skin", "Facial", "Fantasy",
+    "Filmed", "Foot Job", "Futanari", "Gangbang", "Glasses", "Hand Job", "Harem",
+    "Horror", "Incest", "Lactation", "Maid", "Masturbation", "Milf", "Mind Break",
+    "Mind Control", "Monster", "Nekomimi", "Ntr", "Nurse", "Orgy", "Plot", "Pov",
+    "Pregnant", "Public Sex", "Rimjob", "Scat", "School Girl", "Softcore", "Swimsuit",
+    "Teacher", "Tentacle", "Threesome", "Toys", "Trap", "Tsundere", "Uncensored",
+    "Vanilla", "Virgin", "Watersports", "X-Ray", "Yaoi", "Yuri", "3D",
+];
 
 class DefaultExtension extends MProvider {
     constructor() {
@@ -37,7 +48,6 @@ class DefaultExtension extends MProvider {
 
     getBaseUrl() {
         var v = this.getPreference(PREF_BASE);
-        // Ignore a stale/dead domain so the source self-heals.
         if (!v || !v.length || v.indexOf("hentaiworld.to") !== -1) v = DEFAULT_BASE;
         return v.replace(/\/+$/, "");
     }
@@ -61,18 +71,13 @@ class DefaultExtension extends MProvider {
     }
 
     toItem(entry) {
-        return {
-            name: entry.title,
-            imageUrl: entry.img || "",
-            link: entry.slug,
-        };
+        return { name: entry.title, imageUrl: entry.img || "", link: entry.slug };
     }
 
     paginate(items, page) {
         var start = (page - 1) * PER_PAGE;
-        var slice = items.slice(start, start + PER_PAGE);
         return {
-            list: slice.map(this.toItem),
+            list: items.slice(start, start + PER_PAGE).map(this.toItem),
             hasNextPage: start + PER_PAGE < items.length,
         };
     }
@@ -86,27 +91,39 @@ class DefaultExtension extends MProvider {
     }
 
     async getLatestUpdates(page) {
-        // The catalogue is served newest-first.
         return this.paginate(await this.catalog(), page);
     }
 
     async search(query, page, filters) {
         var q = (query || "").toLowerCase().trim();
-        if (!q) return await this.getPopular(page);
+        var genre = "";
+        if (filters && filters.length) {
+            for (var f of filters) {
+                if (
+                    f.type_name === "SelectFilter" &&
+                    f.name === "Genere" &&
+                    f.values &&
+                    f.values[f.state]
+                )
+                    genre = f.values[f.state].value;
+            }
+        }
+
         var all = await this.catalog();
         var matched = all.filter(function (e) {
-            return (
+            var okQ =
+                !q ||
                 (e.title || "").toLowerCase().indexOf(q) !== -1 ||
-                (e.slug || "").toLowerCase().indexOf(q.replace(/\s+/g, "-")) !== -1
-            );
+                (e.slug || "").toLowerCase().indexOf(q.replace(/\s+/g, "-")) !== -1;
+            var okG = !genre || (e.genres || "").indexOf(genre) !== -1;
+            return okQ && okG;
         });
+
+        if (!q && !genre) return this.getPopular(page);
         return this.paginate(matched, page);
     }
 
     findEntry(slug) {
-        slug = String(slug).split("/").filter(function (s) {
-            return s.length > 0;
-        }).pop();
         var all = this._catalog || [];
         for (var i = 0; i < all.length; i++) {
             if (all[i].slug === slug) return all[i];
@@ -116,9 +133,10 @@ class DefaultExtension extends MProvider {
 
     async getDetail(url) {
         await this.catalog();
-        var slug = String(url).split("/").filter(function (s) {
-            return s.length > 0;
-        }).pop();
+        var slug = String(url).split("?")[0].split("#")[0].replace(/\/+$/, "")
+            .split("/").filter(function (s) {
+                return s.length > 0;
+            }).pop();
         var entry = this.findEntry(slug);
 
         var genre = [];
@@ -166,23 +184,37 @@ class DefaultExtension extends MProvider {
     }
 
     async getVideoList(url) {
-        // Mangayomi may hand us the full URL (baseUrl + "/<slug>~<ep>"),
-        // so pull out just the "<slug>~<ep>" token.
+        // Normalizza qualsiasi forma di URL verso "<slug>~<ep>".
         var raw = String(url);
-        var m = raw.match(/([^\/?#]+~\d+)(?:[?#].*)?$/);
-        var id = m ? m[1] : raw;
-        var slug = id.split("~")[0];
-        var ep = id.split("~")[1] || "1";
+        try {
+            raw = decodeURIComponent(raw);
+        } catch (e) {}
+        raw = raw.split("?")[0].split("#")[0].replace(/\/+$/, "");
+
+        var slug, ep;
+        var mt = raw.match(/([^\/]+)~(\d+)$/);
+        if (mt) {
+            slug = mt[1];
+            ep = mt[2];
+        } else {
+            var parts = raw.split("/").filter(function (s) {
+                return s.length > 0;
+            });
+            ep = parts.pop() || "1";
+            slug = parts.pop() || "";
+        }
+        if (!slug) throw new Error("ID episodio non valido: " + url);
+        var id = slug + "~" + ep;
         var base = this.getBaseUrl();
 
+        var h = this.headers(base + "/watch/" + slug + "/" + ep + "/");
         var res = await this.client.get(
             base + "/api/hdb/stream/" + encodeURIComponent(id),
-            this.headers(base + "/watch/" + slug + "/" + ep + "/"),
+            h,
         );
         var json = JSON.parse(res.body);
         var sources = (json && json.sources) || [];
 
-        var h = this.headers(base + "/watch/" + slug + "/" + ep + "/");
         var videos = [];
         for (var i = 0; i < sources.length; i++) {
             var s = sources[i];
@@ -200,7 +232,7 @@ class DefaultExtension extends MProvider {
             });
         }
 
-        // Put the most compatible codec (H.264) first.
+        // H.264 prima (più compatibile con iPhone).
         videos.sort(function (a, b) {
             var ah = a.quality.indexOf("H.264") !== -1 ? 0 : 1;
             var bh = b.quality.indexOf("H.264") !== -1 ? 0 : 1;
@@ -213,7 +245,17 @@ class DefaultExtension extends MProvider {
     }
 
     getFilterList() {
-        return [];
+        var opts = [{ type_name: "SelectOption", name: "Tutti", value: "" }];
+        for (var i = 0; i < GENRES.length; i++) {
+            opts.push({
+                type_name: "SelectOption",
+                name: GENRES[i],
+                value: GENRES[i],
+            });
+        }
+        return [
+            { type_name: "SelectFilter", name: "Genere", state: 0, values: opts },
+        ];
     }
 
     getSourcePreferences() {
