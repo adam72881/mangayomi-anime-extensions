@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.9",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -20,6 +20,7 @@ const PREF_BASE = "pmvhaven_base_url";
 const PREF_PROFILES = "pmvhaven_recent_profiles";
 const PREF_SURPRISE = "pmvhaven_surprise_popular";
 const PREF_POPULAR_PICK = "pmvhaven_popular_pick";
+const PREF_SEEN = "pmvhaven_seen_ids";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -35,13 +36,15 @@ const VIDEO_ORDERS = [
     ["random", "Casuale"],
 ];
 
-// Ordini della pagina Playlist, valori uguali a playlistSortOptions del sito.
-const PLAYLIST_ORDERS = [
-    ["-createdAt", "Più recenti"],
-    ["createdAt", "Più vecchi"],
-    ["-views", "Più visti"],
-    ["-bayesianRating", "Valutazione più alta"],
-    ["-likes", "Più apprezzati"],
+// Un solo filtro. Il valore è la voce; video e playlist usano sort diversi.
+const ORDERS = [
+    ["recent", "Più recenti"],
+    ["old", "Più vecchi"],
+    ["rated", "Più votati"],
+    ["views", "Più visti"],
+    ["likes", "Più apprezzati"],
+    ["long", "Più lunghi"],
+    ["short", "Più corti"],
     ["random", "Casuale"],
 ];
 
@@ -87,6 +90,7 @@ const PRINCIPALI = [
     ["gooning", "Gooning"],
     ["Blackedraw", "Blackedraw"],
     ["poppers", "Poppers"],
+    ["unseen", "Mai visti"],
 ];
 
 // Lingerie e Tacchi usa solo "lingerie": la query con tre parole non è pertinente.
@@ -218,6 +222,48 @@ class DefaultExtension extends MProvider {
             out.push(s);
         }
         return out;
+    }
+
+    rememberSeen(id) {
+        id = String(id || "").trim();
+        if (!id || id.indexOf("pmv:") === 0) return;
+        try {
+            var prefs = new SharedPreferences();
+            var raw = prefs.getString(PREF_SEEN, "") || "";
+            var list = [id];
+            var parts = String(raw).split("\n");
+            for (var i = 0; i < parts.length && list.length < 500; i++) {
+                var s = parts[i].trim();
+                if (s && s !== id) list.push(s);
+            }
+            prefs.setString(PREF_SEEN, list.join("\n"));
+        } catch (e) {}
+    }
+
+    seenSet() {
+        var set = {};
+        try {
+            var raw = new SharedPreferences().getString(PREF_SEEN, "") || "";
+            var parts = String(raw).split("\n");
+            for (var i = 0; i < parts.length && i < 500; i++) {
+                var s = parts[i].trim();
+                if (s) set[s] = true;
+            }
+        } catch (e) {}
+        return set;
+    }
+
+    hideSeen(parsed) {
+        var seen = this.seenSet();
+        var src = (parsed && parsed.list) || [];
+        var list = [];
+        for (var i = 0; i < src.length; i++) {
+            var link = String(src[i].link || "");
+            var last = link.split("?")[0].split("/").pop();
+            if (seen[link] || (last && seen[last])) continue;
+            list.push(src[i]);
+        }
+        return { list: list, hasNextPage: !!(parsed && parsed.hasNextPage) };
     }
 
     surpriseOn() {
@@ -424,6 +470,47 @@ class DefaultExtension extends MProvider {
         return { sort: order, random: false };
     }
 
+    videoSort(kind) {
+        var table = {
+            recent: "-releaseDate",
+            old: "releaseDate",
+            rated: "-bayesianRating",
+            views: "-views",
+            likes: "-likes",
+            long: "-duration",
+            short: "duration",
+            random: "random",
+        };
+        return table[kind] || "-releaseDate";
+    }
+
+    playlistSort(kind) {
+        var table = {
+            recent: "-createdAt",
+            old: "createdAt",
+            rated: "-bayesianRating",
+            views: "-views",
+            likes: "-likes",
+            long: "-views",
+            short: "createdAt",
+            random: "-createdAt",
+        };
+        return table[kind] || "-createdAt";
+    }
+
+    byVideoCount(json, dir) {
+        var copy = {};
+        for (var k in json) copy[k] = json[k];
+        var rows = (json.data || []).slice();
+        rows.sort(function (a, b) {
+            var av = Number(a && (a.validVideoCount != null ? a.validVideoCount : a.videoCount)) || 0;
+            var bv = Number(b && (b.validVideoCount != null ? b.validVideoCount : b.videoCount)) || 0;
+            return dir < 0 ? bv - av : av - bv;
+        });
+        copy.data = rows;
+        return copy;
+    }
+
     playlistId(raw) {
         var s = String(raw || "");
         var m = s.match(/\/playlists\/([a-f0-9]{24})/i);
@@ -539,31 +626,35 @@ class DefaultExtension extends MProvider {
         var profile = this.filterValue(filters, "Profili");
         var who = text.charAt(0) === "@" ? text.slice(1).trim() : (profile ? String(profile).trim() : "");
         if (who) {
-            var specP = this.orderQuery(this.filterValue(filters, "Ordine video") || "-releaseDate");
+            var specP = this.orderQuery(this.videoSort(this.filterValue(filters, "Ordine") || "recent"));
             var byPath = "/api/videos?uploader=" + encodeURIComponent(who);
             if (!specP.random) byPath += "&sort=" + encodeURIComponent(specP.sort);
             return this.toList(await this.loadQuery(byPath, page, specP.random, specP.random ? 10 : 0), 0);
         }
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
+        var unseen = principale === "unseen";
+        if (unseen) principale = "";
         var tag = this.filterValue(filters, "Categoria");
         var section = this.filterValue(filters, "Sezione");
-        var vOrder = this.filterValue(filters, "Ordine video") || "-releaseDate";
-        var pOrder = this.filterValue(filters, "Ordine playlist") || "-createdAt";
+        var kind = this.filterValue(filters, "Ordine") || "recent";
         if (tipo === "playlist") {
             var qpl = text || preset || principale || tag || "";
-            var randomPl = pOrder === "random";
-            var psort = randomPl ? "-createdAt" : pOrder;
+            var randomPl = kind === "random";
+            var psort = this.playlistSort(kind);
             var plist = qpl
                 ? "/api/playlists/search?q=" + encodeURIComponent(qpl) + "&sort=" + encodeURIComponent(psort)
                 : "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort);
-            var plOut = this.toPlaylists(await this.loadQuery(plist, page, randomPl, randomPl ? 10 : 0));
-            if (!plOut.list.length && qpl) {
-                plOut = this.toPlaylists(await this.loadQuery(
-                    "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort),
-                    1,
-                    false,
-                ));
+            var plJson = await this.loadQuery(plist, page, randomPl, randomPl ? 10 : 0);
+            var plRows = plJson.data || [];
+            if (!plRows.length) {
+                plJson = await this.api("/api/playlists?isPublic=true&limit=24&sort=-createdAt&page=1");
+            }
+            if (kind === "long") plJson = this.byVideoCount(plJson, -1);
+            if (kind === "short") plJson = this.byVideoCount(plJson, 1);
+            var plOut = this.toPlaylists(plJson);
+            if (!plOut.list.length) {
+                plOut = this.toPlaylists(await this.api("/api/playlists?isPublic=true&limit=24&sort=-createdAt&page=1"));
             }
             return plOut;
         }
@@ -577,7 +668,7 @@ class DefaultExtension extends MProvider {
             }
         }
         var q = preset || principale || text || tag || "";
-        var spec = this.orderQuery(vOrder);
+        var spec = this.orderQuery(this.videoSort(kind));
         var random = spec.random;
         var path;
         if (section === "trending") {
@@ -604,6 +695,7 @@ class DefaultExtension extends MProvider {
                 false,
             ), 0);
         }
+        if (unseen) out = this.hideSeen(out);
         return out;
     }
 
@@ -771,6 +863,7 @@ class DefaultExtension extends MProvider {
             detail.author = uploader;
             this.rememberProfile(uploader);
         }
+        this.rememberSeen(id);
         return detail;
     }
 
@@ -826,7 +919,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Video: Sezione e Ordine video. Playlist: Ordine playlist. La categoria resta i tag.",
+                name: "Lo stesso Ordine vale per video e playlist. La categoria resta i tag.",
             },
             {
                 type_name: "SelectFilter",
@@ -840,8 +933,7 @@ class DefaultExtension extends MProvider {
             },
             { type_name: "SelectFilter", name: "Profili", state: 0, values: this.profileOptions() },
             { type_name: "SelectFilter", name: "Sezione", state: 0, values: this.options(SECTIONS, "") },
-            { type_name: "SelectFilter", name: "Ordine video", state: 0, values: this.options(VIDEO_ORDERS, "") },
-            { type_name: "SelectFilter", name: "Ordine playlist", state: 0, values: this.options(PLAYLIST_ORDERS, "") },
+            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
             { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
             { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
