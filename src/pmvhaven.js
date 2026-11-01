@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.3",
+        "version": "1.1.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -39,9 +39,6 @@ const PLAYLIST_ORDERS = [
     ["-views", "Più visti"],
     ["-bayesianRating", "Valutazione più alta"],
     ["-likes", "Più apprezzati"],
-    ["name", "AZ"],
-    ["-name", "ZA"],
-    ["-videoCount", "Più video"],
     ["random", "Casuale"],
 ];
 
@@ -224,10 +221,11 @@ class DefaultExtension extends MProvider {
         var raw = [];
         for (var i = 0; i < vids.length; i++) {
             var v = vids[i];
-            if (!v || !v._id || !v.title) continue;
+            var name = this.cleanLine(v && v.title);
+            if (!v || !v._id || !name) continue;
             var item = {
-                name: v.title,
-                imageUrl: v.thumbnailUrl || v.thumbnail || "",
+                name: name,
+                imageUrl: this.httpUrl(v.thumbnailUrl || v.thumbnail),
                 link: v._id,
             };
             raw.push(item);
@@ -244,10 +242,11 @@ class DefaultExtension extends MProvider {
         var list = [];
         for (var i = 0; i < rows.length; i++) {
             var p = rows[i];
-            if (!p || !p._id || !p.name) continue;
+            var name = this.cleanLine(p && p.name);
+            if (!p || !p._id || !name) continue;
             list.push({
-                name: p.name,
-                imageUrl: p.thumbnailUrl || p.thumbnail || "",
+                name: name,
+                imageUrl: this.httpUrl(p.thumbnailUrl || p.thumbnail),
                 link: "/playlists/" + p._id,
             });
         }
@@ -415,11 +414,66 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
-    // dateUpload in Mangayomi è millisecondi in stringa: int.parse in dateFormat.
+    // Solo cifre: dateFormat fa int.parse e un valore non intero manda in errore tutta la riga.
+    millisString(value) {
+        var n;
+        if (typeof value === "number") n = value;
+        else if (typeof value === "string" && /^\d+$/.test(value.trim())) n = Number(value.trim());
+        else if (typeof value === "string") n = Date.parse(value.trim());
+        else return "";
+        if (!isFinite(n)) return "";
+        var s = String(Math.round(n));
+        return /^\d+$/.test(s) ? s : "";
+    }
+
+    httpUrl(value) {
+        if (typeof value !== "string") return "";
+        var s = value.trim();
+        if (!/^https?:\/\//i.test(s)) return "";
+        if (/[\u0000-\u001F]/.test(s)) return "";
+        return s;
+    }
+
+    stripSurrogates(s) {
+        var out = "";
+        for (var i = 0; i < s.length; i++) {
+            var c = s.charCodeAt(i);
+            if (c >= 0xD800 && c <= 0xDBFF) {
+                var n = s.charCodeAt(i + 1);
+                if (n >= 0xDC00 && n <= 0xDFFF) {
+                    out += s.charAt(i) + s.charAt(i + 1);
+                    i++;
+                }
+                continue;
+            }
+            if (c >= 0xDC00 && c <= 0xDFFF) continue;
+            out += s.charAt(i);
+        }
+        return out;
+    }
+
+    cleanBlock(value) {
+        if (typeof value !== "string") return "";
+        return this.stripSurrogates(value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")).trim();
+    }
+
+    cleanLine(value) {
+        return this.cleanBlock(value).replace(/\s+/g, " ").trim();
+    }
+
+    videoId(item) {
+        if (!item || typeof item !== "object") return "";
+        var id = item._id;
+        if (typeof id === "string" && id.trim()) return id.trim();
+        if (id && typeof id === "object" && typeof id.$oid === "string" && id.$oid.trim()) return id.$oid.trim();
+        return "";
+    }
+
     chapterExtras(ch, dateValue, thumb) {
-        var n = typeof dateValue === "number" ? dateValue : Date.parse(String(dateValue || ""));
-        if (isFinite(n)) ch.dateUpload = String(n);
-        if (thumb && String(thumb).trim()) ch.thumbnailUrl = String(thumb).trim();
+        var date = this.millisString(dateValue);
+        if (date) ch.dateUpload = date;
+        var url = this.httpUrl(thumb);
+        if (url) ch.thumbnailUrl = url;
         return ch;
     }
 
@@ -442,24 +496,30 @@ class DefaultExtension extends MProvider {
             var chapters = [];
             for (var i = 0; i < parsed.videos.length; i++) {
                 var item = parsed.videos[i];
-                if (!item || !item._id) continue;
+                var vid = this.videoId(item);
+                if (!vid) continue;
                 var ch = {
-                    name: "Episodio " + (chapters.length + 1) + " - " + (item.title || "Video"),
-                    url: item._id,
+                    name: "Episodio " + (chapters.length + 1) + " - " + (this.cleanLine(item.title) || "Video"),
+                    url: vid,
                 };
                 this.chapterExtras(ch, item.uploadDate, item.thumbnailUrl || item.thumbnail);
                 chapters.push(ch);
             }
+            var who = this.cleanLine(d.ownerUsername);
+            if (!who && typeof d.owner === "string") who = this.cleanLine(d.owner);
             var about = [];
-            if (d.ownerUsername || d.owner) about.push("Di " + (d.ownerUsername || d.owner));
-            if (d.description) about.push(String(d.description));
-            return {
+            if (who) about.push("Di " + who);
+            var plot = this.cleanBlock(d.description);
+            if (plot) about.push(plot);
+            var detail = {
                 link: "/playlists/" + pid,
-                description: about.join("\n\n") || d.name || "Playlist",
+                description: about.join("\n\n") || this.cleanLine(d.name) || "Playlist",
                 genre: [],
                 status: 1,
                 chapters: chapters,
             };
+            if (who) detail.author = who;
+            return detail;
         }
 
         var json = await this.api("/api/videos/" + id);
@@ -468,15 +528,16 @@ class DefaultExtension extends MProvider {
         var genre = [];
         var main = Array.isArray(v.top5Tags) ? v.top5Tags.slice(0, 3) : [];
         var rest = Array.isArray(v.tags) ? v.tags : [];
-        for (var g = 0; g < main.length && genre.length < 3; g++) {
-            if (main[g] && genre.indexOf(main[g]) === -1) genre.push(main[g]);
-        }
-        for (var r = 0; r < rest.length && genre.length < 20; r++) {
-            if (rest[r] && genre.indexOf(rest[r]) === -1) genre.push(rest[r]);
-        }
+        var pushGenre = function (value) {
+            var s = this.cleanLine(value);
+            if (s && genre.indexOf(s) === -1) genre.push(s);
+        }.bind(this);
+        for (var g = 0; g < main.length && genre.length < 3; g++) pushGenre(main[g]);
+        for (var r = 0; r < rest.length && genre.length < 20; r++) pushGenre(rest[r]);
 
         var head = [];
-        if (v.duration) head.push("Durata " + v.duration);
+        var duration = this.cleanLine(v.duration);
+        if (duration) head.push("Durata " + duration);
         var likes = Number(v.likes);
         var dislikes = Number(v.dislikes);
         if (isFinite(likes) && isFinite(dislikes) && likes + dislikes > 0) {
@@ -485,19 +546,25 @@ class DefaultExtension extends MProvider {
         if (v.views != null) head.push(this.formatCount(v.views) + " visualizzazioni");
 
         var body = [];
-        if (v.description && String(v.description).trim()) body.push(String(v.description).trim());
-        if (v.uploader) body.push("Di " + v.uploader);
-        if (v.music && typeof v.music === "string" && v.music.trim()) body.push("♪ " + v.music.trim());
+        var plot = this.cleanBlock(v.description);
+        if (plot) body.push(plot);
+        var uploader = this.cleanLine(v.uploader);
+        if (uploader) body.push("Di " + uploader);
+        var music = this.cleanLine(v.music);
+        if (music) body.push("♪ " + music);
         var description = head.join(" · ");
         if (body.length) description = description ? description + "\n\n" + body.join("\n") : body.join("\n");
 
-        return {
-            link: id,
+        var play = this.httpUrl(v.videoUrl) || String(id || "");
+        var detail = {
+            link: String(id || ""),
             description: description || "PMVHaven",
             genre: genre,
             status: 1,
-            chapters: [this.videoChapter(v.videoUrl || id, v.uploadDate, v.thumbnailUrl || v.thumbnail)],
+            chapters: [this.videoChapter(play, v.uploadDate, v.thumbnailUrl || v.thumbnail)],
         };
+        if (uploader) detail.author = uploader;
+        return detail;
     }
 
     async getVideoList(url) {

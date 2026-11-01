@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.4",
+        "version": "1.1.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -179,10 +179,30 @@ class DefaultExtension extends MProvider {
     }
 
     headers(referer) {
-        return {
+        var h = {
             "User-Agent": UA,
             "Referer": referer || this.getBaseUrl() + "/",
         };
+        var cookie = this.cookieHeader();
+        if (cookie) h["Cookie"] = cookie;
+        return h;
+    }
+
+    cookieHeader() {
+        var c = this._cookie;
+        if (!c) return "";
+        var bits = [];
+        for (var k in c) if (c[k]) bits.push(k + "=" + c[k]);
+        return bits.join("; ");
+    }
+
+    rememberCookies(res) {
+        var raw = this.headerOf(res, "set-cookie");
+        if (!raw) return;
+        var m = String(raw).match(/PHPSESSID=([^;\s,]+)/);
+        if (!m) return;
+        if (!this._cookie) this._cookie = {};
+        this._cookie.PHPSESSID = m[1];
     }
 
     filterValue(filters, name) {
@@ -198,8 +218,7 @@ class DefaultExtension extends MProvider {
 
     async doc(path) {
         var url = path.indexOf("http") === 0 ? path : this.getBaseUrl() + path;
-        var res = await this.client.get(url, this.headers());
-        return new Document(res.body);
+        return new Document(await this.getPage(url, this.headers()));
     }
 
     // base finisce con "/"; pagina N>1 -> base + "pageN.html".
@@ -434,12 +453,70 @@ class DefaultExtension extends MProvider {
         });
     }
 
-    // Il sito vuole circa 10 secondi tra una ricerca e l'altra.
+    // 10 secondi solo tra due ricerche: il POST di searchgate e la pagina N.
+    // Liste, schede, playlist e getVideoList non passano di qui.
     async paceSearch() {
         var last = this._lastSearchAt || 0;
         var wait = last ? 10000 - (Date.now() - last) : 0;
         if (wait > 0) await this.sleep(wait);
         this._lastSearchAt = Date.now();
+    }
+
+    async passGate(path) {
+        this._gateAttempted = true;
+        path = this.decodePath(path || "/");
+        if (path.indexOf("age-gate") !== -1) {
+            var nested = path.match(/[?&]return=([^&]+)/);
+            path = nested ? this.decodePath(nested[1]) : "/";
+        }
+        if (!path || path.charAt(0) !== "/") path = "/" + (path || "");
+        var gateHeaders = this.headers();
+        gateHeaders["Content-Type"] = "application/json";
+        gateHeaders["Accept"] = "application/json";
+        gateHeaders["Origin"] = this.getBaseUrl();
+        var res = await this.client.post(
+            this.getBaseUrl() + "/age-gate?return=" + encodeURIComponent(path),
+            gateHeaders,
+            { timeZone: "UTC", languages: ["en"] },
+        );
+        this.rememberCookies(res);
+        var body = res && res.body ? String(res.body) : "";
+        if (/"blocked"\s*:\s*true/.test(body)) return false;
+        this._sessionReady = true;
+        return true;
+    }
+
+    async ensureSession() {
+        if (this._sessionReady) return;
+        if (this._sessionPromise) {
+            await this._sessionPromise;
+            return;
+        }
+        if (this._gateAttempted) return;
+        this._sessionPromise = this.passGate("/");
+        try { await this._sessionPromise; }
+        finally { this._sessionPromise = null; }
+    }
+
+    // Una GET. Il controllo di accesso si fa una volta per sessione, poi si riusa il cookie.
+    async getPage(url, headers) {
+        await this.ensureSession();
+        var h = headers || this.headers();
+        var cookie = this.cookieHeader();
+        if (cookie) h["Cookie"] = cookie;
+        var res = await this.client.get(url, h);
+        this.rememberCookies(res);
+        var html = res && res.body ? String(res.body) : "";
+        var loc = this.headerOf(res, "location");
+        if (!this.isGate(html) && !/age-gate/.test(loc)) return html;
+        if (this._gateRetried) return html;
+        this._gateRetried = true;
+        this._sessionReady = false;
+        await this.passGate(this.pathOf(url) || "/");
+        h = this.headers();
+        res = await this.client.get(url, h);
+        this.rememberCookies(res);
+        return res && res.body ? String(res.body) : "";
     }
 
     async openGated(path) {
@@ -449,31 +526,34 @@ class DefaultExtension extends MProvider {
         gateHeaders["Content-Type"] = "application/json";
         gateHeaders["Accept"] = "application/json";
         gateHeaders["Origin"] = this.getBaseUrl();
-        await this.client.post(
+        var gated = await this.client.post(
             this.getBaseUrl() + "/age-gate?return=" + encodeURIComponent(path),
             gateHeaders,
             { timeZone: "UTC", languages: ["en"] },
         );
+        this.rememberCookies(gated);
         var getHeaders = this.headers();
         getHeaders["Referer"] = this.getBaseUrl() + "/searchgate.php";
         return this.searchGet(this.urlFor(path), getHeaders);
     }
 
+    // GET della stessa ricerca: niente attesa. L'attesa sta solo prima di searchgate e della pagina N.
     async searchGet(url, headers) {
-        await this.paceSearch();
         var res = await this.client.get(url, headers);
+        this.rememberCookies(res);
         var html = res && res.body ? String(res.body) : "";
         if (/Search error/.test(html)) {
             await this.sleep(10000);
             this._lastSearchAt = Date.now();
             res = await this.client.get(url, headers);
+            this.rememberCookies(res);
             html = res && res.body ? String(res.body) : "";
         }
         return html;
     }
 
-    // POST del form, poi la pagina indicata dal server. Se quella pagina chiede
-    // il controllo di accesso, si esegue la stessa richiesta che fa lo script del sito.
+    // Stessa sequenza della 1.1.1: POST searchgate, poi l'URL del server.
+    // I 10 secondi sono solo tra due ricerche (questo POST e la pagina N).
     async loadSearch(query, type, page, random) {
         var headers = this.headers();
         headers["Content-Type"] = "application/x-www-form-urlencoded";
@@ -484,15 +564,20 @@ class DefaultExtension extends MProvider {
             headers,
             this.formBody(query, type),
         );
+        this.rememberCookies(posted);
         var html = posted && posted.body ? String(posted.body) : "";
         if (/Search error/.test(html)) {
             await this.sleep(10000);
             this._lastSearchAt = Date.now();
+            headers = this.headers();
+            headers["Content-Type"] = "application/x-www-form-urlencoded";
+            headers["Origin"] = this.getBaseUrl();
             posted = await this.client.post(
                 this.getBaseUrl() + "/searchgate.php",
                 headers,
                 this.formBody(query, type),
             );
+            this.rememberCookies(posted);
             html = posted && posted.body ? String(posted.body) : "";
         }
         var path = this.decodePath(this.pathOf(this.headerOf(posted, "location")) || this.returnPath(html));
@@ -515,6 +600,7 @@ class DefaultExtension extends MProvider {
         if (want > 1 && path) {
             var base = path.charAt(path.length - 1) === "/" ? path : path + "/";
             var pagePath = base + "page" + want + ".html";
+            await this.paceSearch();
             var pageHeaders = this.headers();
             pageHeaders["Referer"] = this.urlFor(base);
             var pageHtml = await this.searchGet(this.urlFor(pagePath), pageHeaders);
@@ -606,7 +692,9 @@ class DefaultExtension extends MProvider {
     }
 
     chapterThumb(ch, thumb) {
-        if (thumb && String(thumb).trim()) ch.thumbnailUrl = String(thumb).trim();
+        if (typeof thumb !== "string") return ch;
+        var s = thumb.trim();
+        if (/^https?:\/\//i.test(s) && !/[\u0000-\u001F]/.test(s)) ch.thumbnailUrl = s;
         return ch;
     }
 
@@ -688,9 +776,9 @@ class DefaultExtension extends MProvider {
         if (lastHttp > 0) raw = raw.slice(lastHttp);
         var pageUrl = raw.indexOf("http") === 0 ? raw : this.getBaseUrl() + raw;
 
-        var res = await this.client.get(pageUrl, this.headers());
-        var s = res.body.match(/<source[^>]+src="([^"]+\.mp4[^"]*)"/);
-        if (!s) s = res.body.match(/https?:\/\/media\.hypnotube\.com\/[^\s'"]+\.mp4[^\s'"]*/);
+        var html = await this.getPage(pageUrl, this.headers());
+        var s = String(html || "").match(/<source[^>]+src="([^"]+\.mp4[^"]*)"/);
+        if (!s) s = String(html || "").match(/https?:\/\/media\.hypnotube\.com\/[^\s'"]+\.mp4[^\s'"]*/);
         if (!s) throw new Error("Nessuno stream trovato per questo video");
         var mp4 = (s[1] || s[0]).replace(/&amp;/g, "&");
 
