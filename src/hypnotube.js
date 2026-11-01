@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.1",
+        "version": "1.1.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -532,19 +532,47 @@ class DefaultExtension extends MProvider {
         return this.applyDuration(await this.listing("/most-recent/", page, false), 0);
     }
 
+    channelLabel(value) {
+        for (var i = 0; i < CHANNELS.length; i++) {
+            if (CHANNELS[i][0] === value) return CHANNELS[i][1];
+        }
+        for (var j = 0; j < PRINCIPALI.length; j++) {
+            if (PRINCIPALI[j][0] === value) return PRINCIPALI[j][1];
+        }
+        return String(value || "");
+    }
+
+    async playlistListing(base, page, random) {
+        if (!random) return this.parsePlaylists(await this.doc(this.paged(base, page)));
+        var first = await this.doc(base);
+        var max = this.maxPage(first);
+        var n = 1 + Math.floor(Math.random() * max);
+        var doc = n === 1 ? first : await this.doc(base + "page" + n + ".html");
+        var parsed = this.parsePlaylists(doc);
+        if (!parsed.list.length) return this.parsePlaylists(first);
+        return parsed;
+    }
+
     async search(query, page, filters) {
         var tipo = this.filterValue(filters, "Tipo") || "video";
-        if (tipo === "playlist") {
-            if (query && String(query).trim()) {
-                return this.parsePlaylists(await this.loadSearch(query, "playlists", page, false));
-            }
-            return this.parsePlaylists(await this.doc(this.paged("/playlists/", page)));
-        }
-
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
         var channel = this.filterValue(filters, "Categoria");
         var order = this.filterValue(filters, "Ordine") || "most-recent";
+        if (tipo === "playlist") {
+            var qpl = (query && String(query).trim()) || preset || "";
+            if (!qpl && principale) qpl = this.channelLabel(principale);
+            if (!qpl && channel) qpl = this.channelLabel(channel);
+            if (qpl) {
+                var found = this.parsePlaylists(await this.loadSearch(qpl, "playlists", page, false));
+                if (found.list.length) return found;
+            }
+            var basePl = "/playlists/";
+            if (!qpl && order === "most-viewed") basePl = "/playlists/views/";
+            else if (!qpl && order === "top-rated") basePl = "/playlists/rating/";
+            return this.playlistListing(basePl, page, !qpl && order === "random");
+        }
+
         var minMinutes = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
         var random = order === "random";
         var text = query && String(query).trim() ? String(query).trim() : "";
@@ -586,6 +614,7 @@ class DefaultExtension extends MProvider {
                 chapters.push({
                     name: "Episodio " + (i + 1) + " - " + parsed.list[i].name,
                     url: parsed.list[i].link,
+                    thumbnailUrl: parsed.list[i].imageUrl || "",
                 });
             }
             return {
@@ -630,12 +659,14 @@ class DefaultExtension extends MProvider {
             if (label && label !== "Categories" && genre.indexOf(label) === -1) genre.push(label);
         }
 
+        var og = doc.selectFirst('meta[property="og:image"]');
+        var thumb = og ? og.attr("content") || "" : "";
         return {
             link: url,
             description: description || "Nessuna descrizione.",
             genre: genre,
             status: 1,
-            chapters: [{ name: "Episodio 1", url: url }],
+            chapters: [{ name: "Episodio 1", url: url, thumbnailUrl: thumb }],
         };
     }
 

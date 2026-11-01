@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.1.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -305,20 +305,46 @@ class DefaultExtension extends MProvider {
         return { sort: sort, extra: extra, random: order === "random" };
     }
 
+    playlistSort(order) {
+        if (order === "-views") return "-views";
+        if (order === "views") return "views";
+        if (order === "-bayesianRating") return "-bayesianRating";
+        if (order === "-likes") return "-likes";
+        if (order === "uploadDate") return "createdAt";
+        return "-createdAt";
+    }
+
     async search(query, page, filters) {
         var tipo = this.filterValue(filters, "Tipo") || "video";
         var text = query && String(query).trim() ? String(query).trim() : "";
-        if (tipo === "playlist") {
-            var plist = text
-                ? "/api/playlists/search?q=" + encodeURIComponent(text)
-                : "/api/playlists?isPublic=true&sort=-createdAt&limit=24";
-            return this.toPlaylists(await this.loadQuery(plist, page, false));
-        }
-
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
         var tag = this.filterValue(filters, "Categoria");
         var order = this.filterValue(filters, "Ordine") || "-uploadDate";
+        if (tipo === "playlist") {
+            var qpl = text || preset || principale || tag || "";
+            var psort = this.playlistSort(order);
+            var plist = qpl
+                ? "/api/playlists/search?q=" + encodeURIComponent(qpl) + "&sort=" + encodeURIComponent(psort)
+                : "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort);
+            var plOut = this.toPlaylists(await this.loadQuery(plist, page, order === "random"));
+            if (!plOut.list.length && qpl) {
+                plOut = this.toPlaylists(await this.loadQuery(
+                    "/api/playlists/search?q=" + encodeURIComponent(qpl),
+                    page,
+                    false,
+                ));
+            }
+            if (!plOut.list.length) {
+                plOut = this.toPlaylists(await this.loadQuery(
+                    "/api/playlists?isPublic=true&limit=24&sort=-createdAt",
+                    page,
+                    false,
+                ));
+            }
+            return plOut;
+        }
+
         var minSec = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;
         if (text) {
             var known = NAME2TAG[text.toLowerCase()];
@@ -333,17 +359,26 @@ class DefaultExtension extends MProvider {
         var path;
         // Senza un ordine esplicito la ricerca resta per rilevanza: sort=-uploadDate
         // spinge in cima video recenti che non c'entrano col testo.
+        var scoped = !!(preset || principale || tag);
         var explicitSort = order && order !== "-uploadDate" && order !== "random";
         if (q) {
             path = "/api/videos/search?q=" + encodeURIComponent(q);
-            if (explicitSort) path += "&sort=" + encodeURIComponent(spec.sort) + spec.extra;
+            if (scoped || explicitSort) path += "&sort=" + encodeURIComponent(spec.sort) + spec.extra;
             if (minSec) path += "&durationMin=" + minSec;
         } else {
             path = "/api/videos?sort=" + encodeURIComponent(spec.sort) + spec.extra;
             if (minSec) path += "&durationMin=" + minSec;
         }
         var json = await this.loadQuery(path, page, random);
-        return this.toList(json, minSec);
+        var out = this.toList(json, minSec);
+        if (!out.list.length && q) {
+            out = this.toList(await this.loadQuery(
+                "/api/videos/search?q=" + encodeURIComponent(q),
+                page,
+                false,
+            ), 0);
+        }
+        return out;
     }
 
     async getDetail(url) {
@@ -354,19 +389,33 @@ class DefaultExtension extends MProvider {
             }).pop();
         if (raw.indexOf("playlist:") !== -1 || String(id).indexOf("playlist:") === 0) {
             var pid = String(id).replace(/^playlist:/, "");
-            var pl = await this.api("/api/playlists/" + pid + "?fetchAll=true");
-            var d = pl.data || pl;
-            var vids = d.videoDetails || [];
+            // fetchAll=true mette videoDetails, ma su una playlist grande è tutto il catalogo
+            // (migliaia di video, decine di MB) e l'app non arriva a mostrarli. Stessi campi, a pagine.
             var chapters = [];
-            for (var i = 0; i < vids.length; i++) {
-                var item = vids[i];
-                if (!item || !item._id) continue;
-                var ch = {
-                    name: "Episodio " + (i + 1) + " - " + (item.title || "Video"),
-                    url: item._id,
-                };
-                if (item.uploadDate) ch.dateUpload = String(item.uploadDate);
-                chapters.push(ch);
+            var d = {};
+            var pageN = 1;
+            while (chapters.length < 100 && pageN <= 4) {
+                var pl = await this.api("/api/playlists/" + pid + "?page=" + pageN + "&limit=50");
+                d = pl.data || pl;
+                var vids = d.videoDetails || [];
+                if (!vids.length && pageN === 1 && Array.isArray(d.videos) && d.videos[0] && d.videos[0]._id) {
+                    vids = d.videos;
+                }
+                for (var i = 0; i < vids.length && chapters.length < 100; i++) {
+                    var item = vids[i];
+                    if (!item || !item._id) continue;
+                    var ch = {
+                        name: "Episodio " + (chapters.length + 1) + " - " + (item.title || "Video"),
+                        url: item._id,
+                        thumbnailUrl: item.thumbnailUrl || item.thumbnail || "",
+                    };
+                    if (item.uploadDate) ch.dateUpload = String(item.uploadDate);
+                    chapters.push(ch);
+                }
+                var pag = pl.pagination || {};
+                var more = !!pag.hasMore || (pag.totalPages && pag.page && pag.page < pag.totalPages);
+                if (!more || !vids.length) break;
+                pageN++;
             }
             var about = [];
             if (d.ownerUsername || d.owner) about.push("Di " + (d.ownerUsername || d.owner));
@@ -414,7 +463,11 @@ class DefaultExtension extends MProvider {
             description: description || "PMVHaven",
             genre: genre,
             status: 1,
-            chapters: [{ name: "Episodio 1", url: v.videoUrl || id }],
+            chapters: [{
+                name: "Episodio 1",
+                url: v.videoUrl || id,
+                thumbnailUrl: v.thumbnailUrl || v.thumbnail || "",
+            }],
         };
     }
 
