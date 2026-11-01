@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.6",
+        "version": "1.1.7",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -381,8 +381,88 @@ class DefaultExtension extends MProvider {
         return { info: info, videos: vids, pagination: pag };
     }
 
+    loginItem() {
+        return {
+            list: [{
+                name: "Accedi dalla WebView di Mangayomi per vedere il profilo",
+                imageUrl: "",
+                link: "pmv:login",
+            }],
+            hasNextPage: false,
+        };
+    }
+
+    profileStamp(value) {
+        if (typeof value === "number" && isFinite(value)) return value;
+        var n = Date.parse(String(value || ""));
+        return isFinite(n) ? n : 0;
+    }
+
+    async myProfile(page) {
+        var session = null;
+        try { session = await this.api("/api/auth/session"); } catch (e) {}
+        var user = session && (session.user || (session.data && session.data.user));
+        var id = user && (user.id || user._id);
+        if (!id) return this.loginItem();
+
+        var favJson = {};
+        var postJson = {};
+        try {
+            favJson = await this.api("/api/user/favorites?page=1&limit=50&sortBy=added&sortOrder=desc");
+        } catch (e1) {}
+        try {
+            postJson = await this.api("/api/users/" + encodeURIComponent(id) + "/posts?page=1&limit=50");
+        } catch (e2) {}
+
+        var byId = {};
+        var favs = favJson.favorites || favJson.videos || [];
+        if (!favs.length && Array.isArray(favJson.data)) favs = favJson.data;
+        for (var i = 0; i < favs.length; i++) {
+            var rawFav = favs[i] || {};
+            var fav = rawFav.video && rawFav.video._id ? rawFav.video : rawFav;
+            if (!fav._id) continue;
+            var favAt = this.profileStamp(rawFav.favoritedAt || rawFav.addedAt || fav.uploadDate || fav.releaseDate);
+            byId[fav._id] = {
+                id: fav._id,
+                name: this.cleanLine(fav.title) || "Video",
+                imageUrl: this.httpUrl(fav.thumbnailUrl || fav.thumbnail),
+                at: favAt,
+            };
+        }
+        var posts = postJson.data || postJson.posts || [];
+        for (var p = 0; p < posts.length; p++) {
+            var post = posts[p] || {};
+            if (!post.isRepost) continue;
+            var vid = post.videoId;
+            var video = vid && typeof vid === "object" ? vid : (post.video || {});
+            var vidId = video._id || (typeof vid === "string" ? vid : "");
+            if (!vidId) continue;
+            var at = this.profileStamp(post.createdAt);
+            var prev = byId[vidId];
+            if (prev && prev.at >= at) continue;
+            byId[vidId] = {
+                id: vidId,
+                name: this.cleanLine(video.title) || (prev && prev.name) || "Video",
+                imageUrl: this.httpUrl(video.thumbnailUrl || video.thumbnail) || (prev && prev.imageUrl) || "",
+                at: at || (prev && prev.at) || 0,
+            };
+        }
+        var rows = [];
+        for (var key in byId) rows.push(byId[key]);
+        rows.sort(function (a, b) { return b.at - a.at; });
+        var size = 24;
+        var start = (page > 1 ? page - 1 : 0) * size;
+        var slice = rows.slice(start, start + size);
+        var list = [];
+        for (var n = 0; n < slice.length; n++) {
+            list.push({ name: slice[n].name, imageUrl: slice[n].imageUrl, link: slice[n].id });
+        }
+        return { list: list, hasNextPage: start + size < rows.length };
+    }
+
     async search(query, page, filters) {
         var tipo = this.filterValue(filters, "Tipo") || "video";
+        if (tipo === "profile") return this.myProfile(page);
         var text = query && String(query).trim() ? String(query).trim() : "";
         var profile = this.filterValue(filters, "Profili");
         var who = text.charAt(0) === "@" ? text.slice(1).trim() : (profile ? String(profile).trim() : "");
@@ -524,6 +604,15 @@ class DefaultExtension extends MProvider {
 
     async getDetail(url) {
         var raw = String(url);
+        if (raw.indexOf("pmv:login") !== -1) {
+            return {
+                link: "pmv:login",
+                description: "Accedi dalla WebView di Mangayomi per vedere il profilo.",
+                genre: [],
+                status: 5,
+                chapters: [],
+            };
+        }
         var id = raw.split("?")[0].split("#")[0].replace(/\/+$/, "")
             .split("/").filter(function (s) {
                 return s.length > 0;
@@ -674,6 +763,7 @@ class DefaultExtension extends MProvider {
                 values: [
                     { type_name: "SelectOption", name: "Video", value: "video" },
                     { type_name: "SelectOption", name: "Playlist", value: "playlist" },
+                    { type_name: "SelectOption", name: "Il mio profilo", value: "profile" },
                 ],
             },
             { type_name: "SelectFilter", name: "Profili", state: 0, values: this.profileOptions() },
