@@ -25,7 +25,7 @@ https://raw.githubusercontent.com/adam72881/it-ext-repo/mangayomi/anime_index.js
 | `anime_index.json` | Indice delle sorgenti. **Ogni modifica a un `.js` richiede di alzare `version` sia qui sia nel `mangayomiSources` del file**, altrimenti l'app non scarica il codice nuovo. |
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) — 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me, sito italiano) — 2.1.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) — 1.1.0 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) — 1.1.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) — 1.1.0 |
 
 ## API di Mangayomi (promemoria)
@@ -62,6 +62,7 @@ restituisce l'URL (anche con spazi, es. `/search/videos/sissy hypno caption/`). 
 controllo di accesso, si rifà la stessa POST JSON che fa lo script del sito (`timeZone` + `languages`,
 niente coordinate e niente User-Agent diverso) e si apre l'URL con Referer `searchgate.php`.
 Prove: sissy 18/20 titoli, hypno 20/20, poppers 19/20, «sissy hypno caption» 20 risultati.
+Dalla 1.1.1 ogni ricerca (e la pagina successiva) aspetta almeno 10 secondi dalla precedente; se arriva «Search error» si aspetta 10 secondi e si riprova una volta.
 Pagina 2 della ricerca: dopo la pagina 1, GET di `pageN.html` con Referer della pagina 1; se è vuota si
 ripete il controllo di accesso su quel path. Esito: 20 video, 0 in comune con la pagina 1
 («The Best Sissy Maker Ever» contro «BBC Photography…»).

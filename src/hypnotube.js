@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.1.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -422,6 +422,26 @@ class DefaultExtension extends MProvider {
         return this.getBaseUrl() + path.replace(/ /g, "%20");
     }
 
+    sleep(ms) {
+        return new Promise(function (resolve) {
+            var timer = typeof setTimeout === "function" ? setTimeout : globalThis.setTimeout;
+            if (typeof timer === "function") timer(resolve, ms);
+            else {
+                var end = Date.now() + ms;
+                while (Date.now() < end) {}
+                resolve();
+            }
+        });
+    }
+
+    // Il sito vuole circa 10 secondi tra una ricerca e l'altra.
+    async paceSearch() {
+        var last = this._lastSearchAt || 0;
+        var wait = last ? 10000 - (Date.now() - last) : 0;
+        if (wait > 0) await this.sleep(wait);
+        this._lastSearchAt = Date.now();
+    }
+
     async openGated(path) {
         if (!path) return "";
         if (path.charAt(0) !== "/") path = "/" + path;
@@ -436,8 +456,20 @@ class DefaultExtension extends MProvider {
         );
         var getHeaders = this.headers();
         getHeaders["Referer"] = this.getBaseUrl() + "/searchgate.php";
-        var res = await this.client.get(this.urlFor(path), getHeaders);
-        return res && res.body ? String(res.body) : "";
+        return this.searchGet(this.urlFor(path), getHeaders);
+    }
+
+    async searchGet(url, headers) {
+        await this.paceSearch();
+        var res = await this.client.get(url, headers);
+        var html = res && res.body ? String(res.body) : "";
+        if (/Search error/.test(html)) {
+            await this.sleep(10000);
+            this._lastSearchAt = Date.now();
+            res = await this.client.get(url, headers);
+            html = res && res.body ? String(res.body) : "";
+        }
+        return html;
     }
 
     // POST del form, poi la pagina indicata dal server. Se quella pagina chiede
@@ -446,12 +478,23 @@ class DefaultExtension extends MProvider {
         var headers = this.headers();
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["Origin"] = this.getBaseUrl();
+        await this.paceSearch();
         var posted = await this.client.post(
             this.getBaseUrl() + "/searchgate.php",
             headers,
             this.formBody(query, type),
         );
         var html = posted && posted.body ? String(posted.body) : "";
+        if (/Search error/.test(html)) {
+            await this.sleep(10000);
+            this._lastSearchAt = Date.now();
+            posted = await this.client.post(
+                this.getBaseUrl() + "/searchgate.php",
+                headers,
+                this.formBody(query, type),
+            );
+            html = posted && posted.body ? String(posted.body) : "";
+        }
         var path = this.decodePath(this.pathOf(this.headerOf(posted, "location")) || this.returnPath(html));
         if (!path) {
             var canon = html.match(/rel="canonical"\s+href="([^"]+)"/);
@@ -474,8 +517,7 @@ class DefaultExtension extends MProvider {
             var pagePath = base + "page" + want + ".html";
             var pageHeaders = this.headers();
             pageHeaders["Referer"] = this.urlFor(base);
-            var pageRes = await this.client.get(this.urlFor(pagePath), pageHeaders);
-            var pageHtml = pageRes && pageRes.body ? String(pageRes.body) : "";
+            var pageHtml = await this.searchGet(this.urlFor(pagePath), pageHeaders);
             if (!this.hasCards(pageHtml)) pageHtml = await this.openGated(pagePath);
             if (this.hasCards(pageHtml)) html = pageHtml;
         }
