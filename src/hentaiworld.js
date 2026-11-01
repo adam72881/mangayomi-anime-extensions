@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.4",
+        "version": "1.0.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -215,6 +215,31 @@ class DefaultExtension extends MProvider {
         var json = JSON.parse(res.body);
         var sources = (json && json.sources) || [];
 
+        // Sottotitoli: tracce multiple (incluso Italiano e Inglese).
+        var LANGNAMES = {
+            it: "Italiano", en: "English", es: "Español", fr: "Français",
+            de: "Deutsch", pt: "Português", ja: "日本語", ru: "Русский",
+            ar: "العربية", zh: "中文", ko: "한국어",
+        };
+        var subtitles = [];
+        var subs = (json && json.subs) || [];
+        for (var j = 0; j < subs.length; j++) {
+            var sb = subs[j];
+            if (!sb || !sb.url) continue;
+            var subUrl = sb.url.indexOf("http") === 0 ? sb.url : base + sb.url;
+            subtitles.push({
+                file: subUrl,
+                label: LANGNAMES[sb.lang] || (sb.lang || "Sub").toUpperCase(),
+            });
+        }
+        // Italiano e Inglese in cima.
+        subtitles.sort(function (a, b) {
+            var rank = function (l) {
+                return l === "Italiano" ? 0 : l === "English" ? 1 : 2;
+            };
+            return rank(a.label) - rank(b.label);
+        });
+
         var videos = [];
         for (var i = 0; i < sources.length; i++) {
             var s = sources[i];
@@ -229,6 +254,7 @@ class DefaultExtension extends MProvider {
                 originalUrl: streamUrl,
                 quality: label.trim() || "HentaiWorld",
                 headers: h,
+                subtitles: subtitles,
             });
         }
 
@@ -239,8 +265,13 @@ class DefaultExtension extends MProvider {
             return ah - bh;
         });
 
-        if (videos.length === 0)
-            throw new Error("Nessuno stream trovato per questo episodio");
+        if (videos.length === 0) {
+            var snippet = String(res.body).slice(0, 160).replace(/\s+/g, " ");
+            throw new Error(
+                "No stream. id=[" + id + "] url=[" + String(url).slice(0, 70) +
+                "] resp=" + snippet,
+            );
+        }
         return videos;
     }
 
