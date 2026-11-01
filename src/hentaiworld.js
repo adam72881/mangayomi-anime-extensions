@@ -2,23 +2,25 @@ const mangayomiSources = [
     {
         "name": "HentaiWorld",
         "lang": "it",
-        "baseUrl": "https://www.hentaiworld.to",
+        "baseUrl": "https://hentaiworld.cc",
         "apiUrl": "",
-        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=hentaiworld.to",
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=hentaiworld.cc",
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
     },
 ];
 
-// HentaiWorld is part of the same network as AnimeWorld (WorldSocial), so it
-// uses the same film-list grid, li.episode blocks and /api/episode/info API.
-const DEFAULT_BASE = "https://www.hentaiworld.to";
+// HentaiWorld (hentaiworld.cc) ships its whole catalogue as one JSON
+// (/search-data.json); the per-episode streams come from /api/hdb/stream/<slug>~<ep>
+// as direct mp4 sources.
+const DEFAULT_BASE = "https://hentaiworld.cc";
 const PREF_BASE = "hentaiworld_base_url";
+const PER_PAGE = 30;
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -26,6 +28,7 @@ class DefaultExtension extends MProvider {
     constructor() {
         super();
         this.client = new Client();
+        this._catalog = null;
     }
 
     getPreference(key) {
@@ -44,141 +47,163 @@ class DefaultExtension extends MProvider {
         };
     }
 
-    async doc(path) {
-        var url = path.startsWith("http") ? path : this.getBaseUrl() + path;
-        var res = await this.client.get(url, this.headers());
-        return new Document(res.body);
+    async catalog() {
+        if (this._catalog) return this._catalog;
+        var res = await this.client.get(
+            this.getBaseUrl() + "/search-data.json",
+            this.headers(),
+        );
+        var data = JSON.parse(res.body);
+        this._catalog = Array.isArray(data) ? data : [];
+        return this._catalog;
     }
 
-    parseList(doc) {
-        var list = [];
-        for (var item of doc.select("div.film-list div.item")) {
-            var poster = item.selectFirst("a.poster");
-            var nameEl = item.selectFirst("a.name");
-            var a = poster || nameEl;
-            if (!a) continue;
-            var link = a.getHref;
-            if (!link) continue;
-            var name = nameEl ? nameEl.text.trim() : "";
-            var img = item.selectFirst("img");
-            var imageUrl = img ? img.attr("src") || img.attr("data-src") || "" : "";
-            if (!name && img) name = img.attr("alt") || "";
-            if (!name) continue;
-            list.push({ name: name, imageUrl: imageUrl, link: link });
-        }
-        return { list: list, hasNextPage: list.length > 0 };
+    toItem(entry) {
+        return {
+            name: entry.title,
+            imageUrl: entry.img || "",
+            link: entry.slug,
+        };
+    }
+
+    paginate(items, page) {
+        var start = (page - 1) * PER_PAGE;
+        var slice = items.slice(start, start + PER_PAGE);
+        return {
+            list: slice.map(this.toItem),
+            hasNextPage: start + PER_PAGE < items.length,
+        };
     }
 
     async getPopular(page) {
-        var doc = await this.doc("/filter?sort=6&page=" + page);
-        return this.parseList(doc);
+        var all = (await this.catalog()).slice();
+        all.sort(function (a, b) {
+            return (b.views || 0) - (a.views || 0);
+        });
+        return this.paginate(all, page);
     }
 
     async getLatestUpdates(page) {
-        var doc = await this.doc("/filter?sort=3&page=" + page);
-        return this.parseList(doc);
+        // The catalogue is served newest-first.
+        return this.paginate(await this.catalog(), page);
     }
 
     async search(query, page, filters) {
-        if (!query || !query.length) {
-            return await this.getPopular(page);
+        var q = (query || "").toLowerCase().trim();
+        if (!q) return await this.getPopular(page);
+        var all = await this.catalog();
+        var matched = all.filter(function (e) {
+            return (
+                (e.title || "").toLowerCase().indexOf(q) !== -1 ||
+                (e.slug || "").toLowerCase().indexOf(q.replace(/\s+/g, "-")) !== -1
+            );
+        });
+        return this.paginate(matched, page);
+    }
+
+    findEntry(slug) {
+        slug = String(slug).split("/").filter(function (s) {
+            return s.length > 0;
+        }).pop();
+        var all = this._catalog || [];
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].slug === slug) return all[i];
         }
-        var doc = await this.doc(
-            "/search?keyword=" + encodeURIComponent(query) + "&page=" + page,
-        );
-        return this.parseList(doc);
+        return null;
     }
 
     async getDetail(url) {
-        var doc = await this.doc(url);
-
-        var description = "";
-        var descEl = doc.selectFirst("div.desc");
-        if (descEl) description = descEl.text.trim();
+        await this.catalog();
+        var slug = String(url).split("/").filter(function (s) {
+            return s.length > 0;
+        }).pop();
+        var entry = this.findEntry(slug);
 
         var genre = [];
-        for (var g of doc.select('dd a[href*="/genre/"]')) {
-            var t = g.text.trim();
-            if (t && genre.indexOf(t) === -1) genre.push(t);
-        }
-
-        var status = 5;
-        var metaEl = doc.selectFirst("dl.meta");
-        var metaText = metaEl ? metaEl.text : "";
-        if (metaText.indexOf("In corso") !== -1) status = 0;
-        else if (
-            metaText.indexOf("Finito") !== -1 ||
-            metaText.indexOf("Terminato") !== -1
-        )
-            status = 1;
-
+        var description = "";
         var chapters = [];
-        var seen = {};
-        for (var li of doc.select("li.episode")) {
-            var a = li.selectFirst("a");
-            if (!a) continue;
-            var href = a.getHref;
-            if (!href) continue;
-            var num =
-                a.attr("data-episode-num") ||
-                a.attr("data-num") ||
-                a.text.trim();
-            var key = a.attr("data-id") || href;
-            if (seen[key]) continue;
-            seen[key] = true;
-            chapters.push({ name: "Episodio " + num, url: href });
+
+        if (entry) {
+            if (entry.genres) {
+                genre = String(entry.genres)
+                    .split(",")
+                    .map(function (g) {
+                        return g.trim();
+                    })
+                    .filter(function (g) {
+                        return g.length > 0;
+                    });
+            }
+            var parts = [];
+            if (entry.views) parts.push("Visualizzazioni: " + entry.views);
+            if (entry.votes) parts.push("Voti: " + entry.votes);
+            description = parts.join(" · ");
+
+            var nums = entry.eps ? Object.keys(entry.eps) : [];
+            nums.sort(function (a, b) {
+                return parseInt(a, 10) - parseInt(b, 10);
+            });
+            if (nums.length === 0 && entry.ep) {
+                for (var n = 1; n <= entry.ep; n++) nums.push(String(n));
+            }
+            for (var k = nums.length - 1; k >= 0; k--) {
+                chapters.push({
+                    name: "Episodio " + nums[k],
+                    url: slug + "~" + nums[k],
+                });
+            }
         }
-        chapters.reverse();
 
         return {
-            link: url,
+            link: slug,
             description: description || "Nessuna descrizione disponibile.",
             genre: genre,
-            status: status,
+            status: 5,
             chapters: chapters,
         };
     }
 
     async getVideoList(url) {
-        var clean = url.split("?")[0].split("#")[0];
-        var parts = clean.split("/").filter(function (s) {
-            return s.length > 0;
-        });
-        var code = parts[parts.length - 1];
-        if (!code) throw new Error("Impossibile ricavare l'ID episodio");
+        var id = String(url); // slug~ep
+        var slug = id.split("~")[0];
+        var ep = id.split("~")[1] || "1";
+        var base = this.getBaseUrl();
 
-        var api =
-            this.getBaseUrl() +
-            "/api/episode/info?id=" +
-            encodeURIComponent(code) +
-            "&alt=0";
-        var h = this.headers(url.startsWith("http") ? url : this.getBaseUrl() + url);
-        var res = await this.client.get(api, h);
+        var res = await this.client.get(
+            base + "/api/hdb/stream/" + encodeURIComponent(id),
+            this.headers(base + "/watch/" + slug + "/" + ep + "/"),
+        );
         var json = JSON.parse(res.body);
+        var sources = (json && json.sources) || [];
 
-        var grabber = json && json.grabber;
-        var stream = "";
-        if (typeof grabber === "string") {
-            stream = grabber;
-        } else if (grabber && typeof grabber === "object") {
-            stream =
-                grabber.src ||
-                grabber.url ||
-                grabber["1080p"] ||
-                grabber["720p"] ||
-                grabber["480p"] ||
-                "";
-        }
-        if (!stream) throw new Error("Nessuno stream trovato per questo episodio");
-
-        return [
-            {
-                url: stream,
-                originalUrl: stream,
-                quality: "HentaiWorld",
+        var h = this.headers(base + "/watch/" + slug + "/" + ep + "/");
+        var videos = [];
+        for (var i = 0; i < sources.length; i++) {
+            var s = sources[i];
+            if (!s || !s.url) continue;
+            var streamUrl = s.url.indexOf("http") === 0 ? s.url : base + s.url;
+            var label =
+                (s.q || "") +
+                (s.codec ? " " + s.codec : "") +
+                (s.server ? " · Server " + s.server : "");
+            videos.push({
+                url: streamUrl,
+                originalUrl: streamUrl,
+                quality: label.trim() || "HentaiWorld",
                 headers: h,
-            },
-        ];
+            });
+        }
+
+        // Put the most compatible codec (H.264) first.
+        videos.sort(function (a, b) {
+            var ah = a.quality.indexOf("H.264") !== -1 ? 0 : 1;
+            var bh = b.quality.indexOf("H.264") !== -1 ? 0 : 1;
+            return ah - bh;
+        });
+
+        if (videos.length === 0)
+            throw new Error("Nessuno stream trovato per questo episodio");
+        return videos;
     }
 
     getFilterList() {
@@ -192,7 +217,7 @@ class DefaultExtension extends MProvider {
                 editTextPreference: {
                     title: "Dominio HentaiWorld",
                     summary:
-                        "Cambialo quando il sito cambia indirizzo (es. https://www.hentaiworld.to)",
+                        "Cambialo quando il sito cambia indirizzo (es. https://hentaiworld.cc)",
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio HentaiWorld",
                     dialogMessage: "URL base, senza slash finale",
