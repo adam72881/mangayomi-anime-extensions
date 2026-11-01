@@ -17,6 +17,6 @@ Poi in **Browse** installa le sorgenti che vuoi.
 | Sorgente | Sito | Contenuto |
 |---|---|---|
 | **AnimeWorld** | animeworld.ac | Anime (sub/dub ITA) |
-| **HentaiWorld** | hentaiworld.to | Hentai (18+) |
+| **HentaiWorld** | hentaiworld.me | Hentai (18+) |
 
 Se un sito cambia dominio, aprila nelle impostazioni della sorgente e aggiorna il campo **Dominio**.
