@@ -19,8 +19,8 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.7 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.8 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.8 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.9 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -39,7 +39,7 @@ Verificato dall’utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (
 
 Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `language=sub_ita|sub_eng|dub_ita`. Trama da `div.entry > p`, episodi da `#episodes-grid article.episode-item`, mp4 da `videoUrl` in `/watch/`. Non modificare.
 
-## HypnoTube — 1.1.7
+## HypnoTube — 1.1.8
 
 - Popolari `/most-viewed/`, Recenti `/most-recent/`. Pagina 2 diversa dalla 1.
 - Ordine: Recenti, Più visti, Più votati, Più commentati, Più lunghi, settimana (`/top-rated/week/`), mese (`/top-rated/month/`), Casuale.
@@ -51,8 +51,9 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Generi dopo `@nome`: primi 3 tag (`div.tags-block`) più `a.link12`. Stats in cima alla trama. Capitolo `Episodio 1` con miniatura `og:image` se è un URL http. `getVideoList` → mp4.
 - Playlist: `/playlists/`, Più visti `/playlists/views/`, Più votati `/playlists/rating/`, Casuale. Scheda `/playlist/<id>/<slug>/` con `Episodio N - titolo` e miniatura http. Più lunghi non esiste: resta l’elenco recenti. In playlist non c’è una data sull’episodio.
 - Filtro **Profili**: `getDetail` salva l’uploader in `SharedPreferences` (`hypnotube_recent_profiles`), ultimi 3, senza doppioni, il più recente per primo. Voce «Nessuno» più quei nomi. Sceglierne uno equivale a `@nome`.
+- **Popular a sorpresa** (impostazione, accesa di default): a `page=1` sceglie un ordine di lista (`/most-viewed/`, recenti, votati, lunghi, settimana, mese, casuale) o, più di rado, un canale in cima al filtro. Non usa la ricerca a 10 secondi. La scelta resta per `page>1`; alla riapertura (`page=1`) ne esce un’altra. Spento, Popolari torna a `/most-viewed/`.
 
-## PMVHaven — 1.1.8, profilo confermato da Adam
+## PMVHaven — 1.1.9, profilo confermato da Adam
 
 `tags=` sulla lista non filtra (`gooning` e `poppers` hanno gli stessi id). Categoria, preset e categorie principali usano `/api/videos/search?q=`.
 
@@ -63,6 +64,7 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Scheda video: `author` = `uploader` (niente «Di …» in trama). Primo genere `@uploader`, poi 3 `top5Tags` e gli altri tag. Trama con durata, voto like/(like+dislike) e visualizzazioni. Capitolo `Episodio 1` con `thumbnailUrl` http e `dateUpload` solo se è una stringa di cifre (millisecondi). `getVideoList` → mp4.
 - Barra `@nome`: `GET /api/videos?uploader=<nome>`, unito all’ordine video (`sort`) quando non è Casuale. Verificato con nightlyload e Interceptor.
 - Filtro **Profili**: stessi ultimi 3 di `getDetail`, chiave `pmvhaven_recent_profiles`. Sceglierne uno equivale a `@nome` e usa lo stesso `sort`.
+- **Popular a sorpresa** (impostazione, accesa di default): a `page=1` sceglie un ordine dell’API (recenti, vecchi, votati, visti, apprezzati, lunghi, corti, casuale) o, più di rado, una categoria in cima al filtro (`/api/videos/search?q=`). La scelta è salvata e riusata per `page>1`; alla riapertura ne esce un’altra, diversa. Spento, Popolari resta `sort=-views`.
 - **Tipo = Il mio profilo** (confermato sull’account gloria7288): `GET /api/auth/session`, poi `GET /api/users/{id}/favorites?sortBy=added&sortOrder=desc` e i repost di `GET /api/users/{id}/posts` (`isRepost`). Si uniscono, si tolgono i doppioni per id (`id` o `_id`, anche video annidato) e i più recenti stanno prima. Senza cookie di login la lista dice di accedere dalla WebView. I Mi piace a cuore non hanno un elenco: `/api/videos/{id}/like` è solo il toggle. `/api/user/favorites` non è la lista della scheda profilo.
 - Playlist: link `/playlists/<id>`. Ordine: recenti, vecchi, visti, valutazione, apprezzati, Casuale (pagine 1–10). Scheda: `GET /api/playlists/<id>?page=1&limit=50`, episodi da `data.videoDetails`, miniatura http, data in millisecondi. `fetchAll=true` non si usa: su una playlist grande la risposta è decine di MB e va in timeout.
 - 236 playlist e 4880 episodi controllati: nessun campo che faccia scattare il riquadro grigio. Si salta solo il video senza id. Una data ISO già salvata nell’app resta grigia finché non si toglie la serie e la si riapre (`dateFormat` fa `int.parse`).

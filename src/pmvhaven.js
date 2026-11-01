@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.8",
+        "version": "1.1.9",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -18,6 +18,8 @@ const mangayomiSources = [
 const DEFAULT_BASE = "https://pmvhaven.com";
 const PREF_BASE = "pmvhaven_base_url";
 const PREF_PROFILES = "pmvhaven_recent_profiles";
+const PREF_SURPRISE = "pmvhaven_surprise_popular";
+const PREF_POPULAR_PICK = "pmvhaven_popular_pick";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -218,6 +220,66 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    surpriseOn() {
+        try {
+            var v = new SharedPreferences().get(PREF_SURPRISE);
+            if (v === false || v === "false" || v === 0) return false;
+        } catch (e) {}
+        return true;
+    }
+
+    savedPopular() {
+        try { return String(new SharedPreferences().getString(PREF_POPULAR_PICK, "") || ""); } catch (e) { return ""; }
+    }
+
+    savePopular(pick) {
+        try { new SharedPreferences().setString(PREF_POPULAR_PICK, pick); } catch (e) {}
+    }
+
+    // Ordini peso 5, categorie in cima al filtro peso 1.
+    popularPool() {
+        var pool = [];
+        for (var i = 0; i < VIDEO_ORDERS.length; i++) pool.push({ pick: "o:" + VIDEO_ORDERS[i][0], w: 5 });
+        for (var j = 0; j < FRONT_TAGS.length; j++) pool.push({ pick: "q:" + FRONT_TAGS[j][0], w: 1 });
+        return pool;
+    }
+
+    rollPopular(prev) {
+        var pool = this.popularPool();
+        var previous = String(prev || "");
+        if (previous.indexOf("o:random:") === 0) previous = "o:random";
+        var choices = [];
+        for (var i = 0; i < pool.length; i++) if (pool[i].pick !== previous) choices.push(pool[i]);
+        if (!choices.length) choices = pool;
+        var total = 0;
+        for (var t = 0; t < choices.length; t++) total += choices[t].w;
+        var hit = Math.random() * total;
+        var acc = 0;
+        for (var c = 0; c < choices.length; c++) {
+            acc += choices[c].w;
+            if (hit < acc) {
+                var chosen = choices[c].pick;
+                if (chosen === "o:random") chosen = "o:random:" + (1 + Math.floor(Math.random() * 10));
+                return chosen;
+            }
+        }
+        return choices[0].pick;
+    }
+
+    async loadPopular(pick, page) {
+        if (pick.indexOf("q:") === 0) {
+            return this.loadQuery("/api/videos/search?q=" + encodeURIComponent(pick.slice(2)), page, false);
+        }
+        if (pick.indexOf("o:random:") === 0) {
+            var start = parseInt(pick.slice(9), 10) || 1;
+            var n = start + (page > 1 ? page - 1 : 0);
+            if (n > 10) n = ((n - 1) % 10) + 1;
+            return this.api("/api/videos?sort=-releaseDate&page=" + n);
+        }
+        var sort = pick.indexOf("o:") === 0 ? pick.slice(2) : "-views";
+        return this.api("/api/videos?sort=" + encodeURIComponent(sort) + "&page=" + page);
+    }
+
     getBaseUrl() {
         var v = this.getPreference(PREF_BASE);
         return (v && v.length ? v : DEFAULT_BASE).replace(/\/+$/, "");
@@ -346,7 +408,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        return this.toList(await this.api("/api/videos?sort=-views&page=" + page));
+        if (!this.surpriseOn()) return this.toList(await this.api("/api/videos?sort=-views&page=" + page));
+        var prev = this.savedPopular();
+        var pick = page > 1 && prev ? prev : this.rollPopular(prev);
+        if (page <= 1 || !prev) this.savePopular(pick);
+        return this.toList(await this.loadPopular(pick, page));
     }
 
     async getLatestUpdates(page) {
@@ -793,6 +859,14 @@ class DefaultExtension extends MProvider {
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio PMVHaven",
                     dialogMessage: "URL base, senza slash finale",
+                },
+            },
+            {
+                key: PREF_SURPRISE,
+                switchPreferenceCompat: {
+                    title: "Popular a sorpresa",
+                    summary: "All'apertura di Popolari sceglie un ordine o, a volte, una categoria. Spegni per tornare a Più visti.",
+                    value: true,
                 },
             },
         ];

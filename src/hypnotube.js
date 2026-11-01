@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.7",
+        "version": "1.1.8",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -18,6 +18,8 @@ const mangayomiSources = [
 const DEFAULT_BASE = "https://hypnotube.com";
 const PREF_BASE = "hypnotube_base_url";
 const PREF_PROFILES = "hypnotube_recent_profiles";
+const PREF_SURPRISE = "hypnotube_surprise_popular";
+const PREF_POPULAR_PICK = "hypnotube_popular_pick";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -204,6 +206,62 @@ class DefaultExtension extends MProvider {
             out.push(s);
         }
         return out;
+    }
+
+    surpriseOn() {
+        try {
+            var v = new SharedPreferences().get(PREF_SURPRISE);
+            if (v === false || v === "false" || v === 0) return false;
+        } catch (e) {}
+        return true;
+    }
+
+    savedPopular() {
+        try { return String(new SharedPreferences().getString(PREF_POPULAR_PICK, "") || ""); } catch (e) { return ""; }
+    }
+
+    savePopular(pick) {
+        try { new SharedPreferences().setString(PREF_POPULAR_PICK, pick); } catch (e) {}
+    }
+
+    popularPool() {
+        var pool = [];
+        for (var i = 0; i < ORDERS.length; i++) pool.push({ pick: "o:" + ORDERS[i][0], w: 5 });
+        for (var j = 0; j < PREFERRED_CHANNELS.length; j++) pool.push({ pick: "c:" + PREFERRED_CHANNELS[j], w: 1 });
+        pool.push({ pick: "c:91/gooning", w: 1 });
+        return pool;
+    }
+
+    rollPopular(prev) {
+        var pool = this.popularPool();
+        var previous = String(prev || "");
+        if (previous.indexOf("o:random:") === 0) previous = "o:random";
+        var choices = [];
+        for (var i = 0; i < pool.length; i++) if (pool[i].pick !== previous) choices.push(pool[i]);
+        if (!choices.length) choices = pool;
+        var total = 0;
+        for (var t = 0; t < choices.length; t++) total += choices[t].w;
+        var hit = Math.random() * total;
+        var acc = 0;
+        for (var c = 0; c < choices.length; c++) {
+            acc += choices[c].w;
+            if (hit < acc) {
+                var chosen = choices[c].pick;
+                if (chosen === "o:random") chosen = "o:random:" + (1 + Math.floor(Math.random() * 10));
+                return chosen;
+            }
+        }
+        return choices[0].pick;
+    }
+
+    popularPath(pick, page) {
+        if (pick.indexOf("c:") === 0) return { base: "/channels/" + pick.slice(2) + "/", page: page };
+        if (pick.indexOf("o:random:") === 0) {
+            var start = parseInt(pick.slice(9), 10) || 1;
+            return { base: "/most-recent/", page: start + (page > 1 ? page - 1 : 0) };
+        }
+        var ord = pick.indexOf("o:") === 0 ? pick.slice(2) : "most-viewed";
+        return { base: "/" + ord + "/", page: page };
     }
 
     getBaseUrl() {
@@ -644,7 +702,12 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        return this.applyDuration(await this.listing("/most-viewed/", page, false), 0);
+        if (!this.surpriseOn()) return this.applyDuration(await this.listing("/most-viewed/", page, false), 0);
+        var prev = this.savedPopular();
+        var pick = page > 1 && prev ? prev : this.rollPopular(prev);
+        if (page <= 1 || !prev) this.savePopular(pick);
+        var spec = this.popularPath(pick, page);
+        return this.applyDuration(await this.listing(spec.base, spec.page, false), 0);
     }
 
     async getLatestUpdates(page) {
@@ -919,6 +982,14 @@ class DefaultExtension extends MProvider {
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio HypnoTube",
                     dialogMessage: "URL base, senza slash finale",
+                },
+            },
+            {
+                key: PREF_SURPRISE,
+                switchPreferenceCompat: {
+                    title: "Popular a sorpresa",
+                    summary: "All'apertura di Popolari sceglie un ordine o, a volte, un canale. Spegni per tornare a Più visti.",
+                    value: true,
                 },
             },
         ];
