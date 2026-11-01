@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.1",
+        "version": "1.1.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -381,6 +381,18 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // dateUpload in Mangayomi è millisecondi in stringa: int.parse in dateFormat.
+    chapterExtras(ch, dateValue, thumb) {
+        var n = typeof dateValue === "number" ? dateValue : Date.parse(String(dateValue || ""));
+        if (isFinite(n)) ch.dateUpload = String(n);
+        if (thumb && String(thumb).trim()) ch.thumbnailUrl = String(thumb).trim();
+        return ch;
+    }
+
+    videoChapter(url, dateValue, thumb) {
+        return this.chapterExtras({ name: "Episodio 1", url: url }, dateValue, thumb);
+    }
+
     async getDetail(url) {
         var raw = String(url);
         var id = raw.split("?")[0].split("#")[0].replace(/\/+$/, "")
@@ -407,9 +419,8 @@ class DefaultExtension extends MProvider {
                     var ch = {
                         name: "Episodio " + (chapters.length + 1) + " - " + (item.title || "Video"),
                         url: item._id,
-                        thumbnailUrl: item.thumbnailUrl || item.thumbnail || "",
                     };
-                    if (item.uploadDate) ch.dateUpload = String(item.uploadDate);
+                    this.chapterExtras(ch, item.uploadDate, item.thumbnailUrl || item.thumbnail);
                     chapters.push(ch);
                 }
                 var pag = pl.pagination || {};
@@ -463,11 +474,7 @@ class DefaultExtension extends MProvider {
             description: description || "PMVHaven",
             genre: genre,
             status: 1,
-            chapters: [{
-                name: "Episodio 1",
-                url: v.videoUrl || id,
-                thumbnailUrl: v.thumbnailUrl || v.thumbnail || "",
-            }],
+            chapters: [this.videoChapter(v.videoUrl || id, v.uploadDate, v.thumbnailUrl || v.thumbnail)],
         };
     }
 

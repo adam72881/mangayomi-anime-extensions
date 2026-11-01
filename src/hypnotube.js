@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.2",
+        "version": "1.1.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -604,6 +604,11 @@ class DefaultExtension extends MProvider {
         return this.applyDuration(parsed, minMinutes);
     }
 
+    chapterThumb(ch, thumb) {
+        if (thumb && String(thumb).trim()) ch.thumbnailUrl = String(thumb).trim();
+        return ch;
+    }
+
     async getDetail(url) {
         var doc = await this.doc(url);
         if (String(url).indexOf("/playlist/") !== -1) {
@@ -611,11 +616,12 @@ class DefaultExtension extends MProvider {
             var h1 = doc.selectFirst("h1");
             var chapters = [];
             for (var i = 0; i < parsed.list.length; i++) {
-                chapters.push({
+                var ch = {
                     name: "Episodio " + (i + 1) + " - " + parsed.list[i].name,
                     url: parsed.list[i].link,
-                    thumbnailUrl: parsed.list[i].imageUrl || "",
-                });
+                };
+                this.chapterThumb(ch, parsed.list[i].imageUrl);
+                chapters.push(ch);
             }
             return {
                 link: url,
@@ -660,13 +666,14 @@ class DefaultExtension extends MProvider {
         }
 
         var og = doc.selectFirst('meta[property="og:image"]');
-        var thumb = og ? og.attr("content") || "" : "";
+        var chapter = { name: "Episodio 1", url: url };
+        this.chapterThumb(chapter, og ? og.attr("content") : "");
         return {
             link: url,
             description: description || "Nessuna descrizione.",
             genre: genre,
             status: 1,
-            chapters: [{ name: "Episodio 1", url: url, thumbnailUrl: thumb }],
+            chapters: [chapter],
         };
     }
 
