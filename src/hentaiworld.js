@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.1",
+        "version": "1.0.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -19,7 +19,7 @@ const mangayomiSources = [
 // (/search-data.json); the per-episode streams come from /api/hdb/stream/<slug>~<ep>
 // as direct mp4 sources.
 const DEFAULT_BASE = "https://hentaiworld.cc";
-const PREF_BASE = "hentaiworld_base_url";
+const PREF_BASE = "hentaiworld_cc_base_url";
 const PER_PAGE = 30;
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -37,7 +37,9 @@ class DefaultExtension extends MProvider {
 
     getBaseUrl() {
         var v = this.getPreference(PREF_BASE);
-        return (v && v.length ? v : DEFAULT_BASE).replace(/\/+$/, "");
+        // Ignore a stale/dead domain so the source self-heals.
+        if (!v || !v.length || v.indexOf("hentaiworld.to") !== -1) v = DEFAULT_BASE;
+        return v.replace(/\/+$/, "");
     }
 
     headers(referer) {
