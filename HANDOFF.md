@@ -1,6 +1,6 @@
 # Passaggio di consegne — moduli Mangayomi (branch `mangayomi`)
 
-Stato al 1 novembre 2026. Continuare dai file in `src/`, non riscriverli.
+Stato al 1 novembre 2026, app **Mangayomi v0.9.95**. Continuare dai file in `src/`, non riscriverli.
 AnimeWorld e HentaiWorld non si toccano. Niente bypass di Cloudflare o anti-bot, niente User-Agent diverso da quello già nel file, niente filtri che escludono contenuti.
 
 URL da incollare in Mangayomi (Impostazioni → Browse → repository anime):
@@ -9,7 +9,9 @@ URL da incollare in Mangayomi (Impostazioni → Browse → repository anime):
 https://raw.githubusercontent.com/adam72881/it-ext-repo/mangayomi/anime_index.json
 ```
 
-Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia in `anime_index.json`, altrimenti l'app non scarica il codice nuovo. Commit e push diretti su `mangayomi`.
+Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia in `anime_index.json`. Commit e push diretti su `mangayomi`.
+
+User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 ## Versioni
 
@@ -20,11 +22,18 @@ Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia i
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.7 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.1.8 |
 
-User-Agent fisso, in entrambi i moduli nuovi: iPhone Safari 17.
+## Limiti di Mangayomi v0.9.95
+
+- In `manga_details_view.dart` l’autore è solo testo, senza `onTap`. Non si può aprire la sua lista toccando il nome.
+- Il chip di un genere ha «Browse in source» (`_selectGenre` valore 1 in `manga_info_header.dart`): apre `/mangaHome` con `(source, false)` e **non passa il termine** a `search()`.
+- Toccare il titolo apre la ricerca globale, non la ricerca della sorgente.
+- `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
+- I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
+- I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
 
 ## AnimeWorld — 1.2.0, completo
 
-Verificato dall'utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Sub/Dub ITA), 45 generi, tag cliccabili. Non modificare.
+Verificato dall’utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Sub/Dub ITA), 45 generi. Non modificare.
 
 ## HentaiWorld — 2.1.0, completo
 
@@ -32,96 +41,41 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 
 ## HypnoTube — 1.1.7
 
-### Cosa funziona
-
 - Popolari `/most-viewed/`, Recenti `/most-recent/`. Pagina 2 diversa dalla 1.
-- Ordine video: Recenti, Più visti, Più votati, Più commentati, Più lunghi, Più votati della settimana (`/top-rated/week/`), del mese (`/top-rated/month/`), Casuale (una `pageN.html` a caso).
-- Categorie in cima al filtro, solo canali che esistono: Music PMV, Hypnosis, Sissy Training, Captions, Chastity, Asian.
-- Categorie principali: Gooning = canale `91/gooning`; Poppers e Blackedraw = ricerca del sito.
-- Preset: Sissy Hypno (`sissy hypno caption`), Egirl PMV (`egirl`), Lingerie e Tacchi (`lingerie stockings heels`), Chastity (`chastity caption`), BNWO (`bnwo`).
-- Durata minima letta da `span.time`. Se il filtro svuoterebbe la pagina, resta la pagina intera.
-- Ricerca: POST `searchgate.php` con `q` codificato una sola volta (spazio → `+`). Il server rimanda all'URL, anche con spazi (`/search/videos/sissy hypno caption/`). Se la pagina è l'age-gate, stessa POST JSON del sito (`timeZone`, `languages`) e GET con Referer `searchgate.php`. Pagina N = `pageN.html` con Referer della pagina 1.
-- Scheda: `Episodio 1`, generi = primi 3 tag (`div.tags-block`) più `a.link12`. Il menu «Categories» non c'è. Stats in cima alla trama, esempio `Durata 07:04 · Voto 93% · 7.2M visualizzazioni`.
-- Playlist: `/playlists/`, Più visti `/playlists/views/`, Più votati `/playlists/rating/`, Casuale una pagina a caso. Scheda `/playlist/<id>/<slug>/` con `Episodio N - titolo` e miniatura se c'è un'immagine http.
-- `getVideoList` prende l'mp4 della pagina.
-- Scheda: `author` è il nome su `a.name_normal` (es. GoonRitual) e il primo genere è `@nome`. L'autore in app non è cliccabile; se il tag arriva a `search()`, `@nome` apre `/user/<slug>/` (prima ricerca account, type=members).
+- Ordine: Recenti, Più visti, Più votati, Più commentati, Più lunghi, settimana (`/top-rated/week/`), mese (`/top-rated/month/`), Casuale.
+- Categorie in cima, solo canali esistenti: Music PMV, Hypnosis, Sissy Training, Captions, Chastity, Asian. Categorie principali: Gooning = canale `91/gooning`; Poppers e Blackedraw = ricerca.
+- Preset: Sissy Hypno, Egirl PMV (`egirl`), Lingerie e Tacchi, Chastity, BNWO. Durata minima da `span.time` (se svuota la pagina, la pagina resta).
+- Ricerca: POST `searchgate.php`, `q` codificato una sola volta (spazio → `+`). Se la risposta è l’age-gate, POST JSON del sito (`timeZone`, `languages`) e GET con Referer `searchgate.php`. Pagina N = `pageN.html`. Tra due ricerche passano 10 secondi; «Search error» aspetta 10 secondi e riprova una volta. Liste, schede, playlist e `getVideoList` non aspettano.
+- Senza cookie la lista finisce sull’age-gate. Una POST all’age-gate salva `PHPSESSID` e le chiamate dopo lo riusano.
+- Scheda: `author` è il nome di `a.name_normal`. Il primo genere è `@nome`. In barra, `@nome` cerca gli account (`type=members`) e apre `/user/<slug>/`. La pagina utente non ha un ordine.
+- Generi dopo `@nome`: primi 3 tag (`div.tags-block`) più `a.link12`. Stats in cima alla trama. Capitolo `Episodio 1` con miniatura `og:image` se è un URL http. `getVideoList` → mp4.
+- Playlist: `/playlists/`, Più visti `/playlists/views/`, Più votati `/playlists/rating/`, Casuale. Scheda `/playlist/<id>/<slug>/` con `Episodio N - titolo` e miniatura http. Più lunghi non esiste: resta l’elenco recenti. In playlist non c’è una data sull’episodio.
+- Filtro **Profili**: `getDetail` salva l’uploader in `SharedPreferences` (`hypnotube_recent_profiles`), ultimi 3, senza doppioni, il più recente per primo. Voce «Nessuno» più quei nomi. Sceglierne uno equivale a `@nome`.
 
-### Attesa e sessione (1.1.5)
+## PMVHaven — 1.1.8, profilo confermato da Adam
 
-I 10 secondi valgono solo tra due ricerche: il POST di searchgate e il GET della pagina N. Se il sito risponde «Search error», si aspetta 10 secondi e si riprova una volta. Liste, schede, playlist e `getVideoList` non aspettano.
+`tags=` sulla lista non filtra (`gooning` e `poppers` hanno gli stessi id). Categoria, preset e categorie principali usano `/api/videos/search?q=`.
 
-Senza cookie la lista e la scheda arrivano sull'age-gate (HTML «Checking access», zero video). Una POST all'age-gate salva `PHPSESSID` e le chiamate successive lo rimandano: un controllo, poi una GET.
-
-Tempi misurati prima (1.1.4, senza cookie) e dopo (sessione riusata, stessa prova, prima che l'IP venisse limitato):
-
-| Funzione | Prima | Dopo |
-|---|---|---|
-| getPopular | 1065 ms, 0 video (age-gate) | 1346 ms, 20 video |
-| getLatestUpdates | 355 ms, 0 video (age-gate) | 426 ms, 20 video |
-| getDetail | 1004 ms, pagina del gate | 686 ms, scheda vera |
-| search «sissy» | 10496 ms, 0 video | non rimisurata: vedi problemi aperti |
-
-Una lista aperta subito dopo una ricerca è tornata in 720 ms, senza i 10 secondi. `getVideoList` sulla stessa scheda: 637 ms, mp4 di `media.hypnotube.com`.
+- Sezioni: Tutti (`-releaseDate`), Di tendenza (`trending=true&sort=-views`), Popolare (`-likes`), tag HMV, TikTok, Hypno, Korean BJ.
+- Ordine video: recenti, vecchi, votati `-bayesianRating`, visti `-views`, apprezzati `-likes`, lunghi, corti, Casuale (solo pagine 1–10: oltre sono vuote).
+- Categorie principali: Gooning, Blackedraw, Poppers. In cima a Categoria i termini verificati (PMV, Hypno, Sissy, Egirl, Blonde, BNWO, Caption, Ahegao, Stockings, Heels, Lingerie, e il resto del filtro).
+- Preset: Sissy Hypno, Egirl PMV, Lingerie, Chastity, BNWO. Durata minima `durationMin` (10 / 20 / 45 minuti).
+- Scheda video: `author` = `uploader` (niente «Di …» in trama). Primo genere `@uploader`, poi 3 `top5Tags` e gli altri tag. Trama con durata, voto like/(like+dislike) e visualizzazioni. Capitolo `Episodio 1` con `thumbnailUrl` http e `dateUpload` solo se è una stringa di cifre (millisecondi). `getVideoList` → mp4.
+- Barra `@nome`: `GET /api/videos?uploader=<nome>`, unito all’ordine video (`sort`) quando non è Casuale. Verificato con nightlyload e Interceptor.
+- Filtro **Profili**: stessi ultimi 3 di `getDetail`, chiave `pmvhaven_recent_profiles`. Sceglierne uno equivale a `@nome` e usa lo stesso `sort`.
+- **Tipo = Il mio profilo** (confermato sull’account gloria7288): `GET /api/auth/session`, poi `GET /api/users/{id}/favorites?sortBy=added&sortOrder=desc` e i repost di `GET /api/users/{id}/posts` (`isRepost`). Si uniscono, si tolgono i doppioni per id (`id` o `_id`, anche video annidato) e i più recenti stanno prima. Senza cookie di login la lista dice di accedere dalla WebView. I Mi piace a cuore non hanno un elenco: `/api/videos/{id}/like` è solo il toggle. `/api/user/favorites` non è la lista della scheda profilo.
+- Playlist: link `/playlists/<id>`. Ordine: recenti, vecchi, visti, valutazione, apprezzati, Casuale (pagine 1–10). Scheda: `GET /api/playlists/<id>?page=1&limit=50`, episodi da `data.videoDetails`, miniatura http, data in millisecondi. `fetchAll=true` non si usa: su una playlist grande la risposta è decine di MB e va in timeout.
+- 236 playlist e 4880 episodi controllati: nessun campo che faccia scattare il riquadro grigio. Si salta solo il video senza id. Una data ISO già salvata nell’app resta grigia finché non si toglie la serie e la si riapre (`dateFormat` fa `int.parse`).
 
 ### Tolto
 
-- Più lunghi sulle playlist: il sito non ha un URL (`/playlists/` ha solo Newest, Top Rated, Most Viewed). La voce resta l'elenco recenti.
-- Capitolo «Simili»: Mangayomi lo riprodurrebbe come episodio. I tag sono generi e, toccati, arrivano a `search()`.
-
-## PMVHaven — 1.1.8
-
-### Cosa funziona
-
-API pubblica, nessun login. `tags=` sulla lista non filtra in modo affidabile (`tags=gooning` e `tags=poppers` hanno gli stessi id). Categoria, preset e categorie principali usano `/api/videos/search?q=`.
-
-- Sezioni video, come le pill della home: Tutti (`sort=-releaseDate`), Di tendenza (`trending=true&sort=-views`), Popolare (`sort=-likes`), tag HMV, TikTok, Hypno, Korean BJ.
-- Ordine video: Più recenti `-releaseDate`, Più vecchi, Più votati `-bayesianRating`, Più visti `-views`, Più apprezzati `-likes`, Più lunghi `-duration`, Più corti, Casuale (pagine 1–10: oltre, l'API restituisce liste vuote).
-- Categorie principali: Gooning, Blackedraw, Poppers. In cima a Categoria i termini verificati (PMV, Hypno, Sissy, Egirl, Blonde, BNWO, Caption, Ahegao, Stockings, Heels, Lingerie, e gli altri già nel filtro).
-- Preset via `q=`: Sissy Hypno, Egirl PMV, Lingerie, Chastity, BNWO.
-- Durata minima: `durationMin` in secondi (10 / 20 / 45 minuti).
-- Scheda video: `Episodio 1`, trama che inizia con durata, voto like/(like+dislike) e visualizzazioni. `author` è `uploader` e il primo genere è `@uploader` (niente «Di …» in trama: in Mangayomi l'autore è solo testo; il tag, se arriva a `search()`, usa lo stesso filtro). Poi i primi 3 di `top5Tags` e gli altri tag. `getVideoList` → mp4.
-- Barra `@nome`: `GET /api/videos?uploader=<nome>`, lo stesso filtro della pagina profilo (`/api/videos?uploader=<id>` dopo `/api/users/by-username/`). Verificato: nightlyload e Interceptor, i primi video sono i loro.
-- Playlist: link `/playlists/<id>`. Ordine: Più recenti `-createdAt`, Più vecchi, Più visti `-views`, Valutazione più alta `-bayesianRating`, Più apprezzati `-likes`, Casuale (pagine 1–10). Scheda: una sola richiesta `GET /api/playlists/<id>?page=1&limit=50`, episodi da `data.videoDetails`.
-
-### Controllo righe grigie
-
-236 playlist (recenti, visti, valutazione, pagine avanti), 4880 episodi via `getDetail`: nessun campo rifiutato da Mangayomi. Si salta solo il video senza id. Titolo, trama, generi e autore diventano stringhe; `dateUpload` solo se è una stringa di cifre; `thumbnailUrl` solo se è un URL http.
-
-### Tolto, e perché
-
-- **A-Z e Z-A.** `sort=name` mette nelle prime pagine solo nomi null o fatti di spazi (pagina 1: 24/24 null; pagina 2: metà spazi). Non c'è un modo pulito di mostrarli in fondo senza scartare pagine intere. Le due voci non sono nel filtro.
-- **Più video.** Il sito manda `sort=-videoCount`, ma la prima pagina è identica a Più recenti (stessi id, e la prima playlist ha 1 video). Nessun altro parametro ordina per lunghezza. Voce tolta.
-- **Raccomandato.** La home lo chiede con `personalizedOnly=true`. Senza login l'API restituisce 0 video. Non è nel filtro.
-
-## Cause trovate
-
-- **`dateUpload` in millisecondi, solo cifre.** In Mangayomi `chapter_list_tile_widget.dart` chiama `dateFormat`, e `lib/utils/date.dart` fa `int.parse`. Una data ISO, un decimale o un oggetto fanno eccezione e Flutter disegna il riquadro grigio su ogni episodio. Il valore va omesso oppure è `String` di un intero (es. `1750423603000`).
-- **`fetchAll=true` troppo pesante.** Su una playlist grande (S Tier, migliaia di video) la risposta pesa decine di MB e la scheda va in timeout. La scheda chiede una pagina da 50.
-- **Rate limit della ricerca HypnoTube.** Il sito vuole circa 10 secondi tra una ricerca e l'altra. Sotto quella soglia `searchgate` rimanda all'age-gate o risponde «Search error». Un GET diretto di `/search/videos/...` senza il POST del form dà «Search error». Non insistere con molte ricerche dallo stesso IP: il controllo resta su «Checking access» anche dopo decine di secondi.
-
-## Problemi aperti
-
-- Il filtro Profili (ultimi 3 di `getDetail`, il più recente per primo; su PMVHaven si combina con l'ordine video, su HypnoTube la pagina utente non ha un ordine) si aggiorna solo rientrando nella sorgente o con Reset: il foglio non richiama `getFilterList` a ogni apertura.
-- PMVHaven 1.1.8, Tipo = «Il mio profilo»: i preferiti sono `GET /api/users/{id}/favorites` (la scheda del profilo; `/api/user/favorites` non è quella lista), uniti ai repost di `/api/users/{id}/posts`. Si accettano `id` e `_id`. Senza login la lista chiede la WebView.
-- La pagina 2 della ricerca HypnoTube non è stata rimisurata in questa consegna: le prove ripetute hanno fatto scattare l'age-gate sull'IP. La sequenza è quella della 1.1.1 (searchgate, poi `pageN.html`), con l'attesa solo tra le due richieste. Da riverificare da una rete pulita, una ricerca e una pagina N, a 10 secondi di distanza.
-- Un episodio già salvato nell'app con la data ISO vecchia resta grigio: l'aggiornamento della scheda non riscrive `dateUpload` se il capitolo esiste già. Togliere la serie dalla libreria e riaprirla.
-- HypnoTube non ha la data sul video dentro una playlist: quegli episodi non hanno `dateUpload`.
-- Casuale, su PMVHaven, non usa `totalPages` dell'API (le pagine alte sono vuote) e pesca solo tra le prime 10.
-- I tab Popolari e Recenti dell'app non ricevono i filtri. Il tipo Playlist vale nella ricerca.
-
-## API di Mangayomi (promemoria)
-
-- `getPopular(page)`, `getLatestUpdates(page)`, `search(query, page, filters)` → `{ list: [{name, imageUrl, link}], hasNextPage }`
-- `getDetail(url)` → `{ link, description, genre: [], status, chapters }` (status: 0 in corso, 1 finito, 3 cancellato, 5 sconosciuto)
-- `getVideoList(url)` → `[{ url, originalUrl, quality, headers }]`
-- `getFilterList()` → `SelectFilter` con `state` = indice dell'opzione
-- Mangayomi a volte antepone il baseUrl all'URL del capitolo (`https://sito/https://cdn/...mp4`): in `getVideoList` tenere dall'ultimo `http`.
-- Un genere toccato arriva a `search()` come testo.
-- Il nome capitolo senza numero fa scattare "couldn't be auto-numbered": usare `Episodio 1`.
+- **A-Z e Z-A.** `sort=name` riempie le prime pagine di nomi null o di soli spazi.
+- **Più video.** `sort=-videoCount` restituisce la stessa prima pagina di Più recenti.
+- **Raccomandato.** `personalizedOnly=true` senza login restituisce 0 video.
 
 ## Come verificare
 
-1. `node --check src/<file>.js` e `node -e "JSON.parse(require('fs').readFileSync('anime_index.json','utf8'))"`
-2. HTTP reale con lo User-Agent del file. Non aggirare Cloudflare e non cambiare User-Agent.
-3. HypnoTube: una ricerca, poi almeno 10 secondi prima della successiva. Non ripetere searchgate in raffica.
+1. `node --check src/<file>.js` e il parse di `anime_index.json`.
+2. HTTP con lo User-Agent del file. Non aggirare Cloudflare e non cambiare User-Agent.
+3. HypnoTube: almeno 10 secondi tra una ricerca e la successiva. Non ripetere `searchgate` in raffica.
 4. Push su `mangayomi`. In app: Browse → refresh repository → aggiorna la sorgente.
