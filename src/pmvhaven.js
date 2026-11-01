@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -20,7 +20,13 @@ const PREF_BASE = "pmvhaven_base_url";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-const ORDERS = [["latest", "Recenti"], ["views", "Più visti"]];
+// L'API ordina con prefisso "-" (decrescente).
+const ORDERS = [
+    ["-uploadDate", "Recenti"],
+    ["-views", "Più visti"],
+    ["uploadDate", "Più vecchi"],
+    ["views", "Meno visti"],
+];
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
 const TAGS = [
@@ -156,11 +162,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        return this.toList(await this.api("/api/videos?sort=views&page=" + page));
+        return this.toList(await this.api("/api/videos?sort=-views&page=" + page));
     }
 
     async getLatestUpdates(page) {
-        return this.toList(await this.api("/api/videos?sort=latest&page=" + page));
+        return this.toList(await this.api("/api/videos?sort=-uploadDate&page=" + page));
     }
 
     async search(query, page, filters) {
@@ -187,7 +193,7 @@ class DefaultExtension extends MProvider {
             );
         }
         return this.toList(
-            await this.api("/api/videos?sort=" + (order || "latest") + "&page=" + page),
+            await this.api("/api/videos?sort=" + (order || "-uploadDate") + "&page=" + page),
         );
     }
 
