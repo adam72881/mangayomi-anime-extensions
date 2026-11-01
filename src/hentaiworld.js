@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.5",
+        "version": "1.0.6",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -55,6 +55,18 @@ class DefaultExtension extends MProvider {
     headers(referer) {
         return {
             "User-Agent": UA,
+            "Referer": referer || this.getBaseUrl() + "/",
+        };
+    }
+
+    // Replica la stessa richiesta XHR che fa il player del sito.
+    apiHeaders(referer) {
+        return {
+            "User-Agent": UA,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": this.getBaseUrl(),
             "Referer": referer || this.getBaseUrl() + "/",
         };
     }
@@ -207,13 +219,20 @@ class DefaultExtension extends MProvider {
         var id = slug + "~" + ep;
         var base = this.getBaseUrl();
 
-        var h = this.headers(base + "/watch/" + slug + "/" + ep + "/");
-        var res = await this.client.get(
-            base + "/api/hdb/stream/" + encodeURIComponent(id),
-            h,
-        );
-        var json = JSON.parse(res.body);
-        var sources = (json && json.sources) || [];
+        var referer = base + "/watch/" + slug + "/" + ep + "/";
+        var h = this.headers(referer);
+        var apiUrl = base + "/api/hdb/stream/" + encodeURIComponent(id);
+
+        var json = null;
+        var sources = [];
+        var lastBody = "";
+        for (var attempt = 0; attempt < 3; attempt++) {
+            var res = await this.client.get(apiUrl, this.apiHeaders(referer));
+            lastBody = res.body;
+            json = JSON.parse(res.body);
+            sources = (json && json.sources) || [];
+            if (sources.length) break;
+        }
 
         // Sottotitoli: tracce multiple (incluso Italiano e Inglese).
         var LANGNAMES = {
@@ -266,10 +285,10 @@ class DefaultExtension extends MProvider {
         });
 
         if (videos.length === 0) {
-            var snippet = String(res.body).slice(0, 160).replace(/\s+/g, " ");
+            var snippet = String(lastBody).slice(0, 160).replace(/\s+/g, " ");
             throw new Error(
-                "No stream. id=[" + id + "] url=[" + String(url).slice(0, 70) +
-                "] resp=" + snippet,
+                "No stream. id=[" + id + "] resp=" + snippet +
+                " — apri la Webview una volta e riprova.",
             );
         }
         return videos;
