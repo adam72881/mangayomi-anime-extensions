@@ -25,8 +25,8 @@ https://raw.githubusercontent.com/adam72881/it-ext-repo/mangayomi/anime_index.js
 | `anime_index.json` | Indice delle sorgenti. **Ogni modifica a un `.js` richiede di alzare `version` sia qui sia nel `mangayomiSources` del file**, altrimenti l'app non scarica il codice nuovo. |
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) — 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me, sito italiano) — 2.1.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) — 1.1.2 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) — 1.1.1 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) — 1.1.4 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) — 1.1.3 |
 
 ## API di Mangayomi (promemoria)
 
@@ -63,7 +63,7 @@ controllo di accesso, si rifà la stessa POST JSON che fa lo script del sito (`t
 niente coordinate e niente User-Agent diverso) e si apre l'URL con Referer `searchgate.php`.
 Prove: sissy 18/20 titoli, hypno 20/20, poppers 19/20, «sissy hypno caption» 20 risultati.
 Dalla 1.1.1 ogni ricerca (e la pagina successiva) aspetta almeno 10 secondi dalla precedente; se arriva «Search error» si aspetta 10 secondi e si riprova una volta.
-1.1.2 / PMVHaven 1.1.1: con Tipo=Playlist l'ordine supportato si applica (HypnoTube `/playlists/views/` e `/playlists/rating/`; PMVHaven `sort=-views|-bayesianRating|-likes|createdAt`). Categoria o preset sulla playlist diventano la ricerca playlist; durata, settimana e «più lunghi» sulle playlist non esistono e si ignorano senza svuotare. Ordine+categoria sui video PMVHaven passa `sort` alla ricerca. `fetchAll=true` ha i campi giusti (`videoDetails`, `thumbnailUrl`) ma su una playlist da 5731 video pesa 24 MB: la scheda legge le stesse pagine `?page=&limit=50` (max 100 episodi). Ogni episodio, video singolo compreso, ha `thumbnailUrl` (campo di MChapter).
+1.1.3: filtri separati. Video = Sezione (tutti, tendenza `trending=true&sort=-views`, popolare `sort=-likes`, tag HMV/TikTok/Hypno/Korean BJ) e Ordine video (`-releaseDate`, `releaseDate`, `-bayesianRating`, `-views`, `-likes`, `-duration`, `duration`, casuale). Playlist = Ordine playlist del sito (`-createdAt`, `createdAt`, `-views`, `-bayesianRating`, `-likes`, `name`, `-name`, `-videoCount`, casuale sulle pagine 1–10). Link playlist `/playlists/<id>`; getDetail una sola chiamata `?page=1&limit=50` e legge `data.videoDetails`. Raccomandato (`personalizedOnly`) senza login restituisce 0 video e non è nel filtro. HypnoTube 1.1.4: playlist Più visti `/playlists/views/`, Casuale una pagina a caso; Più lunghi non esiste sul sito e resta l’elenco recenti.
 Pagina 2 della ricerca: dopo la pagina 1, GET di `pageN.html` con Referer della pagina 1; se è vuota si
 ripete il controllo di accesso su quel path. Esito: 20 video, 0 in comune con la pagina 1
 («The Best Sissy Maker Ever» contro «BBC Photography…»).

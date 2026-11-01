@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.2",
+        "version": "1.1.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -20,17 +20,40 @@ const PREF_BASE = "pmvhaven_base_url";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-// L'API ordina con prefisso "-" (decrescente). week/month = più votati nella finestra.
-const ORDERS = [
-    ["-uploadDate", "Recenti"],
-    ["-views", "Più visti"],
+// Ordini video della home (sort di /api/videos). «Più visti» sul sito è disabilitato in UI ma l'API risponde.
+const VIDEO_ORDERS = [
+    ["-releaseDate", "Più recenti"],
+    ["releaseDate", "Più vecchi"],
     ["-bayesianRating", "Più votati"],
+    ["-views", "Più visti"],
+    ["-likes", "Più apprezzati"],
     ["-duration", "Più lunghi"],
-    ["week", "Più votati della settimana"],
-    ["month", "Più votati del mese"],
+    ["duration", "Più corti"],
     ["random", "Casuale"],
-    ["uploadDate", "Più vecchi"],
-    ["views", "Meno visti"],
+];
+
+// Ordini della pagina Playlist, valori uguali a playlistSortOptions del sito.
+const PLAYLIST_ORDERS = [
+    ["-createdAt", "Più recenti"],
+    ["createdAt", "Più vecchi"],
+    ["-views", "Più visti"],
+    ["-bayesianRating", "Valutazione più alta"],
+    ["-likes", "Più apprezzati"],
+    ["name", "AZ"],
+    ["-name", "ZA"],
+    ["-videoCount", "Più video"],
+    ["random", "Casuale"],
+];
+
+// Pill e tag rapidi della home. Raccomandato richiede il login (personalizedOnly vuoto).
+const SECTIONS = [
+    ["", "Tutti i video"],
+    ["trending", "Di tendenza"],
+    ["popular", "Popolare"],
+    ["tag:HMV", "HMV"],
+    ["tag:TikTok", "TikTok"],
+    ["tag:Hypno", "Ipnosi"],
+    ["tag:Korean BJ", "BJ coreano"],
 ];
 
 const DURATIONS = [
@@ -225,7 +248,7 @@ class DefaultExtension extends MProvider {
             list.push({
                 name: p.name,
                 imageUrl: p.thumbnailUrl || p.thumbnail || "",
-                link: "playlist:" + p._id,
+                link: "/playlists/" + p._id,
             });
         }
         var hasNext = false;
@@ -272,14 +295,22 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
-    async loadQuery(path, page, random) {
+    async loadQuery(path, page, random, maxRandom) {
         var join = path.indexOf("?") >= 0 ? "&" : "?";
         if (!random) return this.api(path + join + "page=" + page);
+        var cap = maxRandom || 0;
+        if (cap) {
+            var n = 1 + Math.floor(Math.random() * cap);
+            var picked = await this.api(path + join + "page=" + n);
+            var rows = picked.data || picked.videos || [];
+            if (Array.isArray(rows) && rows.length) return picked;
+            return this.api(path + join + "page=1");
+        }
         var first = await this.api(path + join + "page=1");
         var total = this.totalPages(first);
-        var n = 1 + Math.floor(Math.random() * total);
-        if (n === 1) return first;
-        return this.api(path + join + "page=" + n);
+        var n2 = 1 + Math.floor(Math.random() * total);
+        if (n2 === 1) return first;
+        return this.api(path + join + "page=" + n2);
     }
 
     async getPopular(page) {
@@ -291,27 +322,31 @@ class DefaultExtension extends MProvider {
     }
 
     orderQuery(order) {
-        var sort = order || "-uploadDate";
-        var extra = "";
-        if (sort === "week") {
-            sort = "-bayesianRating";
-            extra = "&uploadDateFrom=" + encodeURIComponent(this.since(7));
-        } else if (sort === "month") {
-            sort = "-bayesianRating";
-            extra = "&uploadDateFrom=" + encodeURIComponent(this.since(30));
-        } else if (sort === "random") {
-            sort = "-uploadDate";
-        }
-        return { sort: sort, extra: extra, random: order === "random" };
+        if (!order || order === "random") return { sort: "-releaseDate", random: order === "random" };
+        return { sort: order, random: false };
     }
 
-    playlistSort(order) {
-        if (order === "-views") return "-views";
-        if (order === "views") return "views";
-        if (order === "-bayesianRating") return "-bayesianRating";
-        if (order === "-likes") return "-likes";
-        if (order === "uploadDate") return "createdAt";
-        return "-createdAt";
+    playlistId(raw) {
+        var s = String(raw || "");
+        var m = s.match(/\/playlists\/([a-f0-9]{24})/i);
+        if (m) return m[1];
+        m = s.match(/playlist:([a-f0-9]{24})/i) || s.match(/playlist%3A([a-f0-9]{24})/i);
+        if (m) return m[1];
+        return "";
+    }
+
+    playlistVideos(json) {
+        var d = json && json.data;
+        var pag = (json && (json.pagination || json.meta)) || {};
+        if (Array.isArray(d)) return { info: {}, videos: d, pagination: pag };
+        var info = d && typeof d === "object" ? d : (json || {});
+        var vids = info.videoDetails;
+        if (!Array.isArray(vids) || !vids.length) {
+            if (Array.isArray(info.videos) && info.videos[0] && info.videos[0]._id) vids = info.videos;
+            else vids = [];
+        }
+        if (!pag.page && info.pagination) pag = info.pagination;
+        return { info: info, videos: vids, pagination: pag };
     }
 
     async search(query, page, filters) {
@@ -320,25 +355,21 @@ class DefaultExtension extends MProvider {
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
         var tag = this.filterValue(filters, "Categoria");
-        var order = this.filterValue(filters, "Ordine") || "-uploadDate";
+        var section = this.filterValue(filters, "Sezione");
+        var vOrder = this.filterValue(filters, "Ordine video") || "-releaseDate";
+        var pOrder = this.filterValue(filters, "Ordine playlist") || "-createdAt";
         if (tipo === "playlist") {
             var qpl = text || preset || principale || tag || "";
-            var psort = this.playlistSort(order);
+            var randomPl = pOrder === "random";
+            var psort = randomPl ? "-createdAt" : pOrder;
             var plist = qpl
                 ? "/api/playlists/search?q=" + encodeURIComponent(qpl) + "&sort=" + encodeURIComponent(psort)
                 : "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort);
-            var plOut = this.toPlaylists(await this.loadQuery(plist, page, order === "random"));
+            var plOut = this.toPlaylists(await this.loadQuery(plist, page, randomPl, randomPl ? 10 : 0));
             if (!plOut.list.length && qpl) {
                 plOut = this.toPlaylists(await this.loadQuery(
-                    "/api/playlists/search?q=" + encodeURIComponent(qpl),
-                    page,
-                    false,
-                ));
-            }
-            if (!plOut.list.length) {
-                plOut = this.toPlaylists(await this.loadQuery(
-                    "/api/playlists?isPublic=true&limit=24&sort=-createdAt",
-                    page,
+                    "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort),
+                    1,
                     false,
                 ));
             }
@@ -354,19 +385,22 @@ class DefaultExtension extends MProvider {
             }
         }
         var q = preset || principale || text || tag || "";
-        var spec = this.orderQuery(order);
+        var spec = this.orderQuery(vOrder);
         var random = spec.random;
         var path;
-        // Senza un ordine esplicito la ricerca resta per rilevanza: sort=-uploadDate
-        // spinge in cima video recenti che non c'entrano col testo.
-        var scoped = !!(preset || principale || tag);
-        var explicitSort = order && order !== "-uploadDate" && order !== "random";
-        if (q) {
+        if (section === "trending") {
+            path = "/api/videos?trending=true&sort=-views";
+        } else if (section === "popular") {
+            path = "/api/videos?sort=-likes";
+        } else if (section.indexOf("tag:") === 0) {
+            path = "/api/videos?tags=" + encodeURIComponent(section.slice(4));
+            if (!random) path += "&sort=" + encodeURIComponent(spec.sort);
+        } else if (q) {
             path = "/api/videos/search?q=" + encodeURIComponent(q);
-            if (scoped || explicitSort) path += "&sort=" + encodeURIComponent(spec.sort) + spec.extra;
+            if (!random) path += "&sort=" + encodeURIComponent(spec.sort);
             if (minSec) path += "&durationMin=" + minSec;
         } else {
-            path = "/api/videos?sort=" + encodeURIComponent(spec.sort) + spec.extra;
+            path = "/api/videos?sort=" + encodeURIComponent(spec.sort);
             if (minSec) path += "&durationMin=" + minSec;
         }
         var json = await this.loadQuery(path, page, random);
@@ -399,40 +433,28 @@ class DefaultExtension extends MProvider {
             .split("/").filter(function (s) {
                 return s.length > 0;
             }).pop();
-        if (raw.indexOf("playlist:") !== -1 || String(id).indexOf("playlist:") === 0) {
-            var pid = String(id).replace(/^playlist:/, "");
-            // fetchAll=true mette videoDetails, ma su una playlist grande è tutto il catalogo
-            // (migliaia di video, decine di MB) e l'app non arriva a mostrarli. Stessi campi, a pagine.
+        var pid = this.playlistId(raw);
+        if (pid) {
+            // Una sola richiesta: fetchAll scarica migliaia di video e può superare il timeout.
+            var pl = await this.api("/api/playlists/" + pid + "?page=1&limit=50");
+            var parsed = this.playlistVideos(pl);
+            var d = parsed.info;
             var chapters = [];
-            var d = {};
-            var pageN = 1;
-            while (chapters.length < 100 && pageN <= 4) {
-                var pl = await this.api("/api/playlists/" + pid + "?page=" + pageN + "&limit=50");
-                d = pl.data || pl;
-                var vids = d.videoDetails || [];
-                if (!vids.length && pageN === 1 && Array.isArray(d.videos) && d.videos[0] && d.videos[0]._id) {
-                    vids = d.videos;
-                }
-                for (var i = 0; i < vids.length && chapters.length < 100; i++) {
-                    var item = vids[i];
-                    if (!item || !item._id) continue;
-                    var ch = {
-                        name: "Episodio " + (chapters.length + 1) + " - " + (item.title || "Video"),
-                        url: item._id,
-                    };
-                    this.chapterExtras(ch, item.uploadDate, item.thumbnailUrl || item.thumbnail);
-                    chapters.push(ch);
-                }
-                var pag = pl.pagination || {};
-                var more = !!pag.hasMore || (pag.totalPages && pag.page && pag.page < pag.totalPages);
-                if (!more || !vids.length) break;
-                pageN++;
+            for (var i = 0; i < parsed.videos.length; i++) {
+                var item = parsed.videos[i];
+                if (!item || !item._id) continue;
+                var ch = {
+                    name: "Episodio " + (chapters.length + 1) + " - " + (item.title || "Video"),
+                    url: item._id,
+                };
+                this.chapterExtras(ch, item.uploadDate, item.thumbnailUrl || item.thumbnail);
+                chapters.push(ch);
             }
             var about = [];
             if (d.ownerUsername || d.owner) about.push("Di " + (d.ownerUsername || d.owner));
             if (d.description) about.push(String(d.description));
             return {
-                link: "playlist:" + pid,
+                link: "/playlists/" + pid,
                 description: about.join("\n\n") || d.name || "Playlist",
                 genre: [],
                 status: 1,
@@ -521,7 +543,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Preset, poi Categorie principali, poi il testo o la categoria. La categoria usa la ricerca.",
+                name: "Video: Sezione e Ordine video. Playlist: Ordine playlist. La categoria resta i tag.",
             },
             {
                 type_name: "SelectFilter",
@@ -532,9 +554,11 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Playlist", value: "playlist" },
                 ],
             },
+            { type_name: "SelectFilter", name: "Sezione", state: 0, values: this.options(SECTIONS, "") },
+            { type_name: "SelectFilter", name: "Ordine video", state: 0, values: this.options(VIDEO_ORDERS, "") },
+            { type_name: "SelectFilter", name: "Ordine playlist", state: 0, values: this.options(PLAYLIST_ORDERS, "") },
             { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
-            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
             { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
             { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(this.orderedTags(), "Tutte") },
         ];

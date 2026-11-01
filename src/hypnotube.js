@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.3",
+        "version": "1.1.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -570,6 +570,7 @@ class DefaultExtension extends MProvider {
             var basePl = "/playlists/";
             if (!qpl && order === "most-viewed") basePl = "/playlists/views/";
             else if (!qpl && order === "top-rated") basePl = "/playlists/rating/";
+            // Più lunghi, più commentati, settimana e mese non hanno una pagina playlist: si resta su /playlists/.
             return this.playlistListing(basePl, page, !qpl && order === "random");
         }
 
@@ -610,8 +611,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getDetail(url) {
-        var doc = await this.doc(url);
-        if (String(url).indexOf("/playlist/") !== -1) {
+        var raw = String(url);
+        var lastHttp = raw.lastIndexOf("http");
+        if (lastHttp > 0) raw = raw.slice(lastHttp);
+        var doc = await this.doc(raw);
+        if (raw.indexOf("/playlist/") !== -1) {
             var parsed = this.parseList(doc);
             var h1 = doc.selectFirst("h1");
             var chapters = [];
@@ -624,7 +628,7 @@ class DefaultExtension extends MProvider {
                 chapters.push(ch);
             }
             return {
-                link: url,
+                link: raw,
                 description: (h1 ? h1.text.trim() : "Playlist") + (chapters.length ? " · " + chapters.length + " video" : ""),
                 genre: [],
                 status: 1,
@@ -666,10 +670,10 @@ class DefaultExtension extends MProvider {
         }
 
         var og = doc.selectFirst('meta[property="og:image"]');
-        var chapter = { name: "Episodio 1", url: url };
+        var chapter = { name: "Episodio 1", url: raw };
         this.chapterThumb(chapter, og ? og.attr("content") : "");
         return {
-            link: url,
+            link: raw,
             description: description || "Nessuna descrizione.",
             genre: genre,
             status: 1,
