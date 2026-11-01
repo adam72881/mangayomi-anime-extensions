@@ -1,4 +1,4 @@
-# Passaggio di consegne — moduli Mangayomi (branch `mangayomi`)
+# Passaggio di consegne — Mangayomi Anime Extensions (repo `adam72881/mangayomi-anime-extensions`, branch `main`)
 
 Stato al 1 novembre 2026, app **Mangayomi v0.9.95**. Continuare dai file in `src/`, non riscriverli.
 AnimeWorld e HentaiWorld non si toccano. Niente bypass di Cloudflare o anti-bot, niente User-Agent diverso da quello già nel file, niente filtri che escludono contenuti.
@@ -6,10 +6,10 @@ AnimeWorld e HentaiWorld non si toccano. Niente bypass di Cloudflare o anti-bot,
 URL da incollare in Mangayomi (Impostazioni → Browse → repository anime):
 
 ```
-https://raw.githubusercontent.com/adam72881/it-ext-repo/mangayomi/anime_index.json
+https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/anime_index.json
 ```
 
-Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia in `anime_index.json`. Commit e push diretti su `mangayomi`.
+Ogni modifica a un `.js` alza `version` sia in `mangayomiSources` del file sia in `anime_index.json`. Commit e push diretti su `main` di questo repo.
 
 User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
@@ -80,4 +80,4 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 1. `node --check src/<file>.js` e il parse di `anime_index.json`.
 2. HTTP con lo User-Agent del file. Non aggirare Cloudflare e non cambiare User-Agent.
 3. HypnoTube: almeno 10 secondi tra una ricerca e la successiva. Non ripetere `searchgate` in raffica.
-4. Push su `mangayomi`. In app: Browse → refresh repository → aggiorna la sorgente.
+4. Push su `main`. In app: Browse → refresh repository → aggiorna la sorgente.
