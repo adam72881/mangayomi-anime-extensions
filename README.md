@@ -20,3 +20,5 @@ Poi in **Browse** installa le sorgenti che vuoi.
 | **HentaiWorld** | hentaiworld.me | Hentai (18+) |
 
 Se un sito cambia dominio, aprila nelle impostazioni della sorgente e aggiorna il campo **Dominio**.
+
+> Stato del lavoro, bug aperti e cosa resta da fare: vedi [HANDOFF.md](HANDOFF.md).
