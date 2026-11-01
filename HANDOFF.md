@@ -2,6 +2,10 @@
 
 Documento per chi riprende il lavoro (persona o altra IA). Stato al 1 novembre 2026.
 
+> **Istruzione per chi riprende:** continua il lavoro già fatto, **non ricominciare da zero e non riscrivere
+> i moduli**. Parti dai file esistenti in `src/` sul branch `mangayomi` e correggi solo i bug elencati nelle
+> sezioni «DA SISTEMARE» (HypnoTube e PMVHaven). AnimeWorld e HentaiWorld sono completi: non toccarli.
+
 ## Cos'è questo branch
 
 Branch orfano `mangayomi` del repo `adam72881/it-ext-repo`. Contiene **solo** sorgenti per l'app
