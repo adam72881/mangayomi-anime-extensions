@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.0",
+        "version": "1.4.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -348,6 +348,15 @@ class DefaultExtension extends MProvider {
         return h;
     }
 
+    // Valori delle impostazioni della sorgente: si leggono con get().
+    settingValue(key) {
+        try {
+            var v = new SharedPreferences().get(key);
+            return v == null ? "" : String(v).trim();
+        } catch (e) { return ""; }
+    }
+
+    // Archivio interno dell'estensione (getString/setString), separato dalle impostazioni.
     readPref(key) {
         try { return String(new SharedPreferences().getString(key, "") || "").trim(); } catch (e) { return ""; }
     }
@@ -357,8 +366,8 @@ class DefaultExtension extends MProvider {
     }
 
     credentials() {
-        var email = this.readPref(PREF_EMAIL);
-        var pass = this.readPref(PREF_PASS);
+        var email = this.settingValue(PREF_EMAIL);
+        var pass = this.settingValue(PREF_PASS);
         return email && pass ? { email: email, pass: pass } : null;
     }
 

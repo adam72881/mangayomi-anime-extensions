@@ -1,5 +1,9 @@
 # Novità
 
+## HypnoTube 1.2.1 · PMVHaven 1.4.1
+
+- Corretto: utente/email e password scritti nelle impostazioni della sorgente non venivano letti, quindi l'accesso salvato non partiva.
+
 ## HypnoTube 1.2.0 · PMVHaven 1.4.0
 
 - **Accesso salvato** nelle impostazioni della sorgente (campi utente/email e password). L'estensione entra da sola quando serve e tiene la sessione; se la sessione scade rientra da sola.

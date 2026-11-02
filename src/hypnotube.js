@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.2.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -304,6 +304,15 @@ class DefaultExtension extends MProvider {
         if (this.credentials()) this.writePref(PREF_SESSION, m[1]);
     }
 
+    // Valori delle impostazioni della sorgente: si leggono con get().
+    settingValue(key) {
+        try {
+            var v = new SharedPreferences().get(key);
+            return v == null ? "" : String(v).trim();
+        } catch (e) { return ""; }
+    }
+
+    // Archivio interno dell'estensione (getString/setString), separato dalle impostazioni.
     readPref(key) {
         try { return String(new SharedPreferences().getString(key, "") || "").trim(); } catch (e) { return ""; }
     }
@@ -313,8 +322,8 @@ class DefaultExtension extends MProvider {
     }
 
     credentials() {
-        var user = this.readPref(PREF_USER);
-        var pass = this.readPref(PREF_PASS);
+        var user = this.settingValue(PREF_USER);
+        var pass = this.settingValue(PREF_PASS);
         return user && pass ? { user: user, pass: pass } : null;
     }
 
