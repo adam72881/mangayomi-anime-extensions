@@ -22,7 +22,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.2.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.2.1 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.4.1 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.4.2 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -72,7 +72,9 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **HypnoTube:** POST `/login` form `ahd_username`, `ahd_password`, `Submit=Login` con `new Client({followRedirects:false})`. Riuscito = 302 verso `/my-profile` + `Set-Cookie: PHPSESSID` (Max-Age 3 giorni), salvato in `hypnotube_session`. Loggato = c'è `href=".../logout"` nella pagina. `getVideoList` rifà il login una volta se la pagina non è da loggato. Verificato su sito vero con un account gratuito: da loggato `sources` ha 480 (`_m.mp4`, 640×360) e 720 (`.mp4`, 1280×720, verificato con ffprobe).
 - **PMVHaven:** Better Auth. POST `/api/auth/sign-in/email` JSON `{email, password, rememberMe:true}`; errore = 401 `INVALID_EMAIL_OR_PASSWORD`; successo = cookie `better-auth.session_token` / `__Secure-better-auth.session_token` (+ `session_data`), salvati in `pmvhaven_session`. Login solo da `myProfile` quando `/api/auth/session` non dà un utente. Nessun captcha. Successo **non** verificato con un account vero (verificati solo l'errore e la lettura dei cookie).
 
-## PMVHaven — 1.4.1, profilo confermato da Adam
+## PMVHaven — 1.4.2, profilo confermato da Adam
+
+- **Playlist per categoria (1.4.2):** `/api/playlists/search?q=` cerca nel **nome** della playlist (Elasticsearch, `meta.total`/`hasMore`). Conteggi verificati: blacked 941, gooning 950, poppers 1117, pmv 7141, hypno 1421, sissy 1496, bnwo 1268, stocking 29 (stockings 12), heel 71 (heels 33), lingerie 19. Oltre l'ultima pagina la risposta è vuota: si restituisce lista vuota (prima ripartiva dalle playlist recenti, all'infinito).
 
 - **Qualità (1.3.0):** `/api/videos/{id}` dà `hlsVariants` (playlist .m3u8 per 360p…2160p), `hlsMasterPlaylistUrl` e `videoUrl` (mp4 originale, anche 1–2 GB). `getVideoList` restituisce tutte le varianti + Auto (master) + Originale, con in testa quella della preferenza `pmvhaven_quality` (default 720). Il capitolo ora salva l'id del video, non l'mp4; un URL mp4 vecchio dà solo «Originale».
 
@@ -80,7 +82,7 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 
 - Sezioni: Tutti (`-releaseDate`), Di tendenza (`trending=true&sort=-views`), Popolare (`-likes`), tag HMV, TikTok, Hypno, Korean BJ.
 - Un solo filtro **Ordine** per video e playlist. Video: `-releaseDate`, `releaseDate`, `-bayesianRating`, `-views`, `-likes`, `-duration`, `duration`, Casuale (pagine 1–10). Playlist: `-createdAt`, `createdAt`, `-bayesianRating`, `-views`, `-likes`. Più lunghi sulle playlist usa `-views` e poi ordina la pagina per numero di video; Più corti usa `createdAt` e ordina per il conteggio crescente. Casuale è una pagina a caso tra 1 e 10, e se è vuota torna ai recenti. Non esce una lista vuota.
-- Categorie principali: Gooning, Blackedraw, Poppers e, in più, **Mai visti**. Mai visti non è una ricerca: nasconde i video già aperti. `getDetail` salva l’id in `SharedPreferences` (`pmvhaven_seen_ids`), ultimi 500, il più recente per primo. Vale nella ricerca, non nei tab Popolari e Recenti, che non ricevono i filtri. In cima a Categoria i termini verificati (PMV, Hypno, Sissy, Egirl, Blonde, BNWO, Caption, Ahegao, Stockings, Heels, Lingerie, e il resto del filtro).
+- Categorie principali: Gooning, Blacked (era Blackedraw: 6 playlist contro 941), Poppers e, in più, **Mai visti**. Mai visti non è una ricerca: nasconde i video già aperti. `getDetail` salva l’id in `SharedPreferences` (`pmvhaven_seen_ids`), ultimi 500, il più recente per primo. Vale nella ricerca, non nei tab Popolari e Recenti, che non ricevono i filtri. In cima a Categoria i termini verificati (PMV, Hypno, Sissy, Egirl, Blonde, BNWO, Caption, Ahegao, Stockings, Heels, Lingerie, e il resto del filtro).
 - Preset: Sissy Hypno, Egirl PMV, Lingerie, Chastity, BNWO. Durata minima `durationMin` (10 / 20 / 45 minuti).
 - Scheda video: `author` = `uploader` (niente «Di …» in trama). Primo genere `@uploader`, poi 3 `top5Tags` e gli altri tag. Trama con durata, voto like/(like+dislike) e visualizzazioni. Capitolo `Episodio 1` con `thumbnailUrl` http e `dateUpload` solo se è una stringa di cifre (millisecondi). `getVideoList` → mp4.
 - Barra `@nome`: `GET /api/videos?uploader=<nome>`, unito all’ordine video (`sort`) quando non è Casuale. Verificato con nightlyload e Interceptor.

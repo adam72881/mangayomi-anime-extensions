@@ -16,6 +16,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **PMVHaven 1.4.2** — categoria Blacked (al posto di Blackedraw): 941 playlist invece di 6; la lista playlist si ferma alla fine dei risultati.
 - **HentaiWorld 2.2.0** — cercando il nome di un genere (es. «yuri») si apre tutto il genere, non solo i titoli con quella parola.
 - **HypnoTube 1.2.1 / PMVHaven 1.4.1** — accesso salvato nelle impostazioni della sorgente: HypnoTube dà il 720p vero (basta l'account gratuito), PMVHaven apre Il mio profilo senza WebView.
 - **HypnoTube 1.1.9 / PMVHaven 1.3.1** — playlist «in corso», così l'aggiornamento della libreria le controlla anche se salti le serie finite; HypnoTube mostra tutte le qualità che manda il sito.
@@ -33,7 +34,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | **AnimeWorld** | 1.2.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
 | **HentaiWorld** | 2.2.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.2.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
-| **PMVHaven** | 1.4.1 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
+| **PMVHaven** | 1.4.2 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.
 

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.1",
+        "version": "1.4.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -72,7 +72,7 @@ const DURATIONS = [
 // In cima al filtro, solo termini verificati con /api/videos/search?q=
 const FRONT_TAGS = [
     ["gooning", "Gooning"],
-    ["Blackedraw", "Blackedraw"],
+    ["blacked", "Blacked"],
     ["poppers", "Poppers"],
     ["pmv", "PMV"],
     ["hypno", "Hypno"],
@@ -82,8 +82,8 @@ const FRONT_TAGS = [
     ["bnwo", "BNWO"],
     ["caption", "Caption"],
     ["ahegao", "Ahegao"],
-    ["stockings", "Stockings"],
-    ["heels", "Heels"],
+    ["stocking", "Stockings"],
+    ["heel", "Heels"],
     ["lingerie", "Lingerie"],
     ["chastity", "Chastity"],
     ["asian", "Asian"],
@@ -92,7 +92,7 @@ const FRONT_TAGS = [
 
 const PRINCIPALI = [
     ["gooning", "Gooning"],
-    ["Blackedraw", "Blackedraw"],
+    ["blacked", "Blacked"],
     ["poppers", "Poppers"],
     ["unseen", "Mai visti"],
 ];
@@ -738,17 +738,14 @@ class DefaultExtension extends MProvider {
                 ? "/api/playlists/search?q=" + encodeURIComponent(qpl) + "&sort=" + encodeURIComponent(psort)
                 : "/api/playlists?isPublic=true&limit=24&sort=" + encodeURIComponent(psort);
             var plJson = await this.loadQuery(plist, page, randomPl, randomPl ? 10 : 0);
-            var plRows = plJson.data || [];
-            if (!plRows.length) {
+            // Pagina vuota oltre la fine dei risultati: lista finita, non si riparte dai recenti.
+            if (!(plJson.data || []).length) {
+                if (page > 1 && !randomPl) return { list: [], hasNextPage: false };
                 plJson = await this.api("/api/playlists?isPublic=true&limit=24&sort=-createdAt&page=1");
             }
             if (kind === "long") plJson = this.byVideoCount(plJson, -1);
             if (kind === "short") plJson = this.byVideoCount(plJson, 1);
-            var plOut = this.toPlaylists(plJson);
-            if (!plOut.list.length) {
-                plOut = this.toPlaylists(await this.api("/api/playlists?isPublic=true&limit=24&sort=-createdAt&page=1"));
-            }
-            return plOut;
+            return this.toPlaylists(plJson);
         }
 
         var minSec = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;

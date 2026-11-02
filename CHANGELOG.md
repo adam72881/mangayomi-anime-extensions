@@ -1,5 +1,11 @@
 # Novità
 
+## PMVHaven 1.4.2
+
+- Categoria **Blackedraw → Blacked**: in Playlist da 6 a 941 risultati (40 pagine), nei video da 621 a 8734.
+- **Stockings** e **Heels** cercano «stocking» e «heel»: più risultati sia nelle playlist sia nei video.
+- Playlist: arrivati in fondo ai risultati la lista si ferma, invece di ricominciare con le playlist recenti che non c'entravano.
+
 ## HentaiWorld 2.2.0
 
 - **Ricerca per genere**: se scrivi il nome di un genere (es. «yuri», «big boobs», «milf») si apre tutto quel genere, non solo i titoli che contengono la parola. Prima «yuri» trovava 1 titolo, ora tutte le serie Yuri (10 pagine). Ordine, stato e lingua scelti nei filtri restano validi.
