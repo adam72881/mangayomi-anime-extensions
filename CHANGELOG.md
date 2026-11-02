@@ -1,5 +1,12 @@
 # Novità
 
+## PMVHaven 1.3.0
+
+- **Scelta della qualità**: 1080p, 720p, 480p, 360p (anche 1440p/2160p quando il sito le ha), Auto e Originale mp4.
+- Nuova impostazione **Qualità preferita** (di default 720p): è quella che parte quando apri un video.
+- Niente più caricamenti continui: le qualità HLS caricano il video a pezzi invece di scaricare l'mp4 originale (spesso centinaia di MB).
+- I video aggiunti alla libreria con le versioni precedenti mostrano solo l'Originale finché non aggiorni la scheda (trascina giù).
+
 ## Riorganizzazione (1 novembre 2026)
 
 - Le estensioni hanno un repo tutto loro: **mangayomi-anime-extensions** (prima erano nel ramo `mangayomi` di `it-ext-repo`).

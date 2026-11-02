@@ -22,7 +22,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.8 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.2.0 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.3.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -55,7 +55,9 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Filtro **Profili**: `getDetail` salva l’uploader in `SharedPreferences` (`hypnotube_recent_profiles`), ultimi 3, senza doppioni, il più recente per primo. Voce «Nessuno» più quei nomi. Sceglierne uno equivale a `@nome`.
 - **Popular a sorpresa** (impostazione, accesa di default): a `page=1` sceglie un ordine di lista (`/most-viewed/`, recenti, votati, lunghi, settimana, mese, casuale) o, più di rado, un canale in cima al filtro. Non usa la ricerca a 10 secondi. La scelta resta per `page>1`; alla riapertura (`page=1`) ne esce un’altra. Spento, Popolari torna a `/most-viewed/`.
 
-## PMVHaven — 1.2.0, profilo confermato da Adam
+## PMVHaven — 1.3.0, profilo confermato da Adam
+
+- **Qualità (1.3.0):** `/api/videos/{id}` dà `hlsVariants` (playlist .m3u8 per 360p…2160p), `hlsMasterPlaylistUrl` e `videoUrl` (mp4 originale, anche 1–2 GB). `getVideoList` restituisce tutte le varianti + Auto (master) + Originale, con in testa quella della preferenza `pmvhaven_quality` (default 720). Il capitolo ora salva l'id del video, non l'mp4; un URL mp4 vecchio dà solo «Originale».
 
 `tags=` sulla lista non filtra (`gooning` e `poppers` hanno gli stessi id). Categoria, preset e categorie principali usano `/api/videos/search?q=`.
 

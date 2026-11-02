@@ -16,6 +16,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **PMVHaven 1.3.0** — scegli la qualità (360p…1080p, Auto, Originale); di default 720p, che carica a pezzi e non si blocca più ogni pochi secondi.
 - **1 novembre 2026 — Repo dedicato.** Le estensioni hanno ora un repo tutto loro. Se avevi il vecchio indirizzo (`it-ext-repo/mangayomi/...`), sostituiscilo con quello qui sopra.
 - **PMVHaven 1.2.0** — un solo filtro Ordine per video e playlist; categoria **Mai visti** per nascondere i video già aperti.
 - **HypnoTube 1.1.8 / PMVHaven 1.1.9** — **Popular a sorpresa**: Popolari cambia ordine o categoria a ogni apertura (si spegne dalle impostazioni della sorgente).
@@ -29,7 +30,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | **AnimeWorld** | 1.2.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
 | **HentaiWorld** | 2.1.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.1.8 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
-| **PMVHaven** | 1.2.0 | pmvhaven.com | EN | PMV 18+: ordini, categorie, ricerca, playlist, profili, «Mai visti» |
+| **PMVHaven** | 1.3.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.
 

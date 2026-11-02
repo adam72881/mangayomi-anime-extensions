@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -21,6 +21,7 @@ const PREF_PROFILES = "pmvhaven_recent_profiles";
 const PREF_SURPRISE = "pmvhaven_surprise_popular";
 const PREF_POPULAR_PICK = "pmvhaven_popular_pick";
 const PREF_SEEN = "pmvhaven_seen_ids";
+const PREF_QUALITY = "pmvhaven_quality";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -851,7 +852,8 @@ class DefaultExtension extends MProvider {
         var description = head.join(" · ");
         if (body.length) description = description ? description + "\n\n" + body.join("\n") : body.join("\n");
 
-        var play = this.httpUrl(v.videoUrl) || String(id || "");
+        // L'id (non l'mp4) così getVideoList può offrire le qualità HLS.
+        var play = String(id || "") || this.httpUrl(v.videoUrl);
         var detail = {
             link: String(id || ""),
             description: description || "PMVHaven",
@@ -872,29 +874,59 @@ class DefaultExtension extends MProvider {
         try { raw = decodeURIComponent(raw); } catch (e) {}
         var lastHttp = raw.lastIndexOf("http");
         if (lastHttp > 0) raw = raw.slice(lastHttp);
+        var headers = { "User-Agent": UA, "Referer": this.getBaseUrl() + "/" };
 
-        var mp4 = "";
+        // Capitoli salvati con le versioni precedenti: solo l'mp4 originale.
         if (raw.indexOf("http") === 0 && /\.(mp4|m3u8)/.test(raw)) {
-            mp4 = raw;
-        } else {
-            var id = raw.split("?")[0].split("#")[0].replace(/\/+$/, "")
-                .split("/").filter(function (s) {
-                    return s.length > 0;
-                }).pop();
-            var json = await this.api("/api/videos/" + id);
-            var v = json.data || json;
-            mp4 = v.videoUrl || "";
+            return [{ url: raw, originalUrl: raw, quality: "Originale", headers: headers }];
         }
-        if (!mp4) throw new Error("Nessuno stream trovato per questo video");
 
-        return [
-            {
-                url: mp4,
-                originalUrl: mp4,
-                quality: "PMVHaven",
-                headers: { "User-Agent": UA, "Referer": this.getBaseUrl() + "/" },
-            },
-        ];
+        var id = raw.split("?")[0].split("#")[0].replace(/\/+$/, "")
+            .split("/").filter(function (s) {
+                return s.length > 0;
+            }).pop();
+        var json = await this.api("/api/videos/" + id);
+        var v = json.data || json.video || json;
+
+        // Le versioni HLS (360p…2160p) partono subito e caricano a pezzi;
+        // l'mp4 originale pesa centinaia di MB e si blocca spesso.
+        var streams = [];
+        var variants = Array.isArray(v.hlsVariants) ? v.hlsVariants.slice() : [];
+        variants.sort(function (a, b) {
+            return (Number(b.height) || 0) - (Number(a.height) || 0);
+        });
+        for (var i = 0; i < variants.length; i++) {
+            var hls = this.httpUrl(variants[i].playlistUrl);
+            if (!hls) continue;
+            var label = this.cleanLine(variants[i].resolution) || (variants[i].height + "p");
+            streams.push({ url: hls, originalUrl: hls, quality: label, headers: headers });
+        }
+        var master = this.httpUrl(v.hlsMasterPlaylistUrl);
+        if (master) streams.push({ url: master, originalUrl: master, quality: "Auto", headers: headers });
+        var mp4 = this.httpUrl(v.videoUrl);
+        if (mp4) {
+            var h = Number(v.height);
+            streams.push({ url: mp4, originalUrl: mp4, quality: "Originale" + (h ? " " + h + "p" : "") + " (mp4)", headers: headers });
+        }
+        if (!streams.length) throw new Error("Nessuno stream trovato per questo video");
+
+        var wanted = this.getPreference(PREF_QUALITY) || "720";
+        var pick = -1;
+        if (wanted === "auto" || wanted === "mp4") {
+            var key = wanted === "auto" ? "Auto" : "Originale";
+            for (var k = 0; k < streams.length; k++) {
+                if (streams[k].quality.indexOf(key) === 0) { pick = k; break; }
+            }
+        } else {
+            // La più alta non sopra quella scelta, altrimenti la più bassa disponibile.
+            var target = Number(wanted);
+            for (var j = 0; j < variants.length && j < streams.length; j++) {
+                if ((Number(variants[j].height) || 0) <= target) { pick = j; break; }
+            }
+            if (pick < 0 && variants.length) pick = Math.min(variants.length, streams.length) - 1;
+        }
+        if (pick > 0) streams.unshift(streams.splice(pick, 1)[0]);
+        return streams;
     }
 
     options(pairs, anyLabel) {
@@ -951,6 +983,16 @@ class DefaultExtension extends MProvider {
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio PMVHaven",
                     dialogMessage: "URL base, senza slash finale",
+                },
+            },
+            {
+                key: PREF_QUALITY,
+                listPreference: {
+                    title: "Qualità preferita",
+                    summary: "La prima della lista quando apri un video. Le altre restano da scegliere nel player.",
+                    valueIndex: 2,
+                    entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)"],
+                    entryValues: ["1080", "720", "480", "360", "auto", "mp4"],
                 },
             },
             {
