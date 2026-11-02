@@ -1,5 +1,11 @@
 # Novità
 
+## PMVHaven 1.5.1
+
+- **Qualità preferita → «Massima disponibile (fino a 4K)»**: parte sempre la qualità più alta del video (2160p, 1440p…).
+- Nel player le qualità sopra il 1080p si chiamano **2160p (4K)** e **1440p (2K)**.
+- Corretto: senza scelta la qualità predefinita era 480p invece di 720p.
+
 ## AnimeWorld 1.4.0 · HentaiWorld 2.4.0 · HypnoTube 1.4.0
 
 - **Date e miniature degli episodi.** HentaiWorld: miniatura e data di uscita vere per ogni episodio. AnimeWorld: data di uscita da AniList (anime recenti), e per molti anime già finiti anche titolo e miniatura dell'episodio; dove mancano, la copertina.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.5.0",
+        "version": "1.5.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -1047,6 +1047,9 @@ class DefaultExtension extends MProvider {
             var hls = this.httpUrl(variants[i].playlistUrl);
             if (!hls) continue;
             var label = this.cleanLine(variants[i].resolution) || (variants[i].height + "p");
+            var h = Number(variants[i].height) || 0;
+            if (h >= 2160) label += " (4K)";
+            else if (h >= 1440) label += " (2K)";
             streams.push({ url: hls, originalUrl: hls, quality: label, headers: headers });
         }
         var master = this.httpUrl(v.hlsMasterPlaylistUrl);
@@ -1060,7 +1063,9 @@ class DefaultExtension extends MProvider {
 
         var wanted = this.getPreference(PREF_QUALITY) || "720";
         var pick = -1;
-        if (wanted === "auto" || wanted === "mp4") {
+        if (wanted === "max") {
+            pick = 0; // le varianti HLS sono già dalla più alta
+        } else if (wanted === "auto" || wanted === "mp4") {
             var key = wanted === "auto" ? "Auto" : "Originale";
             for (var k = 0; k < streams.length; k++) {
                 if (streams[k].quality.indexOf(key) === 0) { pick = k; break; }
@@ -1138,9 +1143,11 @@ class DefaultExtension extends MProvider {
                 listPreference: {
                     title: "Qualità preferita",
                     summary: "La prima della lista quando apri un video. Le altre restano da scegliere nel player.",
-                    valueIndex: 2,
-                    entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)"],
-                    entryValues: ["1080", "720", "480", "360", "auto", "mp4"],
+                    // La voce nuova va in fondo: l'app salva la posizione scelta, e spostare
+                    // le altre cambierebbe la qualità a chi l'ha già impostata.
+                    valueIndex: 1,
+                    entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)", "Massima disponibile (fino a 4K)"],
+                    entryValues: ["1080", "720", "480", "360", "auto", "mp4", "max"],
                 },
             },
             {

@@ -78,7 +78,7 @@
         "hasCloudflare": false,
         "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/pmvhaven.js",
         "apiUrl": "",
-        "version": "1.5.0",
+        "version": "1.5.1",
         "isManga": false,
         "itemType": 1,
         "isFullData": false,
