@@ -21,8 +21,8 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.1.9 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.3.1 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.2.0 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.4.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -61,7 +61,14 @@ Mangayomi legge `status` così: 0 in corso, 1 finito, 2 in pausa, 3 cancellato, 
 
 - **HypnoTube qualità (1.1.9):** la pagina video ha `sources: [{src, size}]` per Plyr; senza accesso c'è solo 480 (`_m.mp4`), Plyr dichiara `options: [720, 480]`. `getVideoList` restituisce tutte le sources, la più alta per prima, con fallback su `<source>`.
 
-## PMVHaven — 1.3.1, profilo confermato da Adam
+## Accesso salvato (HypnoTube 1.2.0, PMVHaven 1.4.0)
+
+Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cookie`, l'app **non** aggiunge i cookie della WebView. Quindi il cookie del login salvato va gestito dall'estensione, e senza credenziali non si manda nessun Cookie proprio (PMVHaven) per lasciare valido l'accesso dalla WebView.
+
+- **HypnoTube:** POST `/login` form `ahd_username`, `ahd_password`, `Submit=Login` con `new Client({followRedirects:false})`. Riuscito = 302 verso `/my-profile` + `Set-Cookie: PHPSESSID` (Max-Age 3 giorni), salvato in `hypnotube_session`. Loggato = c'è `href=".../logout"` nella pagina. `getVideoList` rifà il login una volta se la pagina non è da loggato. Verificato su sito vero con un account gratuito: da loggato `sources` ha 480 (`_m.mp4`, 640×360) e 720 (`.mp4`, 1280×720, verificato con ffprobe).
+- **PMVHaven:** Better Auth. POST `/api/auth/sign-in/email` JSON `{email, password, rememberMe:true}`; errore = 401 `INVALID_EMAIL_OR_PASSWORD`; successo = cookie `better-auth.session_token` / `__Secure-better-auth.session_token` (+ `session_data`), salvati in `pmvhaven_session`. Login solo da `myProfile` quando `/api/auth/session` non dà un utente. Nessun captcha. Successo **non** verificato con un account vero (verificati solo l'errore e la lettura dei cookie).
+
+## PMVHaven — 1.4.0, profilo confermato da Adam
 
 - **Qualità (1.3.0):** `/api/videos/{id}` dà `hlsVariants` (playlist .m3u8 per 360p…2160p), `hlsMasterPlaylistUrl` e `videoUrl` (mp4 originale, anche 1–2 GB). `getVideoList` restituisce tutte le varianti + Auto (master) + Originale, con in testa quella della preferenza `pmvhaven_quality` (default 720). Il capitolo ora salva l'id del video, non l'mp4; un URL mp4 vecchio dà solo «Originale».
 

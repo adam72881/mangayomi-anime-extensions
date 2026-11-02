@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.9",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -20,6 +20,9 @@ const PREF_BASE = "hypnotube_base_url";
 const PREF_PROFILES = "hypnotube_recent_profiles";
 const PREF_SURPRISE = "hypnotube_surprise_popular";
 const PREF_POPULAR_PICK = "hypnotube_popular_pick";
+const PREF_USER = "hypnotube_username";
+const PREF_PASS = "hypnotube_password";
+const PREF_SESSION = "hypnotube_session";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -280,6 +283,10 @@ class DefaultExtension extends MProvider {
     }
 
     cookieHeader() {
+        if (!this._cookie && this.credentials()) {
+            var saved = this.readPref(PREF_SESSION);
+            if (saved) this._cookie = { PHPSESSID: saved };
+        }
         var c = this._cookie;
         if (!c) return "";
         var bits = [];
@@ -294,6 +301,44 @@ class DefaultExtension extends MProvider {
         if (!m) return;
         if (!this._cookie) this._cookie = {};
         this._cookie.PHPSESSID = m[1];
+        if (this.credentials()) this.writePref(PREF_SESSION, m[1]);
+    }
+
+    readPref(key) {
+        try { return String(new SharedPreferences().getString(key, "") || "").trim(); } catch (e) { return ""; }
+    }
+
+    writePref(key, value) {
+        try { new SharedPreferences().setString(key, value); } catch (e) {}
+    }
+
+    credentials() {
+        var user = this.readPref(PREF_USER);
+        var pass = this.readPref(PREF_PASS);
+        return user && pass ? { user: user, pass: pass } : null;
+    }
+
+    isLoggedIn(html) {
+        return /href="[^"]*\/logout"/.test(String(html || ""));
+    }
+
+    // Login con il modulo del sito (ahd_username / ahd_password). Riuscito = 302
+    // verso /my-profile con un nuovo PHPSESSID, che dura 3 giorni e viene salvato.
+    async login() {
+        var cred = this.credentials();
+        if (!cred) return false;
+        var h = { "User-Agent": UA, "Referer": this.getBaseUrl() + "/login",
+            "Origin": this.getBaseUrl(), "Content-Type": "application/x-www-form-urlencoded" };
+        var body = "ahd_username=" + encodeURIComponent(cred.user) +
+            "&ahd_password=" + encodeURIComponent(cred.pass) + "&Submit=Login";
+        var res = await new Client({ followRedirects: false }).post(this.getBaseUrl() + "/login", h, body);
+        var loc = this.headerOf(res, "location");
+        var html = res && res.body ? String(res.body) : "";
+        var ok = /my-profile/.test(loc) || this.isLoggedIn(html);
+        if (!ok) return false;
+        this._cookie = null;
+        this.rememberCookies(res);
+        return !!(this._cookie && this._cookie.PHPSESSID);
     }
 
     filterValue(filters, name) {
@@ -915,6 +960,15 @@ class DefaultExtension extends MProvider {
         var pageUrl = raw.indexOf("http") === 0 ? raw : this.getBaseUrl() + raw;
 
         var html = String(await this.getPage(pageUrl, this.headers()) || "");
+        // Il 720p arriva solo con l'accesso (anche gratuito). Con utente e password
+        // nelle impostazioni, se la sessione è scaduta si rientra da soli una volta.
+        var loginFailed = false;
+        if (this.credentials() && !this.isLoggedIn(html)) {
+            var ok = false;
+            try { ok = await this.login(); } catch (e) {}
+            if (ok) html = String(await this.getPage(pageUrl, this.headers()) || "");
+            loginFailed = !this.isLoggedIn(html);
+        }
         var headers = this.headers(pageUrl);
 
         // Il player riceve l'elenco delle qualità («sources: [...]»). Senza accesso
@@ -942,6 +996,7 @@ class DefaultExtension extends MProvider {
             var mp4 = (s[1] || s[0]).replace(/&amp;/g, "&");
             streams.push({ url: mp4, originalUrl: mp4, quality: "HypnoTube", headers: headers });
         }
+        if (loginFailed) streams[0].quality += " (accesso non riuscito: controlla utente e password)";
         return streams;
     }
 
@@ -997,6 +1052,26 @@ class DefaultExtension extends MProvider {
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio HypnoTube",
                     dialogMessage: "URL base, senza slash finale",
+                },
+            },
+            {
+                key: PREF_USER,
+                editTextPreference: {
+                    title: "Nome utente",
+                    summary: "Account HypnoTube (anche gratuito): serve per il 720p. Vuoto = nessun accesso automatico.",
+                    value: "",
+                    dialogTitle: "Nome utente HypnoTube",
+                    dialogMessage: "Lo stesso che usi sul sito",
+                },
+            },
+            {
+                key: PREF_PASS,
+                editTextPreference: {
+                    title: "Password",
+                    summary: "Salvata solo su questo dispositivo, nelle impostazioni di Mangayomi.",
+                    value: "",
+                    dialogTitle: "Password HypnoTube",
+                    dialogMessage: "Usa una password che non usi altrove",
                 },
             },
             {

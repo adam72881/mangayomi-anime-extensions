@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.1",
+        "version": "1.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -22,6 +22,9 @@ const PREF_SURPRISE = "pmvhaven_surprise_popular";
 const PREF_POPULAR_PICK = "pmvhaven_popular_pick";
 const PREF_SEEN = "pmvhaven_seen_ids";
 const PREF_QUALITY = "pmvhaven_quality";
+const PREF_EMAIL = "pmvhaven_email";
+const PREF_PASS = "pmvhaven_password";
+const PREF_SESSION = "pmvhaven_session";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -333,11 +336,83 @@ class DefaultExtension extends MProvider {
     }
 
     headers() {
-        return {
+        var h = {
             "User-Agent": UA,
             "Accept": "application/json",
             "Referer": this.getBaseUrl() + "/",
         };
+        // Con un Cookie esplicito Mangayomi non aggiunge quelli della WebView:
+        // lo mettiamo solo quando c'è una sessione del login salvato.
+        var session = this.credentials() ? this.readPref(PREF_SESSION) : "";
+        if (session) h["Cookie"] = session;
+        return h;
+    }
+
+    readPref(key) {
+        try { return String(new SharedPreferences().getString(key, "") || "").trim(); } catch (e) { return ""; }
+    }
+
+    writePref(key, value) {
+        try { new SharedPreferences().setString(key, value); } catch (e) {}
+    }
+
+    credentials() {
+        var email = this.readPref(PREF_EMAIL);
+        var pass = this.readPref(PREF_PASS);
+        return email && pass ? { email: email, pass: pass } : null;
+    }
+
+    // Tutti i nome=valore di Set-Cookie (Mangayomi li unisce con ", ").
+    cookiePairs(raw) {
+        var out = [];
+        var parts = String(raw || "").split(/,(?=\s*[A-Za-z0-9_.-]+=)/);
+        for (var i = 0; i < parts.length; i++) {
+            var pair = parts[i].split(";")[0].trim();
+            if (pair.indexOf("=") > 0) out.push(pair);
+        }
+        return out;
+    }
+
+    headerOf(res, name) {
+        var h = res && res.headers;
+        if (!h) return "";
+        var keys = Object.keys(h);
+        for (var i = 0; i < keys.length; i++) {
+            if (String(keys[i]).toLowerCase() === name) return String(h[keys[i]]);
+        }
+        return "";
+    }
+
+    // Login del sito (Better Auth): POST /api/auth/sign-in/email. Il cookie di
+    // sessione che restituisce viene salvato e usato nelle richieste successive.
+    async login() {
+        var cred = this.credentials();
+        if (!cred) return false;
+        var res = await this.client.post(
+            this.getBaseUrl() + "/api/auth/sign-in/email",
+            {
+                "User-Agent": UA,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Origin": this.getBaseUrl(),
+                "Referer": this.getBaseUrl() + "/login",
+            },
+            { email: cred.email, password: cred.pass, rememberMe: true },
+        );
+        if (!res || res.statusCode < 200 || res.statusCode >= 300) return false;
+        var pairs = this.cookiePairs(this.headerOf(res, "set-cookie")).filter(function (p) {
+            return /session/i.test(p.split("=")[0]);
+        });
+        if (!pairs.length) return false;
+        this.writePref(PREF_SESSION, pairs.join("; "));
+        return true;
+    }
+
+    async currentUser() {
+        var session = null;
+        try { session = await this.api("/api/auth/session"); } catch (e) {}
+        var user = session && (session.user || (session.data && session.data.user));
+        return user && (user.id || user._id) ? user : null;
     }
 
     filterValue(filters, name) {
@@ -535,10 +610,12 @@ class DefaultExtension extends MProvider {
         return { info: info, videos: vids, pagination: pag };
     }
 
-    loginItem() {
+    loginItem(failed) {
         return {
             list: [{
-                name: "Accedi dalla WebView di Mangayomi per vedere il profilo",
+                name: failed
+                    ? "Accesso non riuscito: controlla email e password nelle impostazioni della sorgente"
+                    : "Accedi dalla WebView o metti email e password nelle impostazioni della sorgente",
                 imageUrl: "",
                 link: "pmv:login",
             }],
@@ -553,9 +630,14 @@ class DefaultExtension extends MProvider {
     }
 
     async myProfile(page) {
-        var session = null;
-        try { session = await this.api("/api/auth/session"); } catch (e) {}
-        var user = session && (session.user || (session.data && session.data.user));
+        var user = await this.currentUser();
+        // Sessione assente o scaduta: con email e password nelle impostazioni si rientra da soli.
+        if (!user && this.credentials()) {
+            var ok = false;
+            try { ok = await this.login(); } catch (e) {}
+            if (ok) user = await this.currentUser();
+            if (!user) return this.loginItem(true);
+        }
         var id = user && (user.id || user._id);
         if (!id) return this.loginItem();
 
@@ -993,6 +1075,26 @@ class DefaultExtension extends MProvider {
                     valueIndex: 2,
                     entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)"],
                     entryValues: ["1080", "720", "480", "360", "auto", "mp4"],
+                },
+            },
+            {
+                key: PREF_EMAIL,
+                editTextPreference: {
+                    title: "Email",
+                    summary: "Account PMVHaven: serve per Tipo → Il mio profilo. Vuoto = nessun accesso automatico.",
+                    value: "",
+                    dialogTitle: "Email PMVHaven",
+                    dialogMessage: "L'email con cui accedi al sito",
+                },
+            },
+            {
+                key: PREF_PASS,
+                editTextPreference: {
+                    title: "Password",
+                    summary: "Salvata solo su questo dispositivo, nelle impostazioni di Mangayomi.",
+                    value: "",
+                    dialogTitle: "Password PMVHaven",
+                    dialogMessage: "Usa una password che non usi altrove",
                 },
             },
             {

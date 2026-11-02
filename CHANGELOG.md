@@ -1,5 +1,13 @@
 # Novità
 
+## HypnoTube 1.2.0 · PMVHaven 1.4.0
+
+- **Accesso salvato** nelle impostazioni della sorgente (campi utente/email e password). L'estensione entra da sola quando serve e tiene la sessione; se la sessione scade rientra da sola.
+- **HypnoTube**: con l'accesso (basta l'account gratuito) arriva il **720p vero** (1280×720) oltre al 480p (che in realtà è 640×360). Se l'accesso non riesce, il video parte lo stesso e la qualità lo segnala.
+- **PMVHaven**: l'accesso serve per **Tipo → Il mio profilo** (preferiti e repost) senza passare dalla WebView.
+- Campi vuoti = tutto come prima (vale l'accesso fatto nella WebView).
+- La password resta solo sul telefono, nelle impostazioni di Mangayomi, in chiaro: usane una che non usi altrove.
+
 ## HypnoTube 1.1.9 · PMVHaven 1.3.1
 
 - **Playlist «in corso»**: con la nuova opzione di Mangayomi «salta le serie finite», le playlist vengono comunque aggiornate e ricevono i video nuovi. I singoli video restano «finiti» e vengono saltati.
