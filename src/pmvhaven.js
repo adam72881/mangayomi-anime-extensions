@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.5.1",
+        "version": "1.5.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -1146,8 +1146,8 @@ class DefaultExtension extends MProvider {
                     // La voce nuova va in fondo: l'app salva la posizione scelta, e spostare
                     // le altre cambierebbe la qualità a chi l'ha già impostata.
                     valueIndex: 1,
-                    entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)", "Massima disponibile (fino a 4K)"],
-                    entryValues: ["1080", "720", "480", "360", "auto", "mp4", "max"],
+                    entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)", "Massima disponibile (fino a 4K)", "2160p (4K)", "1440p (2K)"],
+                    entryValues: ["1080", "720", "480", "360", "auto", "mp4", "max", "2160", "1440"],
                 },
             },
             {

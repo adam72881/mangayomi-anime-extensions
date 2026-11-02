@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.5.2
+
+- **Qualità preferita**: si possono scegliere anche **2160p (4K)** e **1440p (2K)**. Se il video non le ha, parte la più alta disponibile sotto quella scelta.
+
 ## PMVHaven 1.5.1
 
 - **Qualità preferita → «Massima disponibile (fino a 4K)»**: parte sempre la qualità più alta del video (2160p, 1440p…).
