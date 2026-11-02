@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.1.0",
+        "version": "2.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -141,6 +141,14 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: list.length >= PER_PAGE };
     }
 
+    genreFor(text) {
+        var key = String(text).trim().toLowerCase().replace(/[\s_]+/g, "-");
+        for (var i = 0; i < GENRES.length; i++) {
+            if (GENRES[i][0] === key || GENRES[i][1].toLowerCase().replace(/\s+/g, "-") === key) return GENRES[i][0];
+        }
+        return "";
+    }
+
     async archive(params, page) {
         var q = params && params.length ? params + "&page=" + page : "page=" + page;
         return this.parseArchive(await this.doc("/archive?" + q));
@@ -170,6 +178,16 @@ class DefaultExtension extends MProvider {
         var lang = this.filterValue(filters, "Lingua");
         if ((!filters || !filters.length) && !(query && query.length))
             return this.getPopular(page);
+
+        // La ricerca del sito guarda solo i titoli: se il testo è il nome di un
+        // genere (es. «yuri», «big boobs»), si apre quel genere.
+        if (!genre && query) {
+            var asGenre = this.genreFor(query);
+            if (asGenre) {
+                genre = asGenre;
+                query = "";
+            }
+        }
 
         var parts = [];
         if (query && query.length) parts.push("search=" + encodeURIComponent(query));

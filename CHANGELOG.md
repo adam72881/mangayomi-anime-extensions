@@ -1,5 +1,9 @@
 # Novità
 
+## HentaiWorld 2.2.0
+
+- **Ricerca per genere**: se scrivi il nome di un genere (es. «yuri», «big boobs», «milf») si apre tutto quel genere, non solo i titoli che contengono la parola. Prima «yuri» trovava 1 titolo, ora tutte le serie Yuri (10 pagine). Ordine, stato e lingua scelti nei filtri restano validi.
+
 ## HypnoTube 1.2.1 · PMVHaven 1.4.1
 
 - Corretto: utente/email e password scritti nelle impostazioni della sorgente non venivano letti, quindi l'accesso salvato non partiva.

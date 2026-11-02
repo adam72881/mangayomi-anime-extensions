@@ -20,7 +20,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | File | Sorgente | Versione |
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
-| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.1.0 |
+| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.2.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.2.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.4.1 |
 
@@ -37,7 +37,9 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 Verificato dall’utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Sub/Dub ITA), 45 generi. Non modificare.
 
-## HentaiWorld — 2.1.0, completo
+## HentaiWorld — 2.2.0, completo
+
+- **Ricerca per genere (2.2.0):** `/archive?search=` cerca solo nei titoli (e per sottostringa: «yuri» trova «Ayuri»). Se il testo cercato è uno slug o un nome di `GENRES` e nessun genere è scelto nei filtri, `search()` usa `genre=<slug>` al posto di `search=`. `search` e `genre` insieme danno 0 risultati, quindi non si combinano.
 
 Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `language=sub_ita|sub_eng|dub_ita`. Trama da `div.entry > p`, episodi da `#episodes-grid article.episode-item`, mp4 da `videoUrl` in `/watch/`. Non modificare.
 
