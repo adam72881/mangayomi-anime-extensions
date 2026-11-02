@@ -1,5 +1,12 @@
 # Novità
 
+## AnimeWorld 1.4.0 · HentaiWorld 2.4.0 · HypnoTube 1.4.0
+
+- **Date e miniature degli episodi.** HentaiWorld: miniatura e data di uscita vere per ogni episodio. AnimeWorld: data di uscita da AniList (anime recenti), e per molti anime già finiti anche titolo e miniatura dell'episodio; dove mancano, la copertina.
+- **HentaiWorld: generi e lingue a spunta.** Puoi sceglierne più di uno (es. Yuri + Milf, oppure Sub ITA + Dub ITA): escono le serie che ne hanno almeno uno. Il sito non permette «tutti insieme» né di escludere un genere.
+- **HypnoTube: Qualità preferita** (720p o 480p) nelle impostazioni della sorgente.
+- AnimeWorld: i server alternativi (Streamtape, Filemoon…) non si possono aggiungere: il sito oggi offre solo il suo server.
+
 ## PMVHaven 1.5.0 · HypnoTube 1.3.0 · AnimeWorld 1.3.0
 
 **PMVHaven**

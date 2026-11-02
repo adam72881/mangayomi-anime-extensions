@@ -19,9 +19,9 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 | File | Sorgente | Versione |
 |---|---|---|
-| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.3.0 |
-| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.2.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.3.0 |
+| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.4.0 |
+| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.4.0 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.0 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.0 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -37,7 +37,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 Verificato dall’utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Sub/Dub ITA), 45 generi. Non modificare.
 
-## HentaiWorld — 2.2.0, completo
+## HentaiWorld — 2.4.0, completo
+
+- **Episodi (2.3.0):** miniatura da `article.episode-item img`; data da `"uploadDate"` (JSON-LD) nella pagina `/watch/<slug>`, letta in parallelo per i primi 24 episodi.
+- **Filtri (2.4.0):** `genre[]` e `language[]` multipli = OR (Yuri 189 + Milf 153 → 317 = unione). Nessun parametro per escludere. Anche `status[]`, `year[]`, `type[]` esistono nel modulo del sito.
 
 - **Ricerca per genere (2.2.0):** `/archive?search=` cerca solo nei titoli (e per sottostringa: «yuri» trova «Ayuri»). Se il testo cercato è uno slug o un nome di `GENRES` e nessun genere è scelto nei filtri, `search()` usa `genre=<slug>` al posto di `search=`. `search` e `genre` insieme danno 0 risultati, quindi non si combinano.
 
@@ -60,6 +63,10 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 ## HypnoTube — ordini dentro canali e ricerca (1.3.0)
 
 Canale: `/channels/<id>/<slug>/` + `views/`, `rating/`, `longest/` (+ `pageN.html`); `most-viewed/`, `top-rated/` lì sono ignorati. Ricerca: `/search/videos/<q>/` + `newest/`, `views/`, `rating/`, `longest/`; la pagina ordinata va chiesta dopo la pausa di 10 s (`paceSearch`), altrimenti torna vuota. Tabelle `CHANNEL_SORT` e `SEARCH_SORT`. «blacked» al posto di «Blackedraw» (12 video).
+
+## AnimeWorld — episodi (1.4.0)
+
+Nessuna data/miniatura nella pagina e nessun server alternativo (oggi solo «AnimeWorld Server»; `alt=1` dà lo stesso file; la sezione `div#download` usata da altre estensioni non esiste più). Date e miniature da AniList: id da `a[href*="anilist.co/anime/"]`, POST `https://graphql.anilist.co` con `airingSchedules(mediaId, sort: EPISODE_DESC, notYetAired: false)` (ultimi 50) e `streamingEpisodes` («Episode N - Titolo», miniature Crunchyroll). Senza dati: copertina `div.thumb img`. Jikan (MyAnimeList) dal container non risponde.
 
 ## Stato delle schede (Mangayomi 0.9.95)
 

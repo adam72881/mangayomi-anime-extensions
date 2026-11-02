@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -23,6 +23,7 @@ const PREF_POPULAR_PICK = "hypnotube_popular_pick";
 const PREF_USER = "hypnotube_username";
 const PREF_PASS = "hypnotube_password";
 const PREF_SESSION = "hypnotube_session";
+const PREF_QUALITY = "hypnotube_quality";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -1029,6 +1030,13 @@ class DefaultExtension extends MProvider {
             var mp4 = (s[1] || s[0]).replace(/&amp;/g, "&");
             streams.push({ url: mp4, originalUrl: mp4, quality: "HypnoTube", headers: headers });
         }
+        // Qualità preferita: quella scelta va per prima, se il sito la manda.
+        var wanted = this.settingValue(PREF_QUALITY);
+        if (wanted === "480") {
+            for (var q = 1; q < streams.length; q++) {
+                if (streams[q].quality.indexOf("480") === 0) { streams.unshift(streams.splice(q, 1)[0]); break; }
+            }
+        }
         if (loginFailed) streams[0].quality += " (accesso non riuscito: controlla utente e password)";
         return streams;
     }
@@ -1085,6 +1093,16 @@ class DefaultExtension extends MProvider {
                     value: DEFAULT_BASE,
                     dialogTitle: "Dominio HypnoTube",
                     dialogMessage: "URL base, senza slash finale",
+                },
+            },
+            {
+                key: PREF_QUALITY,
+                listPreference: {
+                    title: "Qualità preferita",
+                    summary: "Quella che parte aprendo un video. Il 720p arriva solo con l'accesso (anche gratuito); il 480p consuma meno dati.",
+                    valueIndex: 0,
+                    entries: ["Più alta disponibile (720p)", "480p"],
+                    entryValues: ["high", "480"],
                 },
             },
             {

@@ -4,6 +4,22 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 
 🔞 Alcune sorgenti sono per soli maggiorenni.
 
+> 🇬🇧 **English** — Anime and video extensions for Mangayomi: an Italian anime source (AnimeWorld) and three 18+ video sources (HentaiWorld, HypnoTube, PMVHaven). Add this anime repository in Mangayomi (**Settings → Browse → anime repository**):
+>
+> `https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/anime_index.json`
+>
+> One-tap install link (open it on the device where Mangayomi is installed):
+> `mangayomi://add-repo?repo_name=adam72881&repo_url=https://github.com/adam72881/mangayomi-anime-extensions&anime_url=https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/anime_index.json`
+>
+> | Source | Site | Language | Highlights |
+> |---|---|---|---|
+> | AnimeWorld | animeworld.ac | IT (sub/dub) | sort, status, dub filter, 45 genres, episode air dates and thumbnails (AniList) |
+> | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
+> | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
+> | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
+>
+> Sources that explicitly depict minors are excluded. No Cloudflare/anti-bot bypass: logins only use your own account.
+
 ## Installazione
 
 In Mangayomi: **Impostazioni → Browse → repository anime**, incolla:
@@ -16,6 +32,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **AnimeWorld 1.4.0 / HentaiWorld 2.4.0 / HypnoTube 1.4.0** — date e miniature degli episodi, generi e lingue a spunta su HentaiWorld, qualità preferita su HypnoTube.
 - **PMVHaven 1.5.0 / HypnoTube 1.3.0 / AnimeWorld 1.3.0** — filtri e ordini sistemati: HMV + Più visti mostra davvero HMV, categorie e ordini funzionano insieme, Blacked su HypnoTube, genere cercando il nome su AnimeWorld.
 - **PMVHaven 1.4.2** — categoria Blacked (al posto di Blackedraw): 941 playlist invece di 6; la lista playlist si ferma alla fine dei risultati.
 - **HentaiWorld 2.2.0** — cercando il nome di un genere (es. «yuri») si apre tutto il genere, non solo i titoli con quella parola.
@@ -32,9 +49,9 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 
 | Sorgente | Versione | Sito | Lingua | Contenuto |
 |---|---|---|---|---|
-| **AnimeWorld** | 1.3.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
-| **HentaiWorld** | 2.2.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
-| **HypnoTube** | 1.3.0 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
+| **AnimeWorld** | 1.4.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
+| **HentaiWorld** | 2.4.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
+| **HypnoTube** | 1.4.0 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
 | **PMVHaven** | 1.5.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.

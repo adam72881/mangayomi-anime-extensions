@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/animeworld.js",
@@ -217,9 +217,24 @@ class DefaultExtension extends MProvider {
             var key = a.attr("data-id") || href;
             if (seen[key]) continue;
             seen[key] = true;
-            chapters.push({ name: "Episodio " + num, url: href });
+            chapters.push({ name: "Episodio " + num, url: href, _n: parseFloat(num) });
         }
         chapters.reverse();
+
+        var cover = doc.selectFirst("div.thumb img");
+        var coverUrl = cover ? cover.attr("src") || "" : "";
+        var al = doc.selectFirst('a[href*="anilist.co/anime/"]');
+        var alId = al ? ((al.attr("href") || "").match(/anime\/(\d+)/) || [])[1] : "";
+        var extra = alId ? await this.anilistEpisodes(alId) : {};
+        for (var e = 0; e < chapters.length; e++) {
+            var ch = chapters[e];
+            var info2 = extra[ch._n] || {};
+            if (info2.date) ch.dateUpload = info2.date;
+            if (info2.title) ch.name += " - " + info2.title;
+            var thumb = info2.thumb || coverUrl;
+            if (/^https?:\/\//.test(thumb)) ch.thumbnailUrl = thumb;
+            delete ch._n;
+        }
 
         return {
             link: url,
@@ -228,6 +243,40 @@ class DefaultExtension extends MProvider {
             status: status,
             chapters: chapters,
         };
+    }
+
+    // AnimeWorld non ha date né miniature degli episodi. AniList (id nella pagina)
+    // dà la data di uscita (anime recenti) e, per molti anime già usciti, titolo e
+    // miniatura degli episodi. Se non risponde, gli episodi restano come prima.
+    async anilistEpisodes(id) {
+        var out = {};
+        try {
+            var res = await this.client.post(
+                "https://graphql.anilist.co",
+                { "Content-Type": "application/json", "Accept": "application/json" },
+                {
+                    query: "query($id:Int){Media(id:$id,type:ANIME){streamingEpisodes{title thumbnail}} " +
+                        "Page(perPage:50){airingSchedules(mediaId:$id,sort:EPISODE_DESC,notYetAired:false){episode airingAt}}}",
+                    variables: { id: parseInt(id, 10) },
+                },
+            );
+            var data = JSON.parse(res.body).data || {};
+            var sched = (data.Page && data.Page.airingSchedules) || [];
+            for (var i = 0; i < sched.length; i++) {
+                var n = sched[i].episode;
+                (out[n] = out[n] || {}).date = String(sched[i].airingAt * 1000);
+            }
+            var eps = (data.Media && data.Media.streamingEpisodes) || [];
+            for (var j = 0; j < eps.length; j++) {
+                var m = String(eps[j].title || "").match(/^Episode\s+(\d+)\s*-\s*(.+)$/i);
+                if (!m) continue;
+                var k = parseInt(m[1], 10);
+                out[k] = out[k] || {};
+                out[k].title = m[2].trim();
+                if (eps[j].thumbnail) out[k].thumb = eps[j].thumbnail;
+            }
+        } catch (e) {}
+        return out;
     }
 
     async getVideoList(url) {

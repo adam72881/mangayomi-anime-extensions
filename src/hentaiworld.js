@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.2.0",
+        "version": "2.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -100,6 +100,21 @@ class DefaultExtension extends MProvider {
         };
     }
 
+    // Valori spuntati di un GroupFilter di CheckBox.
+    checkedValues(filters, name) {
+        var out = [];
+        if (!filters || !filters.length) return out;
+        for (var i = 0; i < filters.length; i++) {
+            var f = filters[i];
+            if (!f || f.type_name !== "GroupFilter" || f.name !== name || !Array.isArray(f.state)) continue;
+            for (var j = 0; j < f.state.length; j++) {
+                var c = f.state[j];
+                if (c && c.state === true && c.value) out.push(String(c.value));
+            }
+        }
+        return out;
+    }
+
     filterValue(filters, name) {
         if (!filters || !filters.length) return "";
         for (var i = 0; i < filters.length; i++) {
@@ -172,29 +187,29 @@ class DefaultExtension extends MProvider {
     }
 
     async search(query, page, filters) {
-        var genre = this.filterValue(filters, "Genere");
+        var genres = this.checkedValues(filters, "Generi");
         var sort = this.filterValue(filters, "Ordine");
         var status = this.filterValue(filters, "Stato");
-        var lang = this.filterValue(filters, "Lingua");
+        var langs = this.checkedValues(filters, "Lingua");
         if ((!filters || !filters.length) && !(query && query.length))
             return this.getPopular(page);
 
         // La ricerca del sito guarda solo i titoli: se il testo è il nome di un
         // genere (es. «yuri», «big boobs»), si apre quel genere.
-        if (!genre && query) {
+        if (!genres.length && query) {
             var asGenre = this.genreFor(query);
             if (asGenre) {
-                genre = asGenre;
+                genres = [asGenre];
                 query = "";
             }
         }
 
         var parts = [];
         if (query && query.length) parts.push("search=" + encodeURIComponent(query));
-        if (genre) parts.push("genre=" + encodeURIComponent(genre));
+        for (var g = 0; g < genres.length; g++) parts.push("genre%5B%5D=" + encodeURIComponent(genres[g]));
         if (sort) parts.push("sort=" + encodeURIComponent(sort));
         if (status) parts.push("status=" + encodeURIComponent(status));
-        if (lang) parts.push("language=" + encodeURIComponent(lang));
+        for (var l = 0; l < langs.length; l++) parts.push("language%5B%5D=" + encodeURIComponent(langs[l]));
         return this.archive(parts.join("&"), page);
     }
 
@@ -240,9 +255,14 @@ class DefaultExtension extends MProvider {
             if (!href || seen[href]) continue;
             seen[href] = true;
             var num = card.attr("data-episode") || String(chapters.length + 1);
-            chapters.push({ name: "Episodio " + num, url: href, _n: parseInt(num, 10) || 0 });
+            var ep = { name: "Episodio " + num, url: href, _n: parseInt(num, 10) || 0 };
+            var img = card.selectFirst("img");
+            var thumb = img ? (img.attr("src") || img.attr("data-src") || "") : "";
+            if (/^https?:\/\//.test(thumb)) ep.thumbnailUrl = thumb;
+            chapters.push(ep);
         }
         chapters.sort(function (a, b) { return b._n - a._n; });
+        await this.addEpisodeDates(chapters);
         for (var c = 0; c < chapters.length; c++) delete chapters[c]._n;
 
         var langName = { eng: "SUB ENG", dubita: "DUB ITA", ita: "SUB ITA" }[langOf(slug)] || "";
@@ -259,6 +279,24 @@ class DefaultExtension extends MProvider {
             status: status,
             chapters: chapters,
         };
+    }
+
+    // La data di uscita sta solo nella pagina di ogni episodio ("uploadDate" nel
+    // JSON-LD). Le serie sono corte: si leggono in parallelo, al massimo 24.
+    async addEpisodeDates(chapters) {
+        var self = this;
+        var jobs = chapters.slice(0, 24).map(function (ch) {
+            var slug = String(ch.url).split("?")[0].replace(/\/+$/, "").split("/").pop();
+            return self.client.get(self.getBaseUrl() + "/watch/" + slug, self.headers(self.getBaseUrl() + "/"))
+                .then(function (res) {
+                    var m = String((res && res.body) || "").match(/"uploadDate"\s*:\s*"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+                    if (!m) return;
+                    var ms = Date.parse(m[1] + "T" + m[2] + "Z");
+                    if (isFinite(ms)) ch.dateUpload = String(ms);
+                })
+                .catch(function () {});
+        });
+        await Promise.all(jobs);
     }
 
     async getVideoList(url) {
@@ -318,7 +356,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Il sito non ha «Più recenti»: l'ordine delle novità è «Ultime aggiunte». Genere, stato e lingua si combinano.",
+                name: "Generi e lingue a spunta: escono le serie che ne hanno almeno uno (il sito non permette «tutti insieme» né di escludere). Ordine e stato si combinano.",
             },
             {
                 type_name: "SelectFilter",
@@ -333,21 +371,18 @@ class DefaultExtension extends MProvider {
                 values: this.options(STATUSES, "Tutti"),
             },
             {
-                type_name: "SelectFilter",
-                name: "Genere",
-                state: 0,
-                values: this.options(GENRES, "Tutti"),
+                type_name: "GroupFilter",
+                name: "Lingua",
+                state: [["sub_ita", "Sub ITA"], ["sub_eng", "Sub ENG"], ["dub_ita", "Dub ITA"]].map(function (x) {
+                    return { type_name: "CheckBox", name: x[1], value: x[0] };
+                }),
             },
             {
-                type_name: "SelectFilter",
-                name: "Lingua",
-                state: 0,
-                values: [
-                    { type_name: "SelectOption", name: "Tutte", value: "" },
-                    { type_name: "SelectOption", name: "Sub ITA", value: "sub_ita" },
-                    { type_name: "SelectOption", name: "Sub ENG", value: "sub_eng" },
-                    { type_name: "SelectOption", name: "Dub ITA", value: "dub_ita" },
-                ],
+                type_name: "GroupFilter",
+                name: "Generi",
+                state: GENRES.map(function (x) {
+                    return { type_name: "CheckBox", name: x[1], value: x[0] };
+                }),
             },
         ];
     }
