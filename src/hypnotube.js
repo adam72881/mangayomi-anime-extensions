@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.8",
+        "version": "1.1.9",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -849,7 +849,7 @@ class DefaultExtension extends MProvider {
                 link: raw,
                 description: (h1 ? h1.text.trim() : "Playlist") + (chapters.length ? " · " + chapters.length + " video" : ""),
                 genre: [],
-                status: 1,
+                status: 0, // in corso: le playlist crescono, l'aggiornamento della libreria le controlla
                 chapters: chapters,
             };
         }
@@ -914,20 +914,35 @@ class DefaultExtension extends MProvider {
         if (lastHttp > 0) raw = raw.slice(lastHttp);
         var pageUrl = raw.indexOf("http") === 0 ? raw : this.getBaseUrl() + raw;
 
-        var html = await this.getPage(pageUrl, this.headers());
-        var s = String(html || "").match(/<source[^>]+src="([^"]+\.mp4[^"]*)"/);
-        if (!s) s = String(html || "").match(/https?:\/\/media\.hypnotube\.com\/[^\s'"]+\.mp4[^\s'"]*/);
-        if (!s) throw new Error("Nessuno stream trovato per questo video");
-        var mp4 = (s[1] || s[0]).replace(/&amp;/g, "&");
+        var html = String(await this.getPage(pageUrl, this.headers()) || "");
+        var headers = this.headers(pageUrl);
 
-        return [
-            {
-                url: mp4,
-                originalUrl: mp4,
-                quality: "HypnoTube",
-                headers: this.headers(pageUrl),
-            },
-        ];
+        // Il player riceve l'elenco delle qualità («sources: [...]»). Senza accesso
+        // c'è di solito solo 480p; altre qualità compaiono se il sito le manda.
+        var streams = [];
+        var list = html.match(/sources:\s*(\[[^\]]*\])/);
+        if (list) {
+            try {
+                var arr = JSON.parse(list[1]);
+                arr.sort(function (a, b) {
+                    return (Number(b.size) || 0) - (Number(a.size) || 0);
+                });
+                for (var i = 0; i < arr.length; i++) {
+                    var src = String(arr[i].src || "");
+                    if (!/^https?:\/\//.test(src)) continue;
+                    var size = Number(arr[i].size);
+                    streams.push({ url: src, originalUrl: src, quality: size ? size + "p" : "HypnoTube", headers: headers });
+                }
+            } catch (e) {}
+        }
+        if (!streams.length) {
+            var s = html.match(/<source[^>]+src="([^"]+\.mp4[^"]*)"/);
+            if (!s) s = html.match(/https?:\/\/media\.hypnotube\.com\/[^\s'"]+\.mp4[^\s'"]*/);
+            if (!s) throw new Error("Nessuno stream trovato per questo video");
+            var mp4 = (s[1] || s[0]).replace(/&amp;/g, "&");
+            streams.push({ url: mp4, originalUrl: mp4, quality: "HypnoTube", headers: headers });
+        }
+        return streams;
     }
 
     options(pairs, anyLabel) {

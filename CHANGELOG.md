@@ -1,5 +1,10 @@
 # Novità
 
+## HypnoTube 1.1.9 · PMVHaven 1.3.1
+
+- **Playlist «in corso»**: con la nuova opzione di Mangayomi «salta le serie finite», le playlist vengono comunque aggiornate e ricevono i video nuovi. I singoli video restano «finiti» e vengono saltati.
+- **HypnoTube**: legge tutte le qualità che manda il sito, dalla più alta. Senza accesso il sito dà solo 480p; se con il tuo account compare il 720p, puoi sceglierlo nel player.
+
 ## PMVHaven 1.3.0
 
 - **Scelta della qualità**: 1080p, 720p, 480p, 360p (anche 1440p/2160p quando il sito le ha), Auto e Originale mp4.

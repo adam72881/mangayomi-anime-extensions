@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.3.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -809,7 +809,7 @@ class DefaultExtension extends MProvider {
                 link: "/playlists/" + pid,
                 description: about.join("\n\n") || this.cleanLine(d.name) || "Playlist",
                 genre: [],
-                status: 1,
+                status: 0, // in corso: le playlist crescono, l'aggiornamento della libreria le controlla
                 chapters: chapters,
             };
             if (who) {
