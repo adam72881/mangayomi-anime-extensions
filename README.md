@@ -18,7 +18,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
 >
-> Sources that explicitly depict minors are excluded. No Cloudflare/anti-bot bypass: logins only use your own account.
+> No Cloudflare/anti-bot bypass: logins only use your own account.
 
 ## Installazione
 
