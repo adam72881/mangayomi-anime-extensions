@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.1",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -38,6 +38,25 @@ const ORDERS = [
     ["random", "Casuale"],
 ];
 
+// Dentro un canale e nei risultati di ricerca il sito ordina con un pezzo di path
+// (verificato): canale «» recenti, views/, rating/, longest/; ricerca «» pertinenza,
+// newest/, views/, rating/, longest/. Settimana/mese e commentati non esistono lì.
+const CHANNEL_SORT = {
+    "most-viewed": "views/",
+    "top-rated": "rating/",
+    "top-rated/week": "rating/",
+    "top-rated/month": "rating/",
+    "longest": "longest/",
+};
+const SEARCH_SORT = {
+    "most-recent": "newest/",
+    "most-viewed": "views/",
+    "top-rated": "rating/",
+    "top-rated/week": "rating/",
+    "top-rated/month": "rating/",
+    "longest": "longest/",
+};
+
 // Minuti. Value vuoto = nessun filtro. Si applica sulla durata in lista.
 const DURATIONS = [
     ["10", "10+ minuti"],
@@ -59,7 +78,8 @@ const PREFERRED_CHANNELS = [
 const PRINCIPALI = [
     ["91/gooning", "Gooning"],
     ["poppers", "Poppers"],
-    ["Blackedraw", "Blackedraw"],
+    // «blackedraw» trovava 12 video (1 pagina), «blacked» circa 22 pagine.
+    ["blacked", "Blacked"],
 ];
 
 const PRESETS = [
@@ -699,7 +719,7 @@ class DefaultExtension extends MProvider {
 
     // Stessa sequenza della 1.1.1: POST searchgate, poi l'URL del server.
     // I 10 secondi sono solo tra due ricerche (questo POST e la pagina N).
-    async loadSearch(query, type, page, random) {
+    async loadSearch(query, type, page, random, sort) {
         var headers = this.headers();
         headers["Content-Type"] = "application/x-www-form-urlencoded";
         headers["Origin"] = this.getBaseUrl();
@@ -742,9 +762,10 @@ class DefaultExtension extends MProvider {
             var max = this.maxPage(new Document(html));
             want = 1 + Math.floor(Math.random() * Math.max(1, max));
         }
-        if (want > 1 && path) {
+        if ((want > 1 || sort) && path) {
             var base = path.charAt(path.length - 1) === "/" ? path : path + "/";
-            var pagePath = base + "page" + want + ".html";
+            if (sort) base += sort;
+            var pagePath = want > 1 ? base + "page" + want + ".html" : base;
             await this.paceSearch();
             var pageHeaders = this.headers();
             pageHeaders["Referer"] = this.urlFor(base);
@@ -828,7 +849,8 @@ class DefaultExtension extends MProvider {
         var preset = this.filterValue(filters, "Preset sessione");
         var principale = this.filterValue(filters, "Categorie principali");
         var channel = this.filterValue(filters, "Categoria");
-        var order = this.filterValue(filters, "Ordine") || "most-recent";
+        var chosen = this.filterValue(filters, "Ordine");
+        var order = chosen || "most-recent";
         if (tipo === "playlist") {
             var qpl = (query && String(query).trim()) || preset || "";
             if (!qpl && principale) qpl = this.channelLabel(principale);
@@ -855,19 +877,21 @@ class DefaultExtension extends MProvider {
             }
         }
 
+        var chSort = CHANNEL_SORT[chosen] || "";
+        var srSort = SEARCH_SORT[chosen] || "";
         var parsed;
         if (preset) {
-            parsed = this.parseList(await this.loadSearch(preset, "videos", page, random));
+            parsed = this.parseList(await this.loadSearch(preset, "videos", page, random, srSort));
         } else if (principale) {
             if (principale.indexOf("/") > 0) {
-                parsed = await this.listing("/channels/" + principale + "/", page, random);
+                parsed = await this.listing("/channels/" + principale + "/" + chSort, page, random);
             } else {
-                parsed = this.parseList(await this.loadSearch(principale, "videos", page, random));
+                parsed = this.parseList(await this.loadSearch(principale, "videos", page, random, srSort));
             }
         } else if (text) {
-            parsed = this.parseList(await this.loadSearch(text, "videos", page, random));
+            parsed = this.parseList(await this.loadSearch(text, "videos", page, random, srSort));
         } else if (channel) {
-            parsed = await this.listing("/channels/" + channel + "/", page, random);
+            parsed = await this.listing("/channels/" + channel + "/" + chSort, page, random);
         } else {
             var path = "/" + (random ? "most-recent" : order) + "/";
             parsed = await this.listing(path, page, random);
@@ -1045,7 +1069,7 @@ class DefaultExtension extends MProvider {
             { type_name: "SelectFilter", name: "Profili", state: 0, values: this.profileOptions() },
             { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
-            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
+            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "Predefinito") },
             { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
             { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(this.orderedChannels(), "Tutte") },
         ];

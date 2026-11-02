@@ -1,5 +1,24 @@
 # Novità
 
+## PMVHaven 1.5.0 · HypnoTube 1.3.0 · AnimeWorld 1.3.0
+
+**PMVHaven**
+- **Sezioni HMV, TikTok, Ipnosi, BJ coreano**: ora mostrano davvero quei video. Prima il sito ignorava il tag e, per esempio, HMV + Più visti dava la classifica generale.
+- **Categorie e preset** filtrano per tag del sito, quindi **tutti gli ordini funzionano** (più visti, più lunghi, più corti, voti…). Categoria principale, Categoria, Sezione e Preset si sommano (es. Gooning + Blonde).
+- Tag corretti: Egirl, Caption, Stockings e Heels ora trovano i video (prima 0–47 risultati).
+- **Di tendenza**: usa la vera tendenza del sito (ultime 24 ore, 100 video) e rispetta l'Ordine scelto.
+- Nuova voce **Ordine → Predefinito**: l'ordine naturale della sezione (tendenza, popolare, recenti).
+- Ricerca per testo: le date ordinano bene; «Più lunghi/Più corti» ordinano la pagina (il sito non ordina la ricerca per durata).
+- Playlist: parole di ricerca più pertinenti (es. Egirl PMV 38 su 40 pertinenti invece di 1 su 40).
+
+**HypnoTube**
+- L'**Ordine** ora vale anche dentro canali, categorie principali, ricerca e preset (prima era ignorato). Nella ricerca un ordine diverso da Predefinito aggiunge circa 10 secondi, per non farsi bloccare dal sito.
+- **Blackedraw → Blacked**: da 12 video a circa 22 pagine.
+- Nuova voce **Ordine → Predefinito** (ricerca per pertinenza, liste per recenti).
+
+**AnimeWorld**
+- Cercando il nome di un genere (es. «azione», «isekai») si apre il genere: prima «azione» trovava 4 anime.
+
 ## PMVHaven 1.4.2
 
 - Categoria **Blackedraw → Blacked**: in Playlist da 6 a 941 risultati (40 pagine), nei video da 621 a 8734.

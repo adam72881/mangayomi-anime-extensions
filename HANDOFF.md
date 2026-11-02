@@ -19,10 +19,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 | File | Sorgente | Versione |
 |---|---|---|
-| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.2.0 |
+| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.3.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.2.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.2.1 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.4.2 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.3.0 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -57,6 +57,10 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Filtro **Profili**: `getDetail` salva l’uploader in `SharedPreferences` (`hypnotube_recent_profiles`), ultimi 3, senza doppioni, il più recente per primo. Voce «Nessuno» più quei nomi. Sceglierne uno equivale a `@nome`.
 - **Popular a sorpresa** (impostazione, accesa di default): a `page=1` sceglie un ordine di lista (`/most-viewed/`, recenti, votati, lunghi, settimana, mese, casuale) o, più di rado, un canale in cima al filtro. Non usa la ricerca a 10 secondi. La scelta resta per `page>1`; alla riapertura (`page=1`) ne esce un’altra. Spento, Popolari torna a `/most-viewed/`.
 
+## HypnoTube — ordini dentro canali e ricerca (1.3.0)
+
+Canale: `/channels/<id>/<slug>/` + `views/`, `rating/`, `longest/` (+ `pageN.html`); `most-viewed/`, `top-rated/` lì sono ignorati. Ricerca: `/search/videos/<q>/` + `newest/`, `views/`, `rating/`, `longest/`; la pagina ordinata va chiesta dopo la pausa di 10 s (`paceSearch`), altrimenti torna vuota. Tabelle `CHANNEL_SORT` e `SEARCH_SORT`. «blacked» al posto di «Blackedraw» (12 video).
+
 ## Stato delle schede (Mangayomi 0.9.95)
 
 Mangayomi legge `status` così: 0 in corso, 1 finito, 2 in pausa, 3 cancellato, 4 pubblicazione finita, altro sconosciuto. L'opzione «salta le serie finite» dell'aggiornamento libreria salta solo 1. Video singoli = 1, playlist (PMVHaven, HypnoTube) = 0, AnimeWorld/HentaiWorld dallo stato del sito.
@@ -72,7 +76,13 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **HypnoTube:** POST `/login` form `ahd_username`, `ahd_password`, `Submit=Login` con `new Client({followRedirects:false})`. Riuscito = 302 verso `/my-profile` + `Set-Cookie: PHPSESSID` (Max-Age 3 giorni), salvato in `hypnotube_session`. Loggato = c'è `href=".../logout"` nella pagina. `getVideoList` rifà il login una volta se la pagina non è da loggato. Verificato su sito vero con un account gratuito: da loggato `sources` ha 480 (`_m.mp4`, 640×360) e 720 (`.mp4`, 1280×720, verificato con ffprobe).
 - **PMVHaven:** Better Auth. POST `/api/auth/sign-in/email` JSON `{email, password, rememberMe:true}`; errore = 401 `INVALID_EMAIL_OR_PASSWORD`; successo = cookie `better-auth.session_token` / `__Secure-better-auth.session_token` (+ `session_data`), salvati in `pmvhaven_session`. Login solo da `myProfile` quando `/api/auth/session` non dà un utente. Nessun captcha. Successo **non** verificato con un account vero (verificati solo l'errore e la lettura dei cookie).
 
-## PMVHaven — 1.4.2, profilo confermato da Adam
+## PMVHaven — 1.5.0, profilo confermato da Adam
+
+**Filtri video (1.5.0), verificati sull'API:**
+- `/api/videos?tags=X` filtra **solo con `expandTags=false`** (altrimenti allarga ai tag simili e restituisce tutto). Più tag: `tags=a,b&tagMode=AND&expandTags=false`. Con questo tutti i sort funzionano: `-releaseDate`, `releaseDate`, `-bayesianRating`, `-views`, `-likes`, `-duration`, `duration`, e `durationMin`.
+- `/api/videos?q=` ignora `q`; `/api/videos/search?q=` cerca nel testo: sort validi `-uploadDate`, `uploadDate`, `-views`, `-likes`, `-bayesianRating`; **la durata non si ordina** (si ordina la pagina). `q` + `tags` insieme: il sito ignora `q`, quindi con un testo vale solo il testo.
+- `trending=true` su `/api/videos` è ignorato. Tendenza vera: `/api/videos/trending?period=24h&limit=100` (7d/30d → 500; `page` ignorato).
+- Nomi di tag esatti: egirls (non egirl), captions, stockings, high heels. Preset: sissy+hypno, egirls+pmv, lingerie, chastity, bnwo. Playlist: testo in `PLAYLIST_TEXT` (scelto per pertinenza dei nomi).
 
 - **Playlist per categoria (1.4.2):** `/api/playlists/search?q=` cerca nel **nome** della playlist (Elasticsearch, `meta.total`/`hasMore`). Conteggi verificati: blacked 941, gooning 950, poppers 1117, pmv 7141, hypno 1421, sissy 1496, bnwo 1268, stocking 29 (stockings 12), heel 71 (heels 33), lingerie 19. Oltre l'ultima pagina la risposta è vuota: si restituisce lista vuota (prima ripartiva dalle playlist recenti, all'infinito).
 

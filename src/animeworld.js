@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/animeworld.js",
@@ -135,12 +135,29 @@ class DefaultExtension extends MProvider {
         return this.parseList(await this.doc("/filter?sort=5&page=" + page), page);
     }
 
+    genreFor(text) {
+        var key = String(text).trim().toLowerCase();
+        for (var i = 0; i < GENRES.length; i++) {
+            if (GENRES[i][1].toLowerCase() === key) return GENRES[i][0];
+        }
+        return "";
+    }
+
     async search(query, page, filters) {
         var sort = this.filterValue(filters, "Ordine");
         var status = this.filterValue(filters, "Stato");
         var genre = this.filterValue(filters, "Genere");
         var dub = this.filterValue(filters, "Lingua");
-        if (!filters || !filters.length) {
+        // La ricerca del sito guarda i titoli: «azione» trovava 4 anime. Se il testo
+        // è il nome di un genere si apre quel genere.
+        if (!genre && query) {
+            var asGenre = this.genreFor(query);
+            if (asGenre) {
+                genre = asGenre;
+                query = "";
+            }
+        }
+        if ((!filters || !filters.length) && !genre) {
             if (query && query.length)
                 return this.parseList(
                     await this.doc("/search?keyword=" + encodeURIComponent(query) + "&page=" + page),

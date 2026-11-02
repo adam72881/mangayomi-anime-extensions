@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.2",
+        "version": "1.5.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -69,7 +69,7 @@ const DURATIONS = [
     ["2700", "45+ minuti"],
 ];
 
-// In cima al filtro, solo termini verificati con /api/videos/search?q=
+// In cima al filtro. Valore = nome esatto del tag (verificato con /api/videos?tags=…&expandTags=false).
 const FRONT_TAGS = [
     ["gooning", "Gooning"],
     ["blacked", "Blacked"],
@@ -77,13 +77,13 @@ const FRONT_TAGS = [
     ["pmv", "PMV"],
     ["hypno", "Hypno"],
     ["sissy", "Sissy"],
-    ["egirl", "Egirl"],
+    ["egirls", "Egirl"],
     ["blonde", "Blonde"],
     ["bnwo", "BNWO"],
-    ["caption", "Caption"],
+    ["captions", "Caption"],
     ["ahegao", "Ahegao"],
-    ["stocking", "Stockings"],
-    ["heel", "Heels"],
+    ["stockings", "Stockings"],
+    ["high heels", "Heels"],
     ["lingerie", "Lingerie"],
     ["chastity", "Chastity"],
     ["asian", "Asian"],
@@ -97,14 +97,24 @@ const PRINCIPALI = [
     ["unseen", "Mai visti"],
 ];
 
-// Lingerie e Tacchi usa solo "lingerie": la query con tre parole non è pertinente.
+// Video: tag da avere tutti (tagMode=AND). Con tre tag i risultati erano troppo pochi
+// (sissy+hypno+captions 86), con due bastano (sissy+hypno 494, egirls+pmv 822).
 const PRESETS = [
-    ["sissy hypno caption", "Sissy Hypno"],
-    ["pmv egirl blonde", "Egirl PMV"],
+    ["sissy,hypno", "Sissy Hypno"],
+    ["egirls,pmv", "Egirl PMV"],
     ["lingerie", "Lingerie e Tacchi"],
-    ["chastity caption", "Chastity"],
+    ["chastity", "Chastity"],
     ["bnwo", "BNWO"],
 ];
+
+// Playlist: il sito cerca nel nome della playlist (anche parole simili). Scelte le
+// parole con più nomi pertinenti: «heels» 29/34 («high heels» trova «high»),
+// «egirls» 38/40 («pmv egirl blonde» 1/40). Le altre usano il nome del tag.
+const PLAYLIST_TEXT = {
+    "sissy,hypno": "sissy hypno caption",
+    "egirls,pmv": "egirls",
+    "high heels": "heels",
+};
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
 const TAGS = [
@@ -318,7 +328,7 @@ class DefaultExtension extends MProvider {
 
     async loadPopular(pick, page) {
         if (pick.indexOf("q:") === 0) {
-            return this.loadQuery("/api/videos/search?q=" + encodeURIComponent(pick.slice(2)), page, false);
+            return this.api("/api/videos?tags=" + encodeURIComponent(pick.slice(2)) + "&tagMode=AND&expandTags=false&sort=-views&page=" + page);
         }
         if (pick.indexOf("o:random:") === 0) {
             var start = parseInt(pick.slice(9), 10) || 1;
@@ -729,9 +739,10 @@ class DefaultExtension extends MProvider {
         if (unseen) principale = "";
         var tag = this.filterValue(filters, "Categoria");
         var section = this.filterValue(filters, "Sezione");
-        var kind = this.filterValue(filters, "Ordine") || "recent";
+        var kind = this.filterValue(filters, "Ordine");
         if (tipo === "playlist") {
-            var qpl = text || preset || principale || tag || "";
+            var plKey = preset || principale || tag || "";
+            var qpl = text || PLAYLIST_TEXT[plKey] || plKey;
             var randomPl = kind === "random";
             var psort = this.playlistSort(kind);
             var plist = qpl
@@ -756,36 +767,85 @@ class DefaultExtension extends MProvider {
                 text = "";
             }
         }
-        var q = preset || principale || text || tag || "";
-        var spec = this.orderQuery(this.videoSort(kind));
-        var random = spec.random;
-        var path;
-        if (section === "trending") {
-            path = "/api/videos?trending=true&sort=-views";
-        } else if (section === "popular") {
-            path = "/api/videos?sort=-likes";
-        } else if (section.indexOf("tag:") === 0) {
-            path = "/api/videos?tags=" + encodeURIComponent(section.slice(4));
-            if (!random) path += "&sort=" + encodeURIComponent(spec.sort);
-        } else if (q) {
-            path = "/api/videos/search?q=" + encodeURIComponent(q);
-            if (!random) path += "&sort=" + encodeURIComponent(spec.sort);
-            if (minSec) path += "&durationMin=" + minSec;
+        var out;
+        if (text) {
+            out = await this.searchText(text, kind, minSec, page);
         } else {
-            path = "/api/videos?sort=" + encodeURIComponent(spec.sort);
-            if (minSec) path += "&durationMin=" + minSec;
-        }
-        var json = await this.loadQuery(path, page, random);
-        var out = this.toList(json, minSec);
-        if (!out.list.length && q) {
-            out = this.toList(await this.loadQuery(
-                "/api/videos/search?q=" + encodeURIComponent(q),
-                page,
-                false,
-            ), 0);
+            // Sezione-tag, categoria principale, categoria e preset si sommano (tagMode=AND).
+            var tags = [];
+            if (section.indexOf("tag:") === 0) tags.push(section.slice(4));
+            if (principale) tags.push(principale);
+            if (tag) tags.push(tag);
+            if (preset) tags = tags.concat(preset.split(","));
+            if (section === "trending" && !tags.length) {
+                out = await this.trending(kind, minSec, page);
+            } else {
+                var order = kind || (section === "popular" && !tags.length ? "likes" : "recent");
+                var spec = this.orderQuery(this.videoSort(order));
+                var path = "/api/videos?";
+                // Senza expandTags=false il sito allarga ai «tag simili» e il filtro non filtra più.
+                if (tags.length) path += "tags=" + encodeURIComponent(tags.join(",")) + "&tagMode=AND&expandTags=false&";
+                path += "sort=" + encodeURIComponent(spec.sort);
+                if (minSec) path += "&durationMin=" + minSec;
+                out = this.toList(await this.loadQuery(path, page, spec.random, spec.random ? 10 : 0), minSec);
+            }
         }
         if (unseen) out = this.hideSeen(out);
         return out;
+    }
+
+    // Ricerca per testo (/api/videos/search). Qui il sito ordina per visite, voti,
+    // like e data di caricamento, ma non per durata: Più lunghi/Più corti ordinano la pagina.
+    async searchText(text, kind, minSec, page) {
+        var table = { recent: "-uploadDate", old: "uploadDate", rated: "-bayesianRating", views: "-views", likes: "-likes" };
+        var path = "/api/videos/search?q=" + encodeURIComponent(text);
+        if (table[kind]) path += "&sort=" + table[kind];
+        if (minSec) path += "&durationMin=" + minSec;
+        var json = await this.loadQuery(path, page, kind === "random", kind === "random" ? 10 : 0);
+        if (kind === "long" || kind === "short") json = this.sortRows(json, kind);
+        return this.toList(json, minSec);
+    }
+
+    // /api/videos/trending: solo il periodo 24h risponde (7d e 30d danno errore 500)
+    // e la pagina è una sola; l'Ordine scelto si applica a quella lista.
+    async trending(kind, minSec, page) {
+        if (page > 1) return { list: [], hasNextPage: false };
+        var json = await this.api("/api/videos/trending?period=24h&limit=100");
+        if (kind) json = this.sortRows(json, kind);
+        var out = this.toList(json, minSec);
+        out.hasNextPage = false;
+        return out;
+    }
+
+    sortRows(json, kind) {
+        var rows = (json.videos || json.data || []).slice();
+        if (kind === "random") {
+            for (var i = rows.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = rows[i]; rows[i] = rows[j]; rows[j] = tmp;
+            }
+        } else {
+            var seconds = function (v) {
+                if (isFinite(Number(v.durationSeconds))) return Number(v.durationSeconds);
+                var parts = String(v.duration || "0").split(":"), n = 0;
+                for (var k = 0; k < parts.length; k++) n = n * 60 + (parseInt(parts[k], 10) || 0);
+                return n;
+            };
+            var key = {
+                recent: function (v) { return Date.parse(v.uploadDate || v.releaseDate || "") || 0; },
+                old: function (v) { return -(Date.parse(v.uploadDate || v.releaseDate || "") || 0); },
+                rated: function (v) { return Number(v.bayesianRating) || 0; },
+                views: function (v) { return Number(v.views) || 0; },
+                likes: function (v) { return Number(v.likes) || 0; },
+                long: seconds,
+                short: function (v) { return -seconds(v); },
+            }[kind];
+            if (key) rows.sort(function (a, b) { return key(b) - key(a); });
+        }
+        var copy = {};
+        for (var f in json) copy[f] = json[f];
+        if (json.videos) copy.videos = rows; else copy.data = rows;
+        return copy;
     }
 
     // Solo cifre: dateFormat fa int.parse e un valore non intero manda in errore tutta la riga.
@@ -1039,7 +1099,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Lo stesso Ordine vale per video e playlist. La categoria resta i tag.",
+                name: "Senza testo: sezione, categorie e preset si sommano. Se scrivi un testo vale la ricerca per testo (lì Più lunghi/Più corti ordinano solo la pagina). L'Ordine vale anche per le playlist.",
             },
             {
                 type_name: "SelectFilter",
@@ -1053,7 +1113,7 @@ class DefaultExtension extends MProvider {
             },
             { type_name: "SelectFilter", name: "Profili", state: 0, values: this.profileOptions() },
             { type_name: "SelectFilter", name: "Sezione", state: 0, values: this.options(SECTIONS, "") },
-            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "") },
+            { type_name: "SelectFilter", name: "Ordine", state: 0, values: this.options(ORDERS, "Predefinito") },
             { type_name: "SelectFilter", name: "Preset sessione", state: 0, values: this.options(PRESETS, "Nessuno") },
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
             { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
