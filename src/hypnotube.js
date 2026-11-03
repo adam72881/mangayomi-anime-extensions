@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.0",
+        "version": "1.4.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -24,6 +24,10 @@ const PREF_USER = "hypnotube_username";
 const PREF_PASS = "hypnotube_password";
 const PREF_SESSION = "hypnotube_session";
 const PREF_QUALITY = "hypnotube_quality";
+const PREF_PL_RANDOM = "hypnotube_playlist_random";
+const PREF_PL_SEEN = "hypnotube_playlist_seen";
+const PREF_LIST_RANDOM = "hypnotube_list_random";
+const PREF_SEARCH_RANDOM = "hypnotube_search_random";
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -555,13 +559,19 @@ class DefaultExtension extends MProvider {
         return { list: out, hasNextPage: parsed.hasNextPage };
     }
 
+    // Casuale: pagina di partenza a caso a pagina 1, poi avanti in ordine (vedi playlistListing).
     async listing(base, page, random) {
         if (!random) return this.parseList(await this.doc(this.paged(base, page)));
-        var first = await this.doc(base);
-        var max = this.maxPage(first);
-        var n = 1 + Math.floor(Math.random() * max);
-        if (n === 1) return this.parseList(first);
-        return this.parseList(await this.doc(base + "page" + n + ".html"));
+        var saved = this.readPref(PREF_LIST_RANDOM).split("|");
+        var start = saved[0] === base ? parseInt(saved[1], 10) || 0 : 0;
+        if (page <= 1 || !start) {
+            var first = await this.doc(base);
+            var max = this.maxPage(first);
+            start = 1 + Math.floor(Math.random() * Math.max(1, max - 5));
+            this.writePref(PREF_LIST_RANDOM, base + "|" + start);
+            if (start === 1) return this.parseList(first);
+        }
+        return this.parseList(await this.doc(this.paged(base, start + page - 1)));
     }
 
     isGate(html) {
@@ -760,8 +770,15 @@ class DefaultExtension extends MProvider {
         }
         var want = page > 1 ? page : 0;
         if (random && path) {
-            var max = this.maxPage(new Document(html));
-            want = 1 + Math.floor(Math.random() * Math.max(1, max));
+            // Pagina di partenza a caso a pagina 1, poi avanti in ordine.
+            var saved = this.readPref(PREF_SEARCH_RANDOM).split("|");
+            var start = saved[0] === path ? parseInt(saved[1], 10) || 0 : 0;
+            if (page <= 1 || !start) {
+                var max = this.maxPage(new Document(html));
+                start = 1 + Math.floor(Math.random() * Math.max(1, max - 5));
+                this.writePref(PREF_SEARCH_RANDOM, path + "|" + start);
+            }
+            want = start + (page > 1 ? page - 1 : 0);
         }
         if ((want > 1 || sort) && path) {
             var base = path.charAt(path.length - 1) === "/" ? path : path + "/";
@@ -827,15 +844,44 @@ class DefaultExtension extends MProvider {
         return this.parseList(await this.doc(this.paged(base, page)));
     }
 
+    // Casuale: a pagina 1 si sceglie una pagina di partenza a caso, poi si va avanti
+    // in ordine (prima ogni pagina ne pescava un'altra a caso e si ripetevano).
     async playlistListing(base, page, random) {
         if (!random) return this.parsePlaylists(await this.doc(this.paged(base, page)));
-        var first = await this.doc(base);
-        var max = this.maxPage(first);
-        var n = 1 + Math.floor(Math.random() * max);
-        var doc = n === 1 ? first : await this.doc(base + "page" + n + ".html");
-        var parsed = this.parsePlaylists(doc);
-        if (!parsed.list.length) return this.parsePlaylists(first);
+        var saved = this.readPref(PREF_PL_RANDOM).split("|");
+        var start = saved[0] === base ? parseInt(saved[1], 10) || 0 : 0;
+        if (page <= 1 || !start) {
+            var first = await this.doc(base);
+            var max = this.maxPage(first);
+            start = 1 + Math.floor(Math.random() * Math.max(1, max - 5));
+            this.writePref(PREF_PL_RANDOM, base + "|" + start);
+            if (start === 1) return this.parsePlaylists(first);
+        }
+        var n = start + page - 1;
+        var parsed = this.parsePlaylists(await this.doc(this.paged(base, n)));
+        if (!parsed.list.length && page <= 1) return this.parsePlaylists(await this.doc(base));
         return parsed;
+    }
+
+    // Le playlist già mostrate in questa lista non si ripetono: il sito aggiunge
+    // playlist nuove mentre scorri e quelle viste scivolano alla pagina dopo.
+    unseenPlaylists(key, page, parsed) {
+        var raw = this.readPref(PREF_PL_SEEN);
+        var cut = raw.indexOf("\n");
+        var ids = page > 1 && cut > 0 && raw.slice(0, cut) === key ? raw.slice(cut + 1).split(" ") : [];
+        var seen = {};
+        for (var k = 0; k < ids.length; k++) if (ids[k]) seen[ids[k]] = true;
+        var list = [];
+        for (var i = 0; i < parsed.list.length; i++) {
+            var item = parsed.list[i];
+            var id = (String(item.link).match(/\/playlist\/(\d+)/) || [])[1] || item.link;
+            if (seen[id]) continue;
+            seen[id] = true;
+            ids.push(id);
+            list.push(item);
+        }
+        this.writePref(PREF_PL_SEEN, key + "\n" + ids.slice(-600).join(" "));
+        return { list: list, hasNextPage: parsed.hasNextPage };
     }
 
     async search(query, page, filters) {
@@ -856,15 +902,19 @@ class DefaultExtension extends MProvider {
             var qpl = (query && String(query).trim()) || preset || "";
             if (!qpl && principale) qpl = this.channelLabel(principale);
             if (!qpl && channel) qpl = this.channelLabel(channel);
+            var plKey = "pl|" + qpl + "|" + order;
             if (qpl) {
                 var found = this.parsePlaylists(await this.loadSearch(qpl, "playlists", page, false));
-                if (found.list.length) return found;
+                if (found.list.length) return this.unseenPlaylists(plKey, page, found);
+                // Pagina successiva vuota (fine o sito che non risponde): la lista finisce qui,
+                // senza mescolare le playlist generali ai risultati.
+                if (page > 1) return { list: [], hasNextPage: false };
             }
             var basePl = "/playlists/";
             if (!qpl && order === "most-viewed") basePl = "/playlists/views/";
             else if (!qpl && order === "top-rated") basePl = "/playlists/rating/";
             // Più lunghi, più commentati, settimana e mese non hanno una pagina playlist: si resta su /playlists/.
-            return this.playlistListing(basePl, page, !qpl && order === "random");
+            return this.unseenPlaylists(plKey, page, await this.playlistListing(basePl, page, !qpl && order === "random"));
         }
 
         var minMinutes = parseInt(this.filterValue(filters, "Durata minima") || "0", 10) || 0;

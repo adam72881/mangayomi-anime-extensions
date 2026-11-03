@@ -1,5 +1,11 @@
 # Novità
 
+## HypnoTube 1.4.1
+
+- **Niente più doppioni scorrendo le playlist.** Le playlist già mostrate non si ripetono (il sito ne aggiunge di nuove mentre scorri e quelle viste scivolano alla pagina dopo).
+- **Ordine Casuale** (playlist, video e ricerca): a ogni apertura parte da una pagina a caso e poi va avanti in ordine. Prima ogni pagina ne pescava un'altra a caso e ricomparivano le stesse.
+- Playlist con ricerca o categoria: se il sito non risponde a una pagina successiva la lista finisce lì, invece di mescolare le playlist generali ai risultati.
+
 ## PMVHaven 1.5.2
 
 - **Qualità preferita**: si possono scegliere anche **2160p (4K)** e **1440p (2K)**. Se il video non le ha, parte la più alta disponibile sotto quella scelta.

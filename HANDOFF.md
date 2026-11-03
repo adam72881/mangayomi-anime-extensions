@@ -21,7 +21,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.4.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.4.0 |
-| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.0 |
+| `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.2 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -59,6 +59,10 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 - Playlist: `/playlists/`, Più visti `/playlists/views/`, Più votati `/playlists/rating/`, Casuale. Scheda `/playlist/<id>/<slug>/` con `Episodio N - titolo` e miniatura http. Più lunghi non esiste: resta l’elenco recenti. In playlist non c’è una data sull’episodio.
 - Filtro **Profili**: `getDetail` salva l’uploader in `SharedPreferences` (`hypnotube_recent_profiles`), ultimi 3, senza doppioni, il più recente per primo. Voce «Nessuno» più quei nomi. Sceglierne uno equivale a `@nome`.
 - **Popular a sorpresa** (impostazione, accesa di default): a `page=1` sceglie un ordine di lista (`/most-viewed/`, recenti, votati, lunghi, settimana, mese, casuale) o, più di rado, un canale in cima al filtro. Non usa la ricerca a 10 secondi. La scelta resta per `page>1`; alla riapertura (`page=1`) ne esce un’altra. Spento, Popolari torna a `/most-viewed/`.
+
+## HypnoTube — paginazione (1.4.1)
+
+«Casuale» (liste, playlist, ricerca): a pagina 1 si sceglie una pagina di partenza e la si salva con `setString` (`hypnotube_list_random`, `hypnotube_playlist_random`, `hypnotube_search_random`, formato `percorso|pagina`), poi pagina N = partenza + N - 1. Lo stato va salvato e non tenuto in memoria perché l'app può ricreare l'estensione tra una pagina e l'altra. Playlist: gli id già mostrati per la stessa lista (`hypnotube_playlist_seen`, chiave `pl|testo|ordine`, ultimi 600) vengono saltati; con ricerca/categoria, pagina > 1 vuota = fine lista (prima ripiegava su `/playlists/` e mescolava).
 
 ## HypnoTube — ordini dentro canali e ricerca (1.3.0)
 
