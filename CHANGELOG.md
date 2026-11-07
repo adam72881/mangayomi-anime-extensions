@@ -1,5 +1,10 @@
 # Novità
 
+## HentaiWorld 2.7.0
+
+- **Raccolta → Estremi** ora ha anche **Scat**, ed è una **classifica**: prima le serie con più generi estremi insieme, e i generi più rari pesano di più (Scat vale molto più di Gangbang). In cima finiscono titoli come Tsuma Netori, Kisaku Spirit, Bondage Game, Night Shift Nurses; Euphoria è a inizio seconda pagina.
+- Si combina con **Lingua** e **Stato**. La prima apertura richiede qualche secondo (legge le liste dei generi), poi il risultato resta per un giorno.
+
 ## HentaiWorld 2.6.0
 
 - Nuovo filtro **Raccolta → Estremi**: BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang e Monster insieme, dai più visti. Si combina con lingua, stato, ordine e altri generi.

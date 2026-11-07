@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.6.0",
+        "version": "2.7.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -22,11 +22,12 @@ const PREF_BASE = "hentaiworld_me_base_url";
 const PER_PAGE = 20;
 const LATEST_SEEN = "hentaiworld_latest_seen";
 
-// Raccolte: gruppi di generi (il sito li unisce in OR). «Estremi» lascia fuori i
-// generi troppo larghi (Bondage, X-Ray, Ahegao: oltre 200 serie ciascuno).
-const COLLECTIONS = {
-    extreme: ["bdsm", "mind-break", "tentacle", "inflation", "ugly-bastard", "gangbang", "monster"],
-};
+// Raccolta «Estremi»: lascia fuori i generi troppo larghi (Bondage, X-Ray, Ahegao:
+// oltre 200 serie ciascuno). Il sito unisce i generi in OR e non sa ordinare per
+// «quanti ne ha»: la classifica la calcola extremeListing.
+const EXTREME = ["bdsm", "mind-break", "tentacle", "inflation", "ugly-bastard", "gangbang", "monster", "scat"];
+const EXTREME_CACHE = "hentaiworld_extreme_cache";
+const EXTREME_TTL = 24 * 3600 * 1000;
 
 // slug usati da /archive?genre=<slug> (59 generi, pagina archivio live).
 const GENRES = [
@@ -171,6 +172,56 @@ class DefaultExtension extends MProvider {
         return "";
     }
 
+    // Classifica «Estremi»: legge tutte le pagine di ogni genere estremo (dai più
+    // visti) e ordina le serie per quanti generi estremi hanno insieme, poi per
+    // posizione nei più visti. Tipo Euphoria (BDSM + Scat + …) finisce in cima.
+    // Risultato tenuto per un giorno: la prima apertura richiede qualche secondo.
+    async extremeListing(page, extra) {
+        var size = 20;
+        var key = "x3|" + extra;
+        var cache = null;
+        try { cache = JSON.parse(this.readStore(EXTREME_CACHE) || "null"); } catch (e) {}
+        if (!cache || cache.key !== key || !(Date.now() - cache.at < EXTREME_TTL) || !(cache.items || []).length) {
+            var self = this;
+            var byLink = {};
+            var found = {};
+            await Promise.all(EXTREME.map(async function (g) {
+                found[g] = [];
+                for (var p = 1; p <= 20; p++) {
+                    var params = "genre%5B%5D=" + g + "&sort=views" + (extra ? "&" + extra : "");
+                    var res;
+                    try { res = await self.archive(params, p); } catch (e) { break; }
+                    for (var i = 0; i < res.list.length; i++) {
+                        var it = res.list[i];
+                        var rank = (p - 1) * PER_PAGE + i;
+                        var cur = byLink[it.link];
+                        if (!cur) byLink[it.link] = cur = { name: it.name, imageUrl: it.imageUrl, link: it.link, score: 0, rank: rank };
+                        if (rank < cur.rank) cur.rank = rank;
+                        found[g].push(cur);
+                    }
+                    if (!res.hasNextPage) break;
+                }
+            }));
+            // Un genere che hanno in pochi pesa di più: Scat (circa 26 serie) vale molto
+            // più di Gangbang (circa 270). Così le serie tipo Euphoria salgono in cima.
+            for (var g2 in found) {
+                var weight = 100 / Math.max(found[g2].length, 10);
+                for (var f = 0; f < found[g2].length; f++) found[g2][f].score += weight;
+            }
+            var items = [];
+            for (var l in byLink) items.push(byLink[l]);
+            items.sort(function (a, b) { return b.score - a.score || a.rank - b.rank; });
+            cache = { key: key, at: Date.now(), items: items };
+            this.writeStore(EXTREME_CACHE, JSON.stringify(cache));
+        }
+        var start = (page - 1) * size;
+        var slice = cache.items.slice(start, start + size);
+        return {
+            list: slice.map(function (it) { return { name: it.name, imageUrl: it.imageUrl, link: it.link }; }),
+            hasNextPage: start + size < cache.items.length,
+        };
+    }
+
     async archive(params, page) {
         var q = params && params.length ? params + "&page=" + page : "page=" + page;
         return this.parseArchive(await this.doc("/archive?" + q));
@@ -239,10 +290,11 @@ class DefaultExtension extends MProvider {
         var sort = this.filterValue(filters, "Ordine");
         var status = this.filterValue(filters, "Stato");
         var langs = this.checkedValues(filters, "Lingua");
-        var collection = COLLECTIONS[this.filterValue(filters, "Raccolta")];
-        if (collection) {
-            for (var c = 0; c < collection.length; c++) if (genres.indexOf(collection[c]) === -1) genres.push(collection[c]);
-            if (!sort) sort = "views";
+        if (this.filterValue(filters, "Raccolta") === "extreme") {
+            var extra = [];
+            if (status) extra.push("status=" + encodeURIComponent(status));
+            for (var x = 0; x < langs.length; x++) extra.push("language%5B%5D=" + encodeURIComponent(langs[x]));
+            return this.extremeListing(page, extra.join("&"));
         }
         if ((!filters || !filters.length) && !(query && query.length))
             return this.getPopular(page);
@@ -434,7 +486,7 @@ class DefaultExtension extends MProvider {
                 state: 0,
                 values: [
                     { type_name: "SelectOption", name: "Nessuna", value: "" },
-                    { type_name: "SelectOption", name: "Estremi (BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang, Monster)", value: "extreme" },
+                    { type_name: "SelectOption", name: "Estremi: prima chi ne ha di più (BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang, Monster, Scat)", value: "extreme" },
                 ],
             },
             {
