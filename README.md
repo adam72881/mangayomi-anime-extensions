@@ -32,6 +32,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **PMVHaven 1.6.0** — categoria Estremi (solo i video segnati dal sito come contenuto estremo).
 - **HentaiWorld 2.8.0** — Raccolta → Estremi come classifica (più generi estremi insieme, i più rari pesano di più), con Scat, Watersports e Horror.
 - **AnimeWorld 1.5.0** — «Più recente» uguale agli «Ultimi Episodi» della home del sito.
 - **HentaiWorld 2.5.0** — «Più recente» uguale agli «Episodi usciti recentemente» della home del sito.
@@ -57,7 +58,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | **AnimeWorld** | 1.5.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
 | **HentaiWorld** | 2.8.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
-| **PMVHaven** | 1.5.2 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
+| **PMVHaven** | 1.6.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.
 

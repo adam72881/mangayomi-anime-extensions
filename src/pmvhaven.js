@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.5.2",
+        "version": "1.6.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -94,6 +94,8 @@ const PRINCIPALI = [
     ["gooning", "Gooning"],
     ["blacked", "Blacked"],
     ["poppers", "Poppers"],
+    // Non è un tag: il sito segna da sé i video con contenuto estremo (includeExtreme=true).
+    ["extreme", "Estremi"],
     ["unseen", "Mai visti"],
 ];
 
@@ -114,6 +116,7 @@ const PLAYLIST_TEXT = {
     "sissy,hypno": "sissy hypno caption",
     "egirls,pmv": "egirls",
     "high heels": "heels",
+    "extreme": "extreme",
 };
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
@@ -737,6 +740,7 @@ class DefaultExtension extends MProvider {
         var principale = this.filterValue(filters, "Categorie principali");
         var unseen = principale === "unseen";
         if (unseen) principale = "";
+        var extreme = principale === "extreme";
         var tag = this.filterValue(filters, "Categoria");
         var section = this.filterValue(filters, "Sezione");
         var kind = this.filterValue(filters, "Ordine");
@@ -769,24 +773,26 @@ class DefaultExtension extends MProvider {
         }
         var out;
         if (text) {
-            out = await this.searchText(text, kind, minSec, page);
+            out = await this.searchText(text, kind, minSec, page, extreme);
         } else {
             // Sezione-tag, categoria principale, categoria e preset si sommano (tagMode=AND).
             var tags = [];
             if (section.indexOf("tag:") === 0) tags.push(section.slice(4));
-            if (principale) tags.push(principale);
+            if (principale && !extreme) tags.push(principale);
             if (tag) tags.push(tag);
             if (preset) tags = tags.concat(preset.split(","));
-            if (section === "trending" && !tags.length) {
+            // La lista tendenza non riporta l'etichetta «estremo»: con Estremi si usano i più visti.
+            if (section === "trending" && !tags.length && !extreme) {
                 out = await this.trending(kind, minSec, page);
             } else {
-                var order = kind || (section === "popular" && !tags.length ? "likes" : "recent");
+                var order = kind || (section === "popular" && !tags.length ? "likes" : (section === "trending" ? "views" : "recent"));
                 var spec = this.orderQuery(this.videoSort(order));
                 var path = "/api/videos?";
                 // Senza expandTags=false il sito allarga ai «tag simili» e il filtro non filtra più.
                 if (tags.length) path += "tags=" + encodeURIComponent(tags.join(",")) + "&tagMode=AND&expandTags=false&";
                 path += "sort=" + encodeURIComponent(spec.sort);
                 if (minSec) path += "&durationMin=" + minSec;
+                if (extreme) path += "&includeExtreme=true";
                 out = this.toList(await this.loadQuery(path, page, spec.random, spec.random ? 10 : 0), minSec);
             }
         }
@@ -796,11 +802,12 @@ class DefaultExtension extends MProvider {
 
     // Ricerca per testo (/api/videos/search). Qui il sito ordina per visite, voti,
     // like e data di caricamento, ma non per durata: Più lunghi/Più corti ordinano la pagina.
-    async searchText(text, kind, minSec, page) {
+    async searchText(text, kind, minSec, page, extreme) {
         var table = { recent: "-uploadDate", old: "uploadDate", rated: "-bayesianRating", views: "-views", likes: "-likes" };
         var path = "/api/videos/search?q=" + encodeURIComponent(text);
         if (table[kind]) path += "&sort=" + table[kind];
         if (minSec) path += "&durationMin=" + minSec;
+        if (extreme) path += "&includeExtreme=true";
         var json = await this.loadQuery(path, page, kind === "random", kind === "random" ? 10 : 0);
         if (kind === "long" || kind === "short") json = this.sortRows(json, kind);
         return this.toList(json, minSec);

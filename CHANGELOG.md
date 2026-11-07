@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.0
+
+- Nuova voce **Categorie principali → Estremi**: solo i video che il sito stesso segna come «contenuto estremo» (circa 2.470). Funziona con tutti gli ordini, con Categoria, Sezione, Preset, Durata minima e con la ricerca per testo. Con «Di tendenza» mostra gli estremi più visti. Tra le playlist cerca quelle con «extreme» nel nome.
+
 ## HentaiWorld 2.8.0
 
 - **Raccolta → Estremi** ora include anche **Watersports** e **Horror** (dove stanno i classici più violenti come Shion, Bible Black, Violence Gekiga). In cima: Tsuma Netori, Naedoko Demon's Ground, Kisaku Spirit, Juurin Oukoku, Shion, Kazama Mana, Goblin no Suana, Bondage Game…

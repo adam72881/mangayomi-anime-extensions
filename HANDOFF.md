@@ -22,7 +22,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.5.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.2 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -97,7 +97,9 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **HypnoTube:** POST `/login` form `ahd_username`, `ahd_password`, `Submit=Login` con `new Client({followRedirects:false})`. Riuscito = 302 verso `/my-profile` + `Set-Cookie: PHPSESSID` (Max-Age 3 giorni), salvato in `hypnotube_session`. Loggato = c'è `href=".../logout"` nella pagina. `getVideoList` rifà il login una volta se la pagina non è da loggato. Verificato su sito vero con un account gratuito: da loggato `sources` ha 480 (`_m.mp4`, 640×360) e 720 (`.mp4`, 1280×720, verificato con ffprobe).
 - **PMVHaven:** Better Auth. POST `/api/auth/sign-in/email` JSON `{email, password, rememberMe:true}`; errore = 401 `INVALID_EMAIL_OR_PASSWORD`; successo = cookie `better-auth.session_token` / `__Secure-better-auth.session_token` (+ `session_data`), salvati in `pmvhaven_session`. Login solo da `myProfile` quando `/api/auth/session` non dà un utente. Nessun captcha. Successo **non** verificato con un account vero (verificati solo l'errore e la lettura dei cookie).
 
-## PMVHaven — 1.5.2, profilo confermato da Adam
+## PMVHaven — 1.6.0, profilo confermato da Adam
+
+**Estremi (1.6.0):** `includeExtreme=true` su `/api/videos` e `/api/videos/search` = solo video con `hasExtremeContent` (2.468; `excludeExtreme=true` li toglie). Si combina con tags/sort/durationMin. `/api/videos/trending` non ha il campo: con Estremi + Di tendenza si usa `/api/videos?sort=-views&includeExtreme=true`.
 
 **Filtri video (1.5.0), verificati sull'API:**
 - `/api/videos?tags=X` filtra **solo con `expandTags=false`** (altrimenti allarga ai tag simili e restituisce tutto). Più tag: `tags=a,b&tagMode=AND&expandTags=false`. Con questo tutti i sort funzionano: `-releaseDate`, `releaseDate`, `-bayesianRating`, `-views`, `-likes`, `-duration`, `duration`, e `durationMin`.
