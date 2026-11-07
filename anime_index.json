@@ -12,7 +12,7 @@
         "hasCloudflare": true,
         "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/animeworld.js",
         "apiUrl": "",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "isManga": false,
         "itemType": 1,
         "isFullData": false,

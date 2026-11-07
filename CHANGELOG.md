@@ -1,5 +1,9 @@
 # Novità
 
+## AnimeWorld 1.5.0
+
+- **«Più recente» come «Ultimi Episodi» della home del sito**: gli anime nell'ordine dei loro episodi più nuovi, una volta sola ciascuno (anche scorrendo). Prima erano gli anime ordinati per data di uscita, e non combaciavano con la home.
+
 ## HentaiWorld 2.5.0
 
 - **«Più recente» come la home del sito** («Episodi usciti recentemente»): le serie nell'ordine dei loro episodi più nuovi, una volta sola ciascuna. Prima erano le serie ordinate per data di aggiunta al sito, e non combaciavano.

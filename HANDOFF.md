@@ -19,7 +19,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 | File | Sorgente | Versione |
 |---|---|---|
-| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.4.0 |
+| `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.5.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.5.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.2 |
@@ -69,6 +69,12 @@ Verificato. Pagine `/archive` con `search=`, `sort=`, `genre=`, `status=`, `lang
 ## HypnoTube — ordini dentro canali e ricerca (1.3.0)
 
 Canale: `/channels/<id>/<slug>/` + `views/`, `rating/`, `longest/` (+ `pageN.html`); `most-viewed/`, `top-rated/` lì sono ignorati. Ricerca: `/search/videos/<q>/` + `newest/`, `views/`, `rating/`, `longest/`; la pagina ordinata va chiesta dopo la pausa di 10 s (`paceSearch`), altrimenti torna vuota. Tabelle `CHANNEL_SORT` e `SEARCH_SORT`. «blacked» al posto di «Blackedraw» (12 video).
+
+## Più recente = novità della home (verificato)
+
+- AnimeWorld 1.5.0: `/updated?page=N` (= «Ultimi Episodi» della home; i link sono agli episodi `/play/<serie>/<ep>`, si tiene `/play/<serie>`, una volta sola anche tra pagine: `getString("animeworld_latest_seen")`). Prima `/filter?sort=5` = serie per data di uscita.
+- HentaiWorld 2.5.0: `/api/episodes` (vedi sezione HentaiWorld).
+- HypnoTube: `/most-recent/` = «Latest Video Content» della home (stessi video, stesso ordine). PMVHaven: `sort=-uploadDate` e `-releaseDate` danno lo stesso ordine della home.
 
 ## AnimeWorld — episodi (1.4.0)
 

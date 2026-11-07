@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.4.0",
+        "version": "1.5.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/animeworld.js",
@@ -57,6 +57,8 @@ const STATUSES = [
     ["2", "Non rilasciato"],
     ["3", "Droppato"],
 ];
+
+const LATEST_SEEN = "animeworld_latest_seen";
 
 class DefaultExtension extends MProvider {
     constructor() {
@@ -131,8 +133,35 @@ class DefaultExtension extends MProvider {
     }
 
     // sort=5 è «Più recenti» (data di uscita). sort=3 è Lista Z-A, non le novità.
+    // Come «Ultimi Episodi» della home: /updated elenca gli episodi dal più nuovo.
+    // Il link porta all'episodio: si tiene quello della serie, una volta sola
+    // (anche tra pagine diverse). «/filter?sort=5» ordinava le serie per data di
+    // uscita e non combaciava con la home.
     async getLatestUpdates(page) {
-        return this.parseList(await this.doc("/filter?sort=5&page=" + page), page);
+        var parsed = this.parseList(await this.doc("/updated?page=" + page), page);
+        var shown = page > 1 ? this.readStore(LATEST_SEEN).split(" ") : [];
+        var seen = {};
+        for (var k = 0; k < shown.length; k++) if (shown[k]) seen[shown[k]] = true;
+        var list = [];
+        for (var i = 0; i < parsed.list.length; i++) {
+            var item = parsed.list[i];
+            var m = String(item.link).match(/\/play\/[^\/?#]+/);
+            var series = m ? m[0] : item.link;
+            if (seen[series]) continue;
+            seen[series] = true;
+            shown.push(series);
+            list.push({ name: item.name, imageUrl: item.imageUrl, link: series });
+        }
+        this.writeStore(LATEST_SEEN, shown.slice(-400).join(" "));
+        return { list: list, hasNextPage: parsed.hasNextPage };
+    }
+
+    readStore(key) {
+        try { return String(new SharedPreferences().getString(key, "") || ""); } catch (e) { return ""; }
+    }
+
+    writeStore(key, value) {
+        try { new SharedPreferences().setString(key, value); } catch (e) {}
     }
 
     genreFor(text) {
