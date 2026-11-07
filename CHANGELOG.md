@@ -1,5 +1,9 @@
 # Novità
 
+## HentaiWorld 2.6.0
+
+- Nuovo filtro **Raccolta → Estremi**: BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang e Monster insieme, dai più visti. Si combina con lingua, stato, ordine e altri generi.
+
 ## AnimeWorld 1.5.0
 
 - **«Più recente» come «Ultimi Episodi» della home del sito**: gli anime nell'ordine dei loro episodi più nuovi, una volta sola ciascuno (anche scorrendo). Prima erano gli anime ordinati per data di uscita, e non combaciavano con la home.

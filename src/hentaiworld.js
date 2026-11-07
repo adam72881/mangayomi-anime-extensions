@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.5.0",
+        "version": "2.6.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -21,6 +21,12 @@ const DEFAULT_BASE = "https://www.hentaiworld.me";
 const PREF_BASE = "hentaiworld_me_base_url";
 const PER_PAGE = 20;
 const LATEST_SEEN = "hentaiworld_latest_seen";
+
+// Raccolte: gruppi di generi (il sito li unisce in OR). «Estremi» lascia fuori i
+// generi troppo larghi (Bondage, X-Ray, Ahegao: oltre 200 serie ciascuno).
+const COLLECTIONS = {
+    extreme: ["bdsm", "mind-break", "tentacle", "inflation", "ugly-bastard", "gangbang", "monster"],
+};
 
 // slug usati da /archive?genre=<slug> (59 generi, pagina archivio live).
 const GENRES = [
@@ -233,6 +239,11 @@ class DefaultExtension extends MProvider {
         var sort = this.filterValue(filters, "Ordine");
         var status = this.filterValue(filters, "Stato");
         var langs = this.checkedValues(filters, "Lingua");
+        var collection = COLLECTIONS[this.filterValue(filters, "Raccolta")];
+        if (collection) {
+            for (var c = 0; c < collection.length; c++) if (genres.indexOf(collection[c]) === -1) genres.push(collection[c]);
+            if (!sort) sort = "views";
+        }
         if ((!filters || !filters.length) && !(query && query.length))
             return this.getPopular(page);
 
@@ -416,6 +427,15 @@ class DefaultExtension extends MProvider {
                 name: "Stato",
                 state: 0,
                 values: this.options(STATUSES, "Tutti"),
+            },
+            {
+                type_name: "SelectFilter",
+                name: "Raccolta",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Nessuna", value: "" },
+                    { type_name: "SelectOption", name: "Estremi (BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang, Monster)", value: "extreme" },
+                ],
             },
             {
                 type_name: "GroupFilter",
