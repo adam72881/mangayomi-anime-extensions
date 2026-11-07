@@ -1,5 +1,10 @@
 # Novità
 
+## HentaiWorld 2.5.0
+
+- **«Più recente» come la home del sito** («Episodi usciti recentemente»): le serie nell'ordine dei loro episodi più nuovi, una volta sola ciascuna. Prima erano le serie ordinate per data di aggiunta al sito, e non combaciavano.
+- Nella lista c'è la miniatura dell'ultimo episodio, come sul sito; aprendo la scheda la copertina diventa la locandina della serie.
+
 ## HypnoTube 1.4.1
 
 - **Niente più doppioni scorrendo le playlist.** Le playlist già mostrate non si ripetono (il sito ne aggiunge di nuove mentre scorri e quelle viste scivolano alla pagina dopo).

@@ -20,7 +20,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | File | Sorgente | Versione |
 |---|---|---|
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.4.0 |
-| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.4.0 |
+| `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.5.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.5.2 |
 
@@ -37,7 +37,9 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 Verificato dall’utente. Ordine (sort 0–7, Più recenti = 5), Stato, Lingua (Sub/Dub ITA), 45 generi. Non modificare.
 
-## HentaiWorld — 2.4.0, completo
+## HentaiWorld — 2.5.0, completo
+
+- **Più recente (2.5.0):** `/api/episodes?page=N&per_page=30` (JSON: `episodes[]` con `media_slug`, `media_title`, `thumbnail`, `created_at`), la stessa che usa la home. Una voce per serie; gli slug già mostrati nelle pagine precedenti sono in `getString("hentaiworld_latest_seen")`. `sort=latest` dell'archivio = serie per data di aggiunta, non per ultimo episodio. `getDetail` restituisce `imageUrl` da `og:image` (locandina) per sostituire la miniatura orizzontale.
 
 - **Episodi (2.3.0):** miniatura da `article.episode-item img`; data da `"uploadDate"` (JSON-LD) nella pagina `/watch/<slug>`, letta in parallelo per i primi 24 episodi.
 - **Filtri (2.4.0):** `genre[]` e `language[]` multipli = OR (Yuri 189 + Milf 153 → 317 = unione). Nessun parametro per escludere. Anche `status[]`, `year[]`, `type[]` esistono nel modulo del sito.

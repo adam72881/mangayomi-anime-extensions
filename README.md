@@ -32,6 +32,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **HentaiWorld 2.5.0** — «Più recente» uguale agli «Episodi usciti recentemente» della home del sito.
 - **HypnoTube 1.4.1** — niente più doppioni scorrendo le playlist; «Casuale» va avanti in ordine invece di ripetere le pagine.
 - **PMVHaven 1.5.2** — Qualità preferita con tutte le scelte del player: 4K, 2K, 1080p… e «Massima disponibile».
 - **AnimeWorld 1.4.0 / HentaiWorld 2.4.0 / HypnoTube 1.4.0** — date e miniature degli episodi, generi e lingue a spunta su HentaiWorld, qualità preferita su HypnoTube.
@@ -52,7 +53,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | Sorgente | Versione | Sito | Lingua | Contenuto |
 |---|---|---|---|---|
 | **AnimeWorld** | 1.4.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
-| **HentaiWorld** | 2.4.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
+| **HentaiWorld** | 2.5.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
 | **PMVHaven** | 1.5.2 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
 

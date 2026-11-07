@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.4.0",
+        "version": "2.5.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -20,6 +20,7 @@ const mangayomiSources = [
 const DEFAULT_BASE = "https://www.hentaiworld.me";
 const PREF_BASE = "hentaiworld_me_base_url";
 const PER_PAGE = 20;
+const LATEST_SEEN = "hentaiworld_latest_seen";
 
 // slug usati da /archive?genre=<slug> (59 generi, pagina archivio live).
 const GENRES = [
@@ -182,8 +183,49 @@ class DefaultExtension extends MProvider {
     }
 
     // Il sito non ha «Più recenti»: l'ordine recente è sort=latest (Ultime aggiunte).
+    // Come la home del sito («Episodi usciti recentemente»): /api/episodes dà gli
+    // episodi dal più nuovo, con la loro serie. Ogni serie compare una volta sola,
+    // nel punto del suo episodio più recente. «sort=latest» dell'archivio invece
+    // ordina le serie per data di aggiunta al sito, e non combaciava.
     async getLatestUpdates(page) {
-        return this.archive("sort=latest", page);
+        var per = 30;
+        var res = await this.client.get(
+            this.getBaseUrl() + "/api/episodes?page=" + page + "&per_page=" + per,
+            this.headers(this.getBaseUrl() + "/"),
+        );
+        var eps = (JSON.parse(res.body) || {}).episodes || [];
+        var shown = page > 1 ? this.readStore(LATEST_SEEN).split(" ") : [];
+        var seen = {};
+        for (var k = 0; k < shown.length; k++) if (shown[k]) seen[shown[k]] = true;
+        var list = [];
+        for (var i = 0; i < eps.length; i++) {
+            var ep = eps[i] || {};
+            var slug = String(ep.media_slug || "");
+            if (!slug || seen[slug]) continue;
+            seen[slug] = true;
+            shown.push(slug);
+            list.push({
+                name: this.decodeHtml(ep.media_title || slug),
+                imageUrl: /^https?:\/\//.test(ep.thumbnail || "") ? ep.thumbnail : "",
+                link: "/hentai/" + slug,
+            });
+        }
+        this.writeStore(LATEST_SEEN, shown.slice(-400).join(" "));
+        return { list: list, hasNextPage: eps.length >= per };
+    }
+
+    readStore(key) {
+        try { return String(new SharedPreferences().getString(key, "") || ""); } catch (e) { return ""; }
+    }
+
+    writeStore(key, value) {
+        try { new SharedPreferences().setString(key, value); } catch (e) {}
+    }
+
+    decodeHtml(text) {
+        return String(text)
+            .replace(/&#0*39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
     }
 
     async search(query, page, filters) {
@@ -272,7 +314,12 @@ class DefaultExtension extends MProvider {
                 : "Lingua: " + langName;
         }
 
+        // Copertina della serie (da «Più recente» arriva la miniatura dell'episodio).
+        var og = doc.selectFirst('meta[property="og:image"]');
+        var cover = og ? og.attr("content") || "" : "";
+
         return {
+            imageUrl: /^https?:\/\//.test(cover) ? cover : undefined,
             link: "/hentai/" + slug,
             description: description || "Nessuna descrizione disponibile.",
             genre: genre,
