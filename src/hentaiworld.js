@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.7.0",
+        "version": "2.8.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -25,7 +25,7 @@ const LATEST_SEEN = "hentaiworld_latest_seen";
 // Raccolta «Estremi»: lascia fuori i generi troppo larghi (Bondage, X-Ray, Ahegao:
 // oltre 200 serie ciascuno). Il sito unisce i generi in OR e non sa ordinare per
 // «quanti ne ha»: la classifica la calcola extremeListing.
-const EXTREME = ["bdsm", "mind-break", "tentacle", "inflation", "ugly-bastard", "gangbang", "monster", "scat"];
+const EXTREME = ["bdsm", "mind-break", "tentacle", "inflation", "ugly-bastard", "gangbang", "monster", "scat", "watersports", "horror"];
 const EXTREME_CACHE = "hentaiworld_extreme_cache";
 const EXTREME_TTL = 24 * 3600 * 1000;
 
@@ -178,7 +178,7 @@ class DefaultExtension extends MProvider {
     // Risultato tenuto per un giorno: la prima apertura richiede qualche secondo.
     async extremeListing(page, extra) {
         var size = 20;
-        var key = "x3|" + extra;
+        var key = "x4|" + extra;
         var cache = null;
         try { cache = JSON.parse(this.readStore(EXTREME_CACHE) || "null"); } catch (e) {}
         if (!cache || cache.key !== key || !(Date.now() - cache.at < EXTREME_TTL) || !(cache.items || []).length) {
@@ -486,7 +486,7 @@ class DefaultExtension extends MProvider {
                 state: 0,
                 values: [
                     { type_name: "SelectOption", name: "Nessuna", value: "" },
-                    { type_name: "SelectOption", name: "Estremi: prima chi ne ha di più (BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang, Monster, Scat)", value: "extreme" },
+                    { type_name: "SelectOption", name: "Estremi: prima chi ne ha di più (BDSM, Mind Break, Tentacle, Inflation, Ugly Bastard, Gangbang, Monster, Scat, Watersports, Horror)", value: "extreme" },
                 ],
             },
             {

@@ -1,5 +1,9 @@
 # Novità
 
+## HentaiWorld 2.8.0
+
+- **Raccolta → Estremi** ora include anche **Watersports** e **Horror** (dove stanno i classici più violenti come Shion, Bible Black, Violence Gekiga). In cima: Tsuma Netori, Naedoko Demon's Ground, Kisaku Spirit, Juurin Oukoku, Shion, Kazama Mana, Goblin no Suana, Bondage Game…
+
 ## HentaiWorld 2.7.0
 
 - **Raccolta → Estremi** ora ha anche **Scat**, ed è una **classifica**: prima le serie con più generi estremi insieme, e i generi più rari pesano di più (Scat vale molto più di Gangbang). In cima finiscono titoli come Tsuma Netori, Kisaku Spirit, Bondage Game, Night Shift Nurses; Euphoria è a inizio seconda pagina.
