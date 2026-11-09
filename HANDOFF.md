@@ -23,6 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.0.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -32,6 +33,14 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.0.0
+
+- Niente catalogo proprio: `search()` con un URL (anche senza `https://`) legge la pagina. In cima «▶ titolo» se la pagina sembra avere un video (og:type video, `<video>`, iframe di player, mp4/m3u8 trovati, o AnimeSaturn), poi le schede `<a>` con `<img>` dello stesso sito (ultimi due pezzi del dominio). Pagina successiva da `rel=next` o link «›/Next/Successiva», salvata in `getString("linkuni_next_pages")` (chiave `link#pagina`).
+- Popolari/Recenti = cronologia (`getString("linkuni_history")`, max 60), scritta da `search` e `getDetail`. Testo senza link = filtro sulla cronologia.
+- `getDetail`: og:title/og:image/og:description. Episodi = link «Episodio N / Ep N / …/ep-N» dello stesso sito; se almeno 2 contengono lo slug della pagina tengo solo quelli (altrimenti la home prende episodi di serie diverse); nessuno = un solo episodio «Video» con il link della pagina.
+- `getVideoList`: link diretto → subito. AnimeSaturn (`/anime|episode/<serie>/ep-N`): `GET /api/watch/<serie>/ep-N` → `servers[].link` = `play.saturncdn.net/embed/<id>?token=&expires=` → `GET /embed/<id>/playlist?token=&expires=` → `d` = base64 XOR token = mp4 (come fa il loro player). Altrimenti: mp4/m3u8/webm nell'HTML (tolti `\/`), scartando quelli dopo chiavi/attributi immagine o anteprima (`og:image`, `data-mediabook`, `<img src>`, poster…) e gli URL `NOT_THE_VIDEO`; qualità dal nome dell'URL o da quality/label/height nello stesso oggetto JSON; m3u8 con più qualità nel nome = «Auto», messo primo. Poi fino a 8 iframe (niente pubblicità/YouTube) e link a player noti negli script: estrattori integrati di Mangayomi (`doodExtractor`, `streamTapeExtractor`, `voeExtractor`, `filemoonExtractor`, `streamWishExtractor`, `mp4UploadExtractor`, `okruExtractor`…), altrimenti si legge l'iframe (profondità 2).
+- Limiti visti: SpankBang 403 (protezione, non si aggira); RedTube/YouPorn solo 360p (le altre qualità passano da `/media/mp4?s=` che vuole i cookie del browser); Eporner un mp4 senza qualità.
 
 ## AnimeWorld — 1.2.0, completo
 

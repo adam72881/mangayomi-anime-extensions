@@ -17,8 +17,21 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
+> | Link universale 🔞 | any site | any | paste a video, series or site link: finds the video (direct mp4/HLS, common embed players), episodes and the site's video list |
 >
 > No Cloudflare/anti-bot bypass: logins only use your own account.
+
+## Link universale
+
+Sorgente per i siti che non hanno un'estensione. Nella **ricerca** incolla un link:
+
+- **link di un video** → la voce «▶ titolo» in cima apre il video (con le qualità trovate nella pagina);
+- **link di una serie** (es. una pagina anime) → la scheda mostra gli episodi;
+- **link di un sito** (es. la home) → la lista dei video/serie della pagina, e scorrendo le pagine successive.
+
+I link aperti restano in **Popolari**; scrivendo una parola senza link cerchi tra quelli.
+Provata con AnimeSaturn, HentaiWorld, Pornhub, xVideos, xHamster, Eporner, RedTube e YouPorn (questi ultimi due solo 360p).
+Non funziona con i siti protetti da Cloudflare o anti-bot (es. SpankBang) né con i player che si costruiscono solo nel browser.
 
 ## Installazione
 
@@ -32,6 +45,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.0.0** — nuova sorgente: incolli nella ricerca il link di un video, di una serie o di un sito e la apre come le altre (vedi sotto).
 - **PMVHaven 1.6.0** — categoria Estremi (solo i video segnati dal sito come contenuto estremo).
 - **HentaiWorld 2.8.0** — Raccolta → Estremi come classifica (più generi estremi insieme, i più rari pesano di più), con Scat, Watersports e Horror.
 - **AnimeWorld 1.5.0** — «Più recente» uguale agli «Ultimi Episodi» della home del sito.

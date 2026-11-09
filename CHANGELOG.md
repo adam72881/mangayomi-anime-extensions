@@ -1,5 +1,13 @@
 # Novità
 
+## Link universale 1.0.0
+
+- Nuova sorgente **Link universale**: incolla nella ricerca il link di un video, di una serie o di un sito.
+  - Trova il video nella pagina: mp4 e HLS diretti (con la qualità), player in iframe, e i player esterni che Mangayomi sa già leggere (Dood, StreamTape, Voe, Filemoon, StreamWish, Mp4Upload, ok.ru…). Salta anteprime e miniature animate.
+  - **AnimeSaturn**: episodi della serie e video dal player del sito.
+  - Link di un sito: lista dei video/serie della pagina, con le pagine successive.
+  - I link aperti restano in **Popolari**.
+
 ## PMVHaven 1.6.0
 
 - Nuova voce **Categorie principali → Estremi**: solo i video che il sito stesso segna come «contenuto estremo» (circa 2.470). Funziona con tutti gli ordini, con Categoria, Sezione, Preset, Durata minima e con la ricerca per testo. Con «Di tendenza» mostra gli estremi più visti. Tra le playlist cerca quelle con «extreme» nel nome.
