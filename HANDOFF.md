@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.3 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.4 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.4
+
+Crash all'apertura (1.4.2 e 1.4.3): `getSourcePreferences` chiamava `applyRename` → `setting()` → `prefs.get()` → `getSourcePreferenceEntry` → di nuovo `getSourcePreferences` (vedi `extension_preferences_service.dart`: se la chiave non è già salvata, `getPreferenceValue` ricostruisce l'elenco dal codice). Stack overflow, l'app si chiude. `getSourcePreferences` non deve chiamare `get()`, `sites()` né `applyRename`. `applyRename` ha un lucchetto `_readingPrefs` per lo stesso motivo. `getString`/`setString` sono un altro archivio e non richiamano `getSourcePreferences`.
 
 ## Link universale — 1.4.3
 

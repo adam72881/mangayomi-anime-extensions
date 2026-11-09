@@ -53,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.4.4** — non si chiude più all'apertura (ciclo nelle impostazioni della 1.4.2).
 - **Link universale 1.4.3** — 11 siti pronti in più (AlphaPorno, HellPorno, YesPorn, TokyoMotion, MegaTube…).
 - **Link universale 1.4.2** — miniature vere (niente riquadro grigio o icona 18+), niente schede «Verify your age», qualità preferita, durata e data nella scheda.
 - **Link universale 1.4.0** — il pulsante Webview apre il sito giusto (o l'elenco dei siti), non più DuckDuckGo.

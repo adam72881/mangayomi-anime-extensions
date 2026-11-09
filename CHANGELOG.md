@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.4.4
+
+- Corretto: aprendo Link universale l'app si chiudeva. Era un ciclo nelle impostazioni introdotto con la 1.4.2. Miniature, verifica dell'età e siti pronti restano quelli della 1.4.3.
+
 ## Link universale 1.4.3
 
 - 11 siti già pronti in più, controllati (lista, miniature, titoli, ricerca e video): AlphaPorno, PornDroids, PornGem, MegaTube, HellPorno, TrendyPorn, AnyPorn, YesPorn, ThisVid, TokyoMotion, XXXFiles. Ora sono 50.

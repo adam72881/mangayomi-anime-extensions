@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.3",
+        "version": "1.4.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -705,6 +705,15 @@ class DefaultExtension extends MProvider {
     }
 
     applyRename() {
+        // get() mentre siamo dentro getSourcePreferences richiama getSourcePreferences:
+        // ciclo infinito e l'app si chiude. Le preferenze si leggono solo da fuori.
+        if (this._readingPrefs) return;
+        this._readingPrefs = true;
+        try { this._applyRename(); }
+        finally { this._readingPrefs = false; }
+    }
+
+    _applyRename() {
         var ren = String(this.setting(PREF_RENAME) || "").trim();
         if (!ren || ren === this.prefs.getString(STORE_LAST_RENAME, "")) return;
         var parts = ren.split("|");
@@ -1713,7 +1722,8 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         var self = this;
-        this.applyRename();
+        // Non chiamare get() / sites() / applyRename qui: Mangayomi, per leggere
+        // una preferenza, richiama questo metodo. Un get() interno è un ciclo.
         var saved = this.savedSites();
         var all = this.allSites(saved);
         var urls = READY.map(function (r) { return r[0]; });
