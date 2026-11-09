@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.2.3
+
+- Tra i siti già pronti PornHat ora è la versione italiana (it.pornhat.com), con i titoli in italiano.
+
 ## Link universale 1.2.2
 
 - Altri 5 siti già pronti: FetishShrine (fetish e BDSM), Ah-Me, PerfectGirls, PornMZ, xFreeHD. Ora sono 39.

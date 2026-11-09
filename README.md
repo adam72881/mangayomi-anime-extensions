@@ -52,6 +52,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.2.3** — PornHat in versione italiana tra i siti pronti.
 - **Link universale 1.2.2** — 5 siti pronti in più (anche FetishShrine per fetish e BDSM).
 - **Link universale 1.2.1** — regole più ampie per i siti mai provati; messaggio chiaro per i siti con verifica anti-bot.
 - **Link universale 1.2.0** — 34 siti già pronti nelle impostazioni, ricerca più precisa.

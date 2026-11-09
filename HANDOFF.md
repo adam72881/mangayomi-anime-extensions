@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.2.2 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.2.3 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -36,6 +36,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 ## Link universale — 1.2.1
 
+- **1.2.3:** PornHat in `READY` è `it.pornhat.com` (provato). crazyshit.com non si aggiunge (sito shock: violenza e incidenti reali).
 - **1.2.2:** in `READY` anche fetishshrine, ah-me, perfectgirls.xxx, pornmz, xfreehd (provati). Provati e non vanno: analdin, pornomovies (verifica), fapvid (verifica sui video), yeptube/vivatube (niente video), hclips, vjav, porndoe (solo JavaScript), hotmovs, pornktube (502).
 
 - **1.2.1:** `unpackAll()` scompatta `eval(function(p,a,c,k,e,d)…)` e il testo scompattato si aggiunge all'HTML prima di cercare i video. `declaredCandidates()`: `contentUrl`, `og:video` con percorso tipo /get|stream|video…, e `file|src` dentro `sources:[`, `setup(`, `new Plyr`, `videojs(` anche senza estensione. `embedUrl` e `og:video`/`twitter:player` che sono pagine → letti come iframe. `fetchHtml` riconosce le pagine di verifica (403/503/429, titolo Loading/Just a moment/…, cf-chl, captcha) e chiede di passare dalla WebView (i cookie della WebView vanno all'estensione). Gruppi delle schede: solo i pezzi con una cifra diventano «*» (prima «category», «pornstar», «channel» finivano nello stesso gruppo). I «consigliati» della home si tolgono dai risultati solo se restano almeno 6 schede-video.
