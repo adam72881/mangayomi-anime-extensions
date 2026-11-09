@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.1
+
+- Immagini con spazi o caratteri speciali nell'indirizzo: ora vengono codificate e si caricano.
+- Nuova impostazione **Immagini: presentati come il sito principale** (spenta di partenza): per i siti che danno le miniature solo alle proprie pagine. Vale per un sito alla volta; dopo averla accesa o dopo aver cambiato sito principale va chiusa e riaperta l'app.
+
 ## Link universale 1.4.0
 
 - **Webview apre il sito giusto**, non più DuckDuckGo:

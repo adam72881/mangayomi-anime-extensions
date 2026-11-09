@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.0",
+        "version": "1.4.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -27,6 +27,7 @@ const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
 const STORE_READY_OFF = "linkuni_ready_off";
 const PREF_RANDOM = "linkuni_random_site";
+const PREF_IMG_REFERER = "linkuni_image_referer";
 const STORE_RANDOM = "linkuni_random_pick_";
 
 // Siti provati: lista, ricerca e video funzionano senza fare niente.
@@ -183,6 +184,9 @@ function resolveUrl(href, base) {
         .replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 10)); })
         .replace(/&amp;/g, "&");
     if (!href || /^(javascript|mailto|tel|data|blob|about):/i.test(href) || href.charAt(0) === "#") return "";
+    // Spazi e caratteri non ASCII negli indirizzi (frequenti nelle immagini):
+    // l'app non li carica se non sono codificati.
+    href = href.replace(/[^\x21-\x7e]/g, function (ch) { return encodeURIComponent(ch); });
     if (/^https?:\/\//i.test(href)) return href;
     if (href.indexOf("//") === 0) return "https:" + href;
     var origin = originOf(base);
@@ -328,6 +332,18 @@ class DefaultExtension extends MProvider {
         super();
         this.client = new Client();
         this.prefs = new SharedPreferences();
+    }
+
+    // Intestazioni che l'app usa per caricare le immagini: sono le stesse per
+    // tutta la sorgente (Mangayomi le calcola una volta sola, all'avvio).
+    getHeaders(url) {
+        try {
+            if (this.setting(PREF_IMG_REFERER) === true) {
+                var main = this.sites()[0];
+                if (main) return { "Referer": main + "/" };
+            }
+        } catch (e) {}
+        return {};
     }
 
     headers(referer) {
@@ -1292,6 +1308,14 @@ class DefaultExtension extends MProvider {
             switchPreferenceCompat: {
                 title: "Sito a sorpresa",
                 summary: "A ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi (i tuoi e quelli pronti spuntati), invece del sito principale.",
+                value: false,
+            },
+        });
+        prefs.push({
+            key: PREF_IMG_REFERER,
+            switchPreferenceCompat: {
+                title: "Immagini: presentati come il sito principale",
+                summary: "Accendilo se le miniature del sito principale restano grigie: alcuni siti danno le immagini solo alle proprie pagine. Vale per un sito alla volta: dopo averlo acceso, o dopo aver cambiato sito principale, chiudi e riapri Mangayomi. Può far sparire le miniature degli altri siti.",
                 value: false,
             },
         });
