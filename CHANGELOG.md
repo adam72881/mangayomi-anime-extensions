@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.6
+
+- Due siti pronti in più, controllati (lista, JPEG, ricerca, mp4): **Bdsmstreak** (BDSM consensuale: femdom, bondage) e **AnalVids** (hardcore). I pronti sono 55.
+- I grandi siti JAV (MissAV, Supjav, Jable, JavBus, OneJav…) da questa rete sono dietro Cloudflare, paywall o un player senza file in pagina. Non sono stati aggiunti e non è stato decodificato nulla. jav.guru resta fuori dai pronti: le liste si aprono, il video no.
+
 ## Link universale 1.4.5
 
 - Tre siti pronti in più, controllati (lista, miniature JPEG, ricerca, mp4): BravoPorn, HomeMovies, YourAmateur. Ora sono 53.

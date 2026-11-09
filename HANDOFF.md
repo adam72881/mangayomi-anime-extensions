@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.5 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.6 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,12 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.6
+
+Aggiunti: `https://bdsmstreak.com` (ricerca `/search?q=`, mp4 su cdn, JPEG) e `https://www.analvids.com` (ricerca `/search/{parola}`, mp4 `ftyp`). `getSourcePreferences` non è stato toccato nel suo divieto: niente `get()`, `sites()`, `applyRename`.
+
+Non aggiunti (9 novembre 2026): Cloudflare o «Checking browser» su MissAV, Supjav, Jable, OneJav, JavDB, JavLibrary, 141jav, javcl, javfull, javgg.net, boundhub, kink.com, hogtied, fetishpapa, hardkinks. Paywall o solo trailer: Brazzers, ManyVids, Clips4Sale, JapanHDV, Jav321 (anteprima DMM). JavGG.com ha il link mp4 ma il file risponde 403. Player solo JavaScript: Javtiful, HPJAV, JavMost, JavHay. jav.guru: indirizzo offuscato, non decodificato. SpankingTube escluso (keyword del sito con «young teen»). PornFidelity escluso (marchio «teen»). Tokyo-Hot: pagina di età e taglio non consensuale. BdsmBoard è un forum, non un tube.
 
 ## Link universale — 1.4.5
 

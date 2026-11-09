@@ -26,7 +26,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 
 **Impostazioni della sorgente:**
-- **Siti già pronti**: 53 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AlphaPorno, HellPorno, YesPorn, BravoPorn, HomeMovies, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
+- **Siti già pronti**: 55 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AlphaPorno, HellPorno, YesPorn, FetishShrine, Bdsmstreak, AnalVids, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
 - **➕ Salva un sito**: scrivi il link della pagina principale (es. `https://xhamster.com`) e apri la sorgente: il sito entra nell'elenco. Puoi salvarne quanti vuoi, uno alla volta o più insieme separati da spazio.
 - **Sito principale**: quello di Popolari e Recenti (anche uno di quelli pronti).
 - **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi.
@@ -53,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.4.6** — Bdsmstreak (BDSM) e AnalVids (hardcore) tra i siti pronti.
 - **Link universale 1.4.5** — BravoPorn, HomeMovies e YourAmateur; filtro Categoria; siti salvati si possono nascondere senza cancellarli.
 - **Link universale 1.4.4** — non si chiude più all'apertura (ciclo nelle impostazioni della 1.4.2).
 - **Link universale 1.4.3** — 11 siti pronti in più (AlphaPorno, HellPorno, YesPorn, TokyoMotion, MegaTube…).
