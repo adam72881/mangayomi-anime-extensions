@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.0.0 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.1.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -34,7 +34,13 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
 
-## Link universale — 1.0.0
+## Link universale — 1.1.0
+
+- **Siti salvati (1.1.0):** impostazione `linkuni_add_site` (testo). `sites()` aggiunge i link nuovi (solo l'origine) a `getString("linkuni_saved_sites")`, ricordando l'ultimo testo in `linkuni_last_added` per non riaggiungere un sito tolto. Mangayomi salva la preferenza la prima volta e poi non ne aggiorna più le scelte (`getSourcePreferenceEntry`), quindi «Sito principale» (listPreference) e «Togli siti» (multiSelect) hanno chiave `linkuni_main_<hash>` / `linkuni_remove_<hash>` dell'elenco: cambia l'elenco, cambia la chiave. Il principale scelto è copiato in `linkuni_main_site`. `getSourcePreferences()` non chiama `get()`.
+- **Popolari/Recenti:** link della home con testo «Più visti / Most viewed / Video migliori / Best / Top rated…» o «Più nuovi / Newest / Latest…» (priorità nell'ordine, esclusi utenti, categorie, album…), in cache `linkuni_sections`; se la pagina non ha schede prova `/best`, `/most-viewed`… o `/new`, `/latest-updates`…; Recenti vuoto → Popolari.
+- **Ricerca nel sito:** filtro «Sito». Modulo GET della home con `q|s|k|search|keyword…`, ricerca JS `'/x?key=' + encodeURIComponent`, poi indirizzi comuni (`/search/{q}`, `?s=`, `/video/search?search=`, `?k=`, `/archive?search=`…). Accettato se almeno 2 schede contengono la parola (o 1 su ≤3); salvato in `linkuni_search_patterns`.
+- **Schede:** `<a>` con `<img>`; `<article>/<li>` con immagine e link a parte (preferito quello non categoria); JSON nella pagina con `pageURL|url|link` + `title` + `thumbURL|image…` (xHamster). Ordine: prima il gruppo di link più numeroso, poi `SIDE_PATH` (categorie, tag, canali, album…). Titoli deboli («1080p», durate) sostituiti dal testo di un altro link alla stessa pagina. Pagina dopo: `rel=next`, «Next/›/Prossimo», link a pagina+1, oppure `"next":N` nel JSON → `?page=N`; gli href con entità (`&#x3D;`) vengono decodificati.
+- **Video:** KVS `video_url`/`video_alt_url*` con `*_text`; AnimeWorld `/play/<serie>/<id>` → `/api/episode/info?id=` (`grabber`). Episodi anche da `data-episode-num` e link con solo il numero sotto la pagina della serie.
 
 - Niente catalogo proprio: `search()` con un URL (anche senza `https://`) legge la pagina. In cima «▶ titolo» se la pagina sembra avere un video (og:type video, `<video>`, iframe di player, mp4/m3u8 trovati, o AnimeSaturn), poi le schede `<a>` con `<img>` dello stesso sito (ultimi due pezzi del dominio). Pagina successiva da `rel=next` o link «›/Next/Successiva», salvata in `getString("linkuni_next_pages")` (chiave `link#pagina`).
 - Popolari/Recenti = cronologia (`getString("linkuni_history")`, max 60), scritta da `search` e `getDetail`. Testo senza link = filtro sulla cronologia.

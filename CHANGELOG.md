@@ -1,5 +1,13 @@
 # Novità
 
+## Link universale 1.1.0
+
+- **Impostazioni → ➕ Salva un sito**: scrivi il link della pagina principale di un sito e lo trovi nell'elenco. **Sito principale** sceglie quello di Popolari e Recenti; **Togli siti** li elimina.
+- **Popolari** e **Recenti** usano le liste «Più visti» e «Più recenti» del sito (trovate da sola), altrimenti la home.
+- **Ricerca** con una parola: scegli il sito nel filtro **Sito**, l'estensione scopre da sola come cerca quel sito (e lo ricorda).
+- Liste più pulite: prima i video, poi categorie, tag, album; niente pubblicità e redirect; titoli veri al posto di «1080p».
+- Legge anche le liste costruite con JavaScript (xHamster), le schede «a riquadro» (HentaiWorld), i player KVS con le qualità (Porntrex e simili) e gli episodi di AnimeWorld.
+
 ## Link universale 1.0.0
 
 - Nuova sorgente **Link universale**: incolla nella ricerca il link di un video, di una serie o di un sito.
