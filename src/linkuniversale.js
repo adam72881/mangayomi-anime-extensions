@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.6",
+        "version": "1.4.7",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -82,6 +82,7 @@ const READY = [
     ["https://yesporn.vip", "YesPorn"],
     ["https://www.thisvid.com", "ThisVid"],
     ["https://www.tokyomotion.net", "TokyoMotion"],
+    ["https://jav.guru", "JavGuru"],
     ["https://www.xxxfiles.com", "XXXFiles"],
     ["https://www.bravoporn.com", "BravoPorn"],
     ["https://www.homemoviestube.com", "HomeMovies"],
@@ -459,6 +460,36 @@ function unpackAll(html) {
         var dict = {};
         while (c--) dict[enc(c)] = k[c] || enc(c);
         out += "\n" + p.replace(/\b\w+\b/g, function (w) { return dict[w] !== undefined ? dict[w] : w; });
+    }
+    return out;
+}
+
+// Indirizzi del player scritti in base64, o ricostruiti invertendo i pezzi
+// data-* come fa lo script della pagina (jav.guru). Non è un anti-bot.
+function hiddenPlayerUrls(html) {
+    var out = [];
+    var add = function (u) {
+        if (u && /^https?:\/\//i.test(u) && out.indexOf(u) === -1) out.push(u);
+    };
+    var re = /["']iframe_url["']\s*:\s*["']([A-Za-z0-9+/=]{16,})["']/g;
+    var m;
+    while ((m = re.exec(html)) !== null && out.length < 6) add(base64Decode(m[1]));
+    var cfg = html.match(/cid:\s*['"]([^'"]+)['"][\s\S]{0,400}?base:\s*['"]([^'"]+)['"][\s\S]{0,240}?rtype:\s*['"]([^'"]+)['"][\s\S]{0,240}?keys:\s*\[([^\]]+)\]/);
+    if (cfg) {
+        var names = cfg[4].match(/['"]([^'"]+)['"]/g) || [];
+        var parts = [];
+        var ok = true;
+        for (var i = 0; i < names.length; i++) {
+            var name = names[i].replace(/['"]/g, "");
+            var attr = html.match(new RegExp("\\b" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
+            if (!attr) { ok = false; break; }
+            parts.push(attr[1]);
+        }
+        if (ok && parts.length) {
+            var rev = parts.join("").split("").reverse().join("");
+            var base = cfg[2];
+            add(base + (base.indexOf("?") === -1 ? "?" : "&") + cfg[3] + "r=" + rev);
+        }
     }
     return out;
 }
@@ -1634,6 +1665,10 @@ class DefaultExtension extends MProvider {
         if (depth >= 2) return videos;
 
         var frames = [];
+        hiddenPlayerUrls(html).forEach(function (u) {
+            u = resolveUrl(u, pageUrl);
+            if (u && !AD_HOSTS.test(u) && frames.indexOf(u) === -1) frames.push(u);
+        });
         var re = /<iframe\b[^>]*?\b(?:data-lazy-src|data-src|src)\s*=\s*["']([^"']+)["']/gi;
         var m;
         while ((m = re.exec(html)) !== null) {

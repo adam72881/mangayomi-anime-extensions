@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.4.7
+
+- **JavGuru: i video partono nell'app.** Il player è scritto nella pagina in base64 e poi a pezzi invertiti: l'estensione lo ricostruisce, come farebbe il sito, e legge l'HLS (fino a 1080p). Se un server del video chiede Cloudflare o un paywall, quel server si salta; gli altri restano. JavGuru è anche tra i siti pronti.
+
 ## Link universale 1.4.6
 
 - Due siti pronti in più, controllati (lista, JPEG, ricerca, mp4): **Bdsmstreak** (BDSM consensuale: femdom, bondage) e **AnalVids** (hardcore). I pronti sono 55.

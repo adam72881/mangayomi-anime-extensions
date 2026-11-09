@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.6 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.7 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.7
+
+`hiddenPlayerUrls`: `iframe_url` in base64 se è un http, e il player che concatena `data-*` e li inverte (`cid`/`base`/`rtype`/`keys`, jav.guru → `searcho/?xr=`). Si seguono come iframe (profondità già 2: la pagina `searcho` costruisce `xr`, il redirect arriva al player, `unpackAll` trova il master `.m3u8`). Verificato il 9 novembre 2026 su START-663: playlist `#EXTM3U` 1920×1080, Referer `jav.guru` accettato. Non si decifra altro e non si aggira Cloudflare. JavGuru in `READY`. `getSourcePreferences` invariato sul divieto di `get()`.
 
 ## Link universale — 1.4.6
 
