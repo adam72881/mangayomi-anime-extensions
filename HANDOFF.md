@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.3.0 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.3.1 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -36,6 +36,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 ## Link universale — 1.2.1
 
+- **1.3.1:** `pickImage()` sceglie tra tutte le `<img>` della scheda la prima non segnaposto (svg, 18plus, logo, blank, data:), attributi lazy prima di `src` (PornDig metteva prima l'icona 18+ con alt «Verify your age»). Nomi ripetuti 3+ volte nella pagina → titolo da un altro link o dallo slug. Copertina scheda: og:image, poi `thumbnailUrl`, `<video poster>`, `poster:`/`preview_url:`. Script `imgcheck.js` in scratchpad controlla immagini/titoli dei siti `READY`. Dall'Italia alcuni siti (Pornhub ecc.) possono chiedere la verifica dell'età: non si aggira, si fa nella WebView.
 - **1.3.0:** interruttore `linkuni_random_site` (default spento). `sectionListing` a pagina 1 estrae un sito da `sites()` diverso dall'ultimo (`getString("linkuni_random_pick_<kind>")`), fino a 3 tentativi se errore o lista vuota; le pagine dopo usano quello salvato. La logica per sito è in `siteSection(site, kind, page)`.
 - **1.2.3:** PornHat in `READY` è `it.pornhat.com` (provato). crazyshit.com non si aggiunge (sito shock: violenza e incidenti reali).
 - **1.2.2:** in `READY` anche fetishshrine, ah-me, perfectgirls.xxx, pornmz, xfreehd (provati). Provati e non vanno: analdin, pornomovies (verifica), fapvid (verifica sui video), yeptube/vivatube (niente video), hclips, vjav, porndoe (solo JavaScript), hotmovs, pornktube (502).

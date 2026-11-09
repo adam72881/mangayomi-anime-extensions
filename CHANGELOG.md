@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.3.1
+
+- **Immagini e titoli delle liste**: su alcuni siti (PornDig) al posto della miniatura usciva l'icona «18+» e come titolo «Verify your age». Ora prende la miniatura vera, saltando segnaposto, loghi e icone, e il titolo vero. Le etichette ripetute su tante schede («SHORTS», «In process») vengono sostituite dal titolo.
+- **Copertina nella scheda** anche quando il sito non la dichiara: usa l'immagine del player.
+
 ## Link universale 1.3.0
 
 - Nuova impostazione **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi (i tuoi e quelli pronti spuntati), mai lo stesso due volte di fila. Scorrendo si resta sullo stesso sito. Se il sito estratto non risponde ne prova un altro.

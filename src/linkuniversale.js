@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.3.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -94,12 +94,14 @@ const KNOWN_HOSTS = [
 
 // Pagine di servizio, pubblicità e redirect: non sono video né serie.
 function isContentPath(path) {
+    // Cambio lingua: /es/, /pt-br/
+    if (/^\/[a-z]{2}(-[a-z]{2})?\/?$/i.test(path.split("?")[0])) return false;
     return !/\/(login|signup|register|premium|upload|privacy|terms|dmca|contact|logout|account|out|go|redirect|click|ads?|rss|feed|feeds)(\/|\?|$)|[?&]utm_|\/ff\/out/i.test(path);
 }
 
 // Testi che non sono titoli: qualità, durata, «HD», contatori.
 function weakTitle(t) {
-    return !t || t.length < 4 || /^(screenshot|thumbnail|thumb|image|preview|poster|immagine|anteprima)\b/i.test(t.trim()) || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
+    return !t || t.length < 4 || /^(screenshot|thumbnail|thumb|image|preview|poster|immagine|anteprima|verify your age|age verification|18\+)\b/i.test(t.trim()) || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
 }
 
 const SIDE_PATH = /\/(c|cat|cats|category|categories|tags?|channels?|pornstars?|models?|studios?|genres?|generi|genere|users?|members?|playlists?|search|albums?|photos?|gallery|galleries|pics)(\/|\?|$)|[?&](genre|tag|category|cat)=/i;
@@ -130,6 +132,24 @@ function orderCards(cards) {
     }).sort(function (a, b) {
         return a.main - b.main || a.side - b.side || a.i - b.i;
     }).map(function (x) { return x.c; });
+}
+
+// L'immagine vera di una scheda: tra tutte le <img>, la prima che non è un
+// segnaposto (icona 18+, logo, pixel vuoto, svg), guardando prima gli
+// attributi del caricamento ritardato.
+function pickImage(html) {
+    var tags = html.match(/<img\b[^>]*>/gi) || [];
+    var attrs = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-mediumthumb", "data-thumb_url", "data-thumb", "data-image", "data-poster", "src"];
+    var placeholder = /^data:|\.svg(\?|$)|18plus|placeholder|blank\.|spacer|pixel\.|loading\.|lazy\.|\/logo|sprite|\/flags?\/|avatar/i;
+    for (var t = 0; t < tags.length; t++) {
+        for (var j = 0; j < attrs.length; j++) {
+            var m = tags[t].match(new RegExp("\\b" + attrs[j] + "\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
+            if (m && !placeholder.test(m[1])) return { tag: tags[t], src: m[1] };
+        }
+        var ss = tags[t].match(/\b(?:data-)?srcset\s*=\s*["']([^\s"',]+)/i);
+        if (ss && !placeholder.test(ss[1])) return { tag: tags[t], src: ss[1] };
+    }
+    return { tag: tags[0] || "", src: "" };
 }
 
 function hostOf(url) {
@@ -735,22 +755,14 @@ class DefaultExtension extends MProvider {
             if (path === "" || path === "/" || /\.(jpe?g|png|gif|webp|svg|css|js)(\?|$)/i.test(path)) continue;
             if (!isContentPath(path)) continue;
 
-            var img = inner.match(/<img\b[^>]*>/i)[0];
-            var src = "";
-            var lazy = ["data-src", "data-original", "data-lazy-src", "data-mediumthumb", "data-thumb_url", "data-thumb", "data-image", "src"];
-            for (var j = 0; j < lazy.length && !src; j++) {
-                var am = img.match(new RegExp("\\b" + lazy[j] + "\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
-                if (am && !/^data:/i.test(am[1])) src = am[1];
-            }
-            if (!src) {
-                var ss = img.match(/\bsrcset\s*=\s*["']([^\s"',]+)/i);
-                if (ss) src = ss[1];
-            }
+            var picked = pickImage(inner);
+            var img = picked.tag;
+            var src = picked.src;
             var title = "";
             var tm = attrs.match(/\btitle\s*=\s*["']([^"']+)["']/i);
             if (tm) title = tm[1];
             if (!title) {
-                var alt = img.match(/\balt\s*=\s*["']([^"']+)["']/i);
+                var alt = attrs.match(/\balt\s*=\s*["']([^"']+)["']/i) || img.match(/\balt\s*=\s*["']([^"']+)["']/i);
                 if (alt) title = alt[1];
             }
             title = decodeEntities(title);
@@ -768,7 +780,28 @@ class DefaultExtension extends MProvider {
         all = all.filter(function (c) {
             return !(hostOf(c.link) !== here && /^[a-z]{2}(-[a-z]{2})?\./.test(hostOf(c.link)) && /^(deutsch|english|español|espanol|français|francais|italiano|português|portugues|русский|日本語|中文|nederlands|polski|türkçe|[a-z]{2})$/i.test(c.name.trim()));
         });
-        return orderCards(all);
+        // Lo stesso «titolo» su tante schede è un'etichetta (SHORTS, In process…):
+        // al suo posto il titolo di un altro link alla stessa pagina, o le parole del link.
+        var count = {};
+        all.forEach(function (c) { count[c.name] = (count[c.name] || 0) + 1; });
+        all.forEach(function (c) {
+            if (count[c.name] < 3) return;
+            var other = titles[c.link];
+            if (other && other !== c.name && (count[other] || 0) < 3) { c.name = other; return; }
+            var parts = c.link.replace(/^https?:\/\/[^\/]+/, "").split("?")[0].split("/").filter(Boolean);
+            var slug = parts.filter(function (x) { return /[a-z]{3,}[-_][a-z]/i.test(x); }).pop();
+            if (slug) {
+                slug = slug.replace(/\.html?$/i, "").replace(/[-_]+/g, " ").trim();
+                c.name = slug.charAt(0).toUpperCase() + slug.slice(1);
+            } else {
+                c._untitled = true;
+            }
+        });
+        // Le schede rimaste senza titolo vanno in fondo.
+        var untitled = all.filter(function (c) { return c._untitled; });
+        all = orderCards(all.filter(function (c) { return !c._untitled; })).concat(untitled);
+        all.forEach(function (c) { delete c._untitled; });
+        return all;
     }
 
     // Schede dove il link copre il riquadro e l'immagine sta accanto
@@ -794,12 +827,7 @@ class DefaultExtension extends MProvider {
                 if (!SIDE_PATH.test(path)) { a = cand; break; }
             }
             if (!a) continue;
-            var src = "";
-            var lazy = ["data-src", "data-original", "data-lazy-src", "data-thumb", "src"];
-            for (var j = 0; j < lazy.length && !src; j++) {
-                var am = img[0].match(new RegExp("\\b" + lazy[j] + "\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
-                if (am && !/^data:/i.test(am[1])) src = am[1];
-            }
+            var src = pickImage(box).src;
             var head = box.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i);
             var title = decodeEntities((a.attrs.match(/\btitle\s*=\s*["']([^"']+)/i) || ["", ""])[1]) ||
                 (head ? decodeEntities(head[1].replace(/<[^>]+>/g, " ")) : "") ||
@@ -891,7 +919,13 @@ class DefaultExtension extends MProvider {
         var link = cleanLink(url);
         var html = await this.fetchHtml(link, originOf(link) + "/");
         var title = pageTitle(html) || link;
-        var image = resolveUrl(metaContent(html, ["og:image", "twitter:image"]), link);
+        var image = resolveUrl(metaContent(html, ["og:image", "twitter:image", "thumbnailUrl"]), link);
+        if (!image) {
+            var poster = unescapeJs(html).match(/"thumbnailUrl"\s*:\s*\[?\s*"([^"]+)"/i) ||
+                html.match(/<video\b[^>]*\bposter\s*=\s*["']([^"']+)["']/i) ||
+                unescapeJs(html).match(/\b(?:poster|preview_url|image)\s*:\s*["']((?:https?:)?\/\/[^"']+\.(?:jpe?g|png|webp)[^"']*)["']/i);
+            if (poster) image = resolveUrl(poster[1], link);
+        }
         var description = metaContent(html, ["og:description", "description", "twitter:description"]);
 
         var chapters = this.episodesOf(html, link);
