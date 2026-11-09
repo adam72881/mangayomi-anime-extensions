@@ -1,5 +1,13 @@
 # Novità
 
+## Link universale 1.4.5
+
+- Tre siti pronti in più, controllati (lista, miniature JPEG, ricerca, mp4): BravoPorn, HomeMovies, YourAmateur. Ora sono 53.
+- **Categoria** nella ricerca: dopo aver aperto il sito almeno una volta, nel filtro compaiono le categorie della home. «Tutte» lascia la ricerca com'è; sceglierne una e cercare senza testo apre quella lista.
+- **I tuoi siti attivi**: togli la spunta per nasconderli senza cancellarli. Il preferito resta «Sito principale».
+- Se manca il video o, con Diagnostica accesa, la lista è vuota, il messaggio dice il motore riconosciuto (KVS, WordPress, xVideos, JSON).
+- Ricontrollo dei 50 precedenti, da questa rete: Eporner mostra la verifica età dell'Ohio, Xozilla è Cloudflare, Porntrex risponde 403, XXXBunker una pagina «Traffic Verification», la home di xnxx non ha schede (le liste /best sì). Non li ho tolti: sul telefono, se uno resta vuoto, togli la spunta.
+
 ## Link universale 1.4.4
 
 - Corretto: aprendo Link universale l'app si chiudeva. Era un ciclo nelle impostazioni introdotto con la 1.4.2. Miniature, verifica dell'età e siti pronti restano quelli della 1.4.3.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.4",
+        "version": "1.4.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -34,6 +34,7 @@ const PREF_RENAME = "linkuni_rename";
 const PREF_NAV = "linkuni_nav";
 const STORE_NAMES = "linkuni_names";
 const STORE_LAST_RENAME = "linkuni_last_rename";
+const STORE_SAVED_OFF = "linkuni_saved_off";
 const STORE_RANDOM = "linkuni_random_pick_";
 
 // Siti provati: lista, ricerca e video funzionano senza fare niente.
@@ -80,6 +81,9 @@ const READY = [
     ["https://www.thisvid.com", "ThisVid"],
     ["https://www.tokyomotion.net", "TokyoMotion"],
     ["https://www.xxxfiles.com", "XXXFiles"],
+    ["https://www.bravoporn.com", "BravoPorn"],
+    ["https://www.homemoviestube.com", "HomeMovies"],
+    ["https://www.youramateurporn.com", "YourAmateur"],
     ["https://zbporn.com", "ZBporn (360p)"],
     ["https://www.bravotube.net", "BravoTube (360p)"],
     ["https://www.youporn.com", "YouPorn (360p)"],
@@ -507,6 +511,20 @@ class DefaultExtension extends MProvider {
         if (res.statusCode >= 400) throw new Error("Il sito ha risposto con errore " + res.statusCode);
     }
 
+    diagnose(html, what) {
+        var fam = siteFamily(html);
+        var engine = fam === "kvs" ? "motore KVS (video_url / get_file)" :
+            fam === "wordpress" ? "motore WordPress" :
+            fam === "xv" ? "motore tipo xVideos/xnxx" :
+            fam === "json" ? "motore a JSON nella pagina" :
+            "pagina HTML generica";
+        var why = what === "nessun video" ?
+            "Nessun file mp4/HLS in pagina (" + engine + "). Se parte nel browser, tocca Webview." :
+            "Nessuna scheda (" + engine + "). " + (ageWallText(html) ? "Sembra una verifica dell'età: tocca Webview." : "Non ho trovato titoli con una miniatura.");
+        if (this.setting(PREF_DEBUG) === true) why += " Diagnostica: " + fam + ".";
+        return why;
+    }
+
     ageWallMessage(url, html) {
         var host = hostOf(url);
         if (hardAgeCheck(html)) {
@@ -679,7 +697,16 @@ class DefaultExtension extends MProvider {
         if (on && typeof on.length === "number") {
             this.prefs.setString(STORE_READY_OFF, JSON.stringify(urls.filter(function (u) { return on.indexOf(u) === -1; })));
         }
-        var all = this.allSites(saved);
+        var active = saved;
+        if (saved.length) {
+            var savedOn = this.setting(this.listKey("linkuni_saved_on_", saved));
+            if (savedOn && typeof savedOn.length === "number") {
+                this.prefs.setString(STORE_SAVED_OFF, JSON.stringify(saved.filter(function (u) { return savedOn.indexOf(u) === -1; })));
+            }
+            var savedOff = this.readJson(STORE_SAVED_OFF, []);
+            active = saved.filter(function (u) { return savedOff.indexOf(u) === -1; });
+        }
+        var all = this.allSites(active);
         var mainChoice = this.setting(this.listKey("linkuni_main_", all));
         if (mainChoice && all.indexOf(mainChoice) !== -1) this.prefs.setString(STORE_MAIN, mainChoice);
         var chosen = this.prefs.getString(STORE_MAIN, "");
@@ -791,6 +818,17 @@ class DefaultExtension extends MProvider {
         var cache = this.readJson(PREF_NAV, {});
         cache[site] = cats;
         this.prefs.setString(PREF_NAV, JSON.stringify(cache));
+    }
+
+    categoryPick(filters, site) {
+        var idx = 0;
+        (filters || []).forEach(function (f) {
+            if (f && f.type_name === "SelectFilter" && f.name === "Categoria") idx = f.state || 0;
+        });
+        if (!idx) return "";
+        var cats = (this.readJson(PREF_NAV, {})[site] || []);
+        var c = cats[idx - 1];
+        return c && c.url ? c.url : "";
     }
 
     categoryMatch(site, text) {
@@ -955,7 +993,9 @@ class DefaultExtension extends MProvider {
         var site = this.siteFromFilters(filters);
         if (!site) return this.historyPage(text);
         var order = this.orderKind(filters);
+        var catPick = this.categoryPick(filters, site);
         if (!text) {
+            if (catPick) return this.listing(catPick, page, false);
             if (order) return this.siteSection(site, order, page);
             return this.listing(site + "/", page, false);
         }
@@ -1149,6 +1189,9 @@ class DefaultExtension extends MProvider {
         }
         if (!list.length && page === 1 && withSelf) {
             list.push({ name: pageTitle(html) || url, imageUrl: "", link: url });
+        }
+        if (!list.length && page === 1 && this.setting(PREF_DEBUG) === true) {
+            throw new Error(this.diagnose(html, "nessuna scheda"));
         }
         return { list: list, hasNextPage: !!next && cards.length > 0 };
     }
@@ -1494,7 +1537,7 @@ class DefaultExtension extends MProvider {
         videos.forEach(function (v) { delete v._score; });
         videos = this.orderByPreferredQuality(videos);
         if (!videos.length) {
-            throw new Error("Nessun video trovato in questa pagina. Il sito probabilmente carica il player in un modo che l'estensione non sa ancora leggere.");
+            throw new Error(this.diagnose(html, "nessun video"));
         }
         return videos;
     }
@@ -1716,6 +1759,17 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Più lunghi", value: "longest" },
                 ],
             });
+            var cats = (self.readJson(PREF_NAV, {})[sites[0]] || []).slice(0, 40);
+            if (cats.length) {
+                filters.push({
+                    type_name: "SelectFilter",
+                    name: "Categoria",
+                    state: 0,
+                    values: [{ type_name: "SelectOption", name: "Tutte", value: "" }].concat(cats.map(function (c) {
+                        return { type_name: "SelectOption", name: c.name, value: c.url };
+                    })),
+                });
+            }
         }
         return filters;
     }
@@ -1782,7 +1836,7 @@ class DefaultExtension extends MProvider {
             key: PREF_DEBUG,
             switchPreferenceCompat: {
                 title: "Diagnostica",
-                summary: "Aggiunge al titolo il tipo di lettura (html, json, kvs, wordpress, xv) e lo ripete nella scheda. Lasciala spenta.",
+                summary: "Spiegazione quando una lista o un video non esce, e il motore riconosciuto (KVS, WordPress, xVideos, JSON) accanto al titolo. Lasciala spenta.",
                 value: false,
             },
         });
@@ -1809,6 +1863,17 @@ class DefaultExtension extends MProvider {
             },
         });
         if (saved.length) {
+            var savedOff = this.readJson(STORE_SAVED_OFF, []);
+            prefs.push({
+                key: this.listKey("linkuni_saved_on_", saved),
+                multiSelectListPreference: {
+                    title: "I tuoi siti attivi",
+                    summary: "Togli la spunta per nasconderli senza cancellarli. Quello di Popolari e Recenti è «Sito principale», qui sopra.",
+                    entries: saved.map(function (x) { return self.siteName(x); }),
+                    entryValues: saved,
+                    values: saved.filter(function (u) { return savedOff.indexOf(u) === -1; }),
+                },
+            });
             prefs.push({
                 key: this.listKey("linkuni_remove_", saved),
                 multiSelectListPreference: {

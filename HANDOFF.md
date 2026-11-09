@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.4 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.5 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,14 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.5
+
+Aggiunti a `READY`: BravoPorn, HomeMovies (`/search?q=&mode=search&type=videos`), YourAmateur (`searchgate.php?q=`). Prova: schede, due JPEG (`ffd8`), ricerca con la parola nei titoli, mp4 con `ftyp`.
+
+Filtro Categoria: da `linkuni_nav` (riempito alla prima home), solo in ricerca; indice 0 = Tutte. `linkuni_saved_on_<hash>` nasconde i siti salvati senza cancellarli (`linkuni_saved_off`). `diagnose()` nel messaggio «nessun video» e, se Diagnostica è accesa, anche sulla lista vuota. `getSourcePreferences` continua a non chiamare `get()`.
+
+Ricontrollo 9 novembre 2026 (IP Ohio), non tolti: Eporner = muro età di legge; Xozilla = Cloudflare; Porntrex = 403; XXXBunker = Traffic Verification; xnxx home senza schede (`/best` ha i video). Provati e non aggiunti: quasi tutti gli altri candidati sono Cloudflare, non hanno il file in pagina (DrTuber, NuVid, KeezMovies, Porn.com, Porn555, JavHay, JavMost, RealGF) o la ricerca non contiene la parola (xCum, HellMoms, PornPlus 403 sulla ricerca, Fapality il mp4 risponde 410). Hentai aggregatori non aggiunti.
 
 ## Link universale — 1.4.4
 
