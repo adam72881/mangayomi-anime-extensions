@@ -53,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.4.2** — miniature vere (niente riquadro grigio o icona 18+), niente schede «Verify your age», qualità preferita, durata e data nella scheda.
 - **Link universale 1.4.0** — il pulsante Webview apre il sito giusto (o l'elenco dei siti), non più DuckDuckGo.
 - **Link universale 1.3.1** — miniature e titoli giusti nelle liste (niente più «Verify your age»).
 - **Link universale 1.3.0** — «Sito a sorpresa»: un sito a caso a ogni apertura.

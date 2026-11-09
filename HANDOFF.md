@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.1 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.2 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,14 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.2
+
+- **Miniature:** `pickImage` assegna un punteggio e scarta segnaposto (`blank-tile`, `placeholder`, `18plus`, svg, classe `size-helper` / `img_18plus`). `data-original` batte il `src` vuoto. `badImageTag` guarda solo `class`, non l'intero tag (se no `placeholder.png` nel `src` scartava anche `data-original`). I riquadri `div.video-thumb` / `thumb-block` / `video-item` / `videobox` si leggono anche quando il titolo e l'immagine non sono nello stesso `<a>`.
+- **Età:** `pageIsAgeWall` = testo di verifica (titolo o almeno 3 volte «verify your age» / «verifica dell'età») e meno di 4 schede vere, e la pagina non sembra già un video. Cookie semplice (`document.cookie` / `create_cookie` con nome età e valore `1`/`yes`/`18`) → una richiesta con quell'header. Modulo stesso sito senza password, e-mail o captcha → invio. `hardAgeCheck` (account, e-mail, documento, Yoti, Veriff…) non si tocca: messaggio e WebView. Le schede rimaste con quel titolo si tolgono.
+- **KVS:** `video_url` accetta il prefisso `function/0/`. Gli URL con `trailer` si scartano (`NOT_THE_VIDEO`).
+- **Ricerca:** il modulo tiene gli `input hidden` e il primo `<option>` delle `<select>` (es. `search_type=videos`).
+- **Altro:** `linkuni_quality` (default massima), durata/data da JSON-LD in descrizione, filtro Ordine sulla ricerca, categoria se il nome coincide con un link di categoria visto in home, `linkuni_debug`, rinomina `indirizzo | nome` in `linkuni_names`. crazyshit.com non è in `READY` (shock).
 
 ## Link universale — 1.2.1
 

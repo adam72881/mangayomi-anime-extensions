@@ -1,5 +1,15 @@
 # Novità
 
+## Link universale 1.4.2
+
+- **Miniature.** Se la scheda ha prima un riquadro vuoto o l'icona «18+» e poi la foto vera, ora esce la foto. Vale anche per le immagini in `data-original` e per i siti che mettono il titolo e la miniatura uno accanto all'altra.
+- **Verifica dell'età.** Non compaiono più schede intitolate «Verify your age». Se la pagina è solo la conferma «ho 18 anni» (un cookie o un modulo dello stesso sito, senza captcha), l'estensione la supera. Se invece chiede account, e-mail o un documento, lo dice e non la aggira: si fa dalla WebView.
+- **Qualità preferita** nelle impostazioni: parte quella, se il video ce l'ha.
+- Nella scheda, **durata e data** quando il sito le scrive.
+- Nella ricerca, filtro **Ordine** (più recenti, più visti, più votati, più lunghi) se il sito ha quella lista. Scrivere il nome esatto di una categoria apre la categoria.
+- **Rinomina un sito** (`indirizzo | nome`). Il sito di Popolari e Recenti resta «Sito principale».
+- **Diagnostica** (spenta): sul titolo si vede come è stata letta la pagina.
+
 ## Link universale 1.4.1
 
 - Immagini con spazi o caratteri speciali nell'indirizzo: ora vengono codificate e si caricano.

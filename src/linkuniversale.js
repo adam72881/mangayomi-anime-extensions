@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.1",
+        "version": "1.4.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -28,6 +28,12 @@ const STORE_MAIN = "linkuni_main_site";
 const STORE_READY_OFF = "linkuni_ready_off";
 const PREF_RANDOM = "linkuni_random_site";
 const PREF_IMG_REFERER = "linkuni_image_referer";
+const PREF_QUALITY = "linkuni_quality";
+const PREF_DEBUG = "linkuni_debug";
+const PREF_RENAME = "linkuni_rename";
+const PREF_NAV = "linkuni_nav";
+const STORE_NAMES = "linkuni_names";
+const STORE_LAST_RENAME = "linkuni_last_rename";
 const STORE_RANDOM = "linkuni_random_pick_";
 
 // Siti provati: lista, ricerca e video funzionano senza fare niente.
@@ -78,7 +84,7 @@ const HISTORY_MAX = 60;
 const VIDEO_EXT = "m3u8|mp4|webm|mkv|mov|m4v";
 
 // Anteprime, miniature animate e pubblicità: sono mp4 veri, ma non il video.
-const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|\/pics\//i;
+const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\//i;
 const AD_HOSTS = /a-ads\.com|doubleclick|googlesyndication|googletagmanager|google-analytics|facebook\.com|twitter\.com|disqus|recaptcha|hcaptcha|cloudflare|wingsmob|exoclick|juicyads|trafficjunky|adsterra|popads|histats/i;
 
 // Player esterni che Mangayomi sa già leggere (estrattori integrati nell'app).
@@ -106,7 +112,89 @@ function isContentPath(path) {
 
 // Testi che non sono titoli: qualità, durata, «HD», contatori.
 function weakTitle(t) {
-    return !t || t.length < 4 || /^(screenshot|thumbnail|thumb|image|preview|poster|immagine|anteprima|verify your age|age verification|18\+)\b/i.test(t.trim()) || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
+    return !t || t.length < 4 || ageJunkTitle(t) || /^(screenshot|thumbnail|thumb|image|preview|poster|immagine|anteprima|18\+)\b/i.test(t.trim()) || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
+}
+
+// Titoli della pagina di conferma età: non sono video.
+function ageJunkTitle(t) {
+    return /^(verify your age|age verification|confirm your age|age restricted|adults only|i am 18|i'm 18|enter site|verifica( la tua)? et[aà]|conferma( la tua)? et[aà]|ho 18 anni|sono maggiorenne)\b/i.test(String(t || "").trim());
+}
+
+function ageWallText(html) {
+    var title = pageTitle(html);
+    if (title.length < 100 && /verify your age|age verification|verifica dell.et|verifica la tua et|conferma la tua et|age restricted|verify user ages|agegate/i.test(title)) return true;
+    var n = (String(html).slice(0, 50000).match(/verify your age|age verification|verifica dell.et|verifica la tua et/gi) || []).length;
+    return n >= 3;
+}
+
+// Verifica vera (account, e-mail, documento, servizio esterno): non si aggira.
+function hardAgeCheck(html) {
+    return /yoti|veriff|ondato|au10tix|ageid|getyoti|verify-my-age|idscan|credit card|carta d'identit|documento d'identit|crea un account|create an account|confirm your email|conferma la tua e-mail|openModalAgeVer|government identification|upload your id/i.test(String(html).slice(0, 80000));
+}
+
+// Cookie che il sito scrive quando si clicca «ho 18 anni» (valore corto, niente sessione).
+function simpleAgeCookie(html) {
+    var nameOk = /age|adult|discl|verify|mature|nsfw|gate|enter/i;
+    var valueOk = /^(1|2|true|yes|ok|18|on)$/i;
+    var re = /document\.cookie\s*=\s*["']([A-Za-z0-9_\-]{2,40})=([^;"'\s]{1,24})/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        if (nameOk.test(m[1]) && valueOk.test(m[2])) return m[1] + "=" + m[2];
+    }
+    var re2 = /(?:create_cookie|setCookie|Cookies\.set)\(\s*["']([A-Za-z0-9_\-]{2,40})["']\s*,\s*["']?([A-Za-z0-9_\-]{1,12})/g;
+    while ((m = re2.exec(html)) !== null) {
+        if (nameOk.test(m[1]) && valueOk.test(m[2])) return m[1] + "=" + m[2];
+    }
+    return "";
+}
+
+function siteFamily(html) {
+    var h = String(html || "");
+    if (/video_url\s*:|kt_player|\/get_file\//i.test(h)) return "kvs";
+    if (/wp-content\/uploads/i.test(h) && /<article\b/i.test(h)) return "wordpress";
+    if (/thumb-block|html5player/i.test(h)) return "xv";
+    if (/"thumbURL"\s*:|"pageURL"\s*:/i.test(h)) return "json";
+    return "html";
+}
+
+function twoDigits(n) {
+    n = String(n);
+    return n.length < 2 ? "0" + n : n;
+}
+
+function humanDuration(raw) {
+    var s = String(raw || "").trim();
+    var iso = s.match(/^P(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?|(\d+)D)/i);
+    if (iso && (iso[1] || iso[2] || iso[3])) {
+        var h = parseInt(iso[1] || "0", 10), m = parseInt(iso[2] || "0", 10), sec = parseInt(iso[3] || "0", 10);
+        if (h) return h + ":" + twoDigits(m) + ":" + twoDigits(sec);
+        return m + ":" + twoDigits(sec);
+    }
+    if (/^\d+$/.test(s)) {
+        var n = parseInt(s, 10);
+        if (n > 0 && n < 60 * 60 * 12) return Math.floor(n / 60) + ":" + twoDigits(n % 60);
+    }
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return s;
+    return "";
+}
+
+function humanDate(raw) {
+    var m = String(raw || "").match(/(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3] + "/" + m[2] + "/" + m[1] : "";
+}
+
+function videoFacts(html) {
+    var text = unescapeJs(html);
+    var dur = "", date = "";
+    var dm = text.match(/"duration"\s*:\s*"([^"]+)"/i) ||
+        html.match(/itemprop=["']duration["'][^>]*content=["']([^"']+)/i) ||
+        html.match(/content=["']([^"']+)["'][^>]*itemprop=["']duration["']/i) ||
+        html.match(/(?:property|name)=["'](?:video:duration|og:video:duration)["'][^>]*content=["']([^"']+)/i);
+    if (dm) dur = humanDuration(dm[1]);
+    var dt = text.match(/"(?:uploadDate|datePublished)"\s*:\s*"([^"]+)"/i) ||
+        html.match(/<time[^>]*datetime=["']([^"']+)/i);
+    if (dt) date = humanDate(dt[1]);
+    return { duration: dur, date: date };
 }
 
 const SIDE_PATH = /\/(c|cat|cats|category|categories|tags?|channels?|pornstars?|models?|studios?|genres?|generi|genere|users?|members?|playlists?|search|albums?|photos?|gallery|galleries|pics)(\/|\?|$)|[?&](genre|tag|category|cat)=/i;
@@ -139,27 +227,72 @@ function orderCards(cards) {
     }).map(function (x) { return x.c; });
 }
 
-// L'immagine vera di una scheda: tra tutte le <img>, la prima che non è un
-// segnaposto (icona 18+, logo, pixel vuoto, svg), guardando prima gli
-// attributi del caricamento ritardato.
+function badImageUrl(src) {
+    var u = String(src || "").trim();
+    if (!u || /^(?:javascript|data|blob|about):/i.test(u)) return true;
+    if (/\.svg(?:\?|$)/i.test(u)) return true;
+    return /18plus|placeholder|blank[-_.]|\/blank\b|spacer|pixel\.|loading\.|lazy\.gif|missing_thumb|no[-_]?thumb|no[-_]?image|transparent|1x1|age[-_]?verif|\/logo|sprite|\/flags?\//i.test(u);
+}
+
+function badImageTag(tag) {
+    var cls = (String(tag || "").match(/\bclass\s*=\s*["']([^"']+)/i) || ["", ""])[1];
+    return /\b(?:size-helper|img_18plus|placeholder|logo|avatar|agegate)\b/i.test(cls);
+}
+
+// Punteggio di una miniatura: i segnaposto (tile grigio, icona 18+) valgono
+// meno di zero e vengono scartati. Tra le altre vince la più «da foto».
+function imageScore(src, tag) {
+    if (badImageUrl(src) || badImageTag(tag)) return -1;
+    var score = 10;
+    var path = String(src).split("?")[0];
+    if (/\.(?:jpe?g|webp|avif)$/i.test(path)) score += 6;
+    else if (/\.png$/i.test(path)) score += 3;
+    else if (/\.gif$/i.test(path)) score += 1;
+    if (/thumb|poster|cover|upload|\/media\/|cdn|image/i.test(src)) score += 3;
+    if (/\/static\/images\//i.test(src)) score -= 6;
+    if (/[?&]prev=/.test(src)) score -= 3;
+    if (tag && /\b(?:hidden|thumb_preview)\b/i.test(tag)) score -= 5;
+    if (/\.mp4(?:\?|$)/i.test(path) && !/\/plain\/|rs:fit/i.test(src)) score -= 4;
+    return score;
+}
+
+function bestOfSrcset(value) {
+    var parts = String(value || "").split(",");
+    var best = "", bestW = -1;
+    for (var i = 0; i < parts.length; i++) {
+        var bit = parts[i].trim().split(/\s+/);
+        if (!bit[0]) continue;
+        var w = parseInt(String(bit[1] || "").replace(/w$/i, ""), 10);
+        if (isNaN(w)) w = 0;
+        if (w >= bestW) { bestW = w; best = bit[0]; }
+    }
+    return best;
+}
+
+// L'immagine vera di una scheda. Non la prima <img>: sui siti che mettono
+// prima un tile vuoto o l'icona «18+» quella è grigia o è la verifica dell'età.
 function pickImage(html) {
     var tags = html.match(/<img\b[^>]*>/gi) || [];
     var attrs = ["data-src", "data-original", "data-lazy-src", "data-lazy", "data-mediumthumb", "data-thumb_url", "data-thumb", "data-image", "data-poster", "src"];
-    var placeholder = /^data:|\.svg(\?|$)|18plus|placeholder|blank\.|spacer|pixel\.|loading\.|lazy\.|\/logo|sprite|\/flags?\/|avatar/i;
+    var best = { tag: "", src: "", score: -1 };
+    var consider = function (tag, src) {
+        var score = imageScore(src, tag);
+        if (score > best.score) best = { tag: tag, src: src, score: score };
+    };
     for (var t = 0; t < tags.length; t++) {
         for (var j = 0; j < attrs.length; j++) {
             var m = tags[t].match(new RegExp("\\b" + attrs[j] + "\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
-            if (m && !placeholder.test(m[1])) return { tag: tags[t], src: m[1] };
+            if (m) consider(tags[t], m[1]);
         }
-        var ss = tags[t].match(/\b(?:data-)?srcset\s*=\s*["']([^\s"',]+)/i);
-        if (ss && !placeholder.test(ss[1])) return { tag: tags[t], src: ss[1] };
+        var ss = tags[t].match(/\b(?:data-)?srcset\s*=\s*["']([^"']+)["']/i);
+        if (ss) consider(tags[t], bestOfSrcset(ss[1]));
     }
-    // Nessuna <img> buona: un attributo qualsiasi con dentro un'immagine
-    // (data-qualcosa, poster, srcset di <source>) o lo sfondo CSS.
-    var any = html.match(/\b(?:data-[\w-]+|poster|srcset|content)\s*=\s*["']((?:https?:)?\/\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*|\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*)/i) ||
-        html.match(/background(?:-image)?\s*:\s*url\(\s*(?:&quot;|["'])?([^"')&]+)/i);
-    if (any && !placeholder.test(any[1])) return { tag: tags[0] || "", src: any[1] };
-    return { tag: tags[0] || "", src: "" };
+    if (best.score < 0) {
+        var any = html.match(/\b(?:data-[\w-]+|poster|srcset|content)\s*=\s*["']((?:https?:)?\/\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*|\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*)/i) ||
+            html.match(/background(?:-image)?\s*:\s*url\(\s*(?:&quot;|["'])?([^"')&]+)/i);
+        if (any) consider(tags[0] || "", any[1]);
+    }
+    return { tag: best.tag || tags[0] || "", src: best.score >= 0 ? best.src : "" };
 }
 
 function hostOf(url) {
@@ -352,9 +485,7 @@ class DefaultExtension extends MProvider {
         return h;
     }
 
-    async fetchHtml(url, referer) {
-        var res = await this.client.get(url, this.headers(referer));
-        var body = String(res.body || "");
+    assertReachable(res, body, url) {
         // Pagina di verifica anti-bot: la fa la persona nella WebView, poi i
         // cookie della WebView valgono anche per l'estensione.
         if (res.statusCode === 403 || res.statusCode === 503 || res.statusCode === 429 ||
@@ -363,7 +494,86 @@ class DefaultExtension extends MProvider {
             throw new Error("Il sito " + hostOf(url) + " chiede una verifica (anti-bot). Tocca Webview, scegli il sito dall'elenco, supera la verifica e poi tocca Riprova.");
         }
         if (res.statusCode >= 400) throw new Error("Il sito ha risposto con errore " + res.statusCode);
-        return body;
+    }
+
+    ageWallMessage(url, html) {
+        var host = hostOf(url);
+        if (hardAgeCheck(html)) {
+            return "Il sito " + host + " chiede una verifica dell'età vera (account, e-mail o documento), non il pulsante «ho 18 anni». L'estensione non la aggira. Tocca Webview se vuoi farla lì, poi tocca Riprova.";
+        }
+        return "Il sito " + host + " mostra la conferma dell'età al posto dell'elenco. Tocca Webview, conferma «ho 18 anni» e poi tocca Riprova.";
+    }
+
+    // Poche schede vere e il testo della verifica: non è un elenco.
+    pageIsAgeWall(html, url) {
+        if (this.looksLikeVideoPage(url, html)) return false;
+        if (!ageWallText(html)) return false;
+        var cards = [];
+        try { cards = this.cardsOf(html, url); } catch (e) {}
+        var good = cards.filter(function (c) { return !ageJunkTitle(c.name); });
+        return good.length < 4;
+    }
+
+    async openAgeGate(url, html, referer) {
+        if (hardAgeCheck(html)) return "";
+        var cookie = simpleAgeCookie(html);
+        if (cookie) {
+            var h = this.headers(referer || (originOf(url) + "/"));
+            h["Cookie"] = cookie;
+            var res = await this.client.get(url, h);
+            var body = String(res.body || "");
+            this.assertReachable(res, body, url);
+            if (!this.pageIsAgeWall(body, url)) return body;
+        }
+        var via = await this.submitAgeForm(url, html, referer);
+        if (via && !this.pageIsAgeWall(via, url)) return via;
+        return "";
+    }
+
+    // Modulo dello stesso sito con il pulsante «ho 18 anni», senza login né captcha.
+    async submitAgeForm(url, html, referer) {
+        var forms = html.match(/<form\b[\s\S]*?<\/form>/gi) || [];
+        for (var i = 0; i < forms.length; i++) {
+            var f = forms[i];
+            var text = f.replace(/<[^>]+>/g, " ");
+            if (!/\b(18|enter|agree|confirm|continua|entra|maggiorenn)\b/i.test(text)) continue;
+            if (/password|e-?mail|captcha|yoti|veriff|credit|username/i.test(f)) continue;
+            var action = (f.match(/action\s*=\s*["']([^"']*)["']/i) || ["", ""])[1];
+            var target = resolveUrl(action || url, url) || url;
+            if (!target || siteOf(target) !== siteOf(url)) continue;
+            var method = ((f.match(/method\s*=\s*["']?(\w+)/i) || ["", "get"])[1] || "get").toLowerCase();
+            var h = this.headers(referer || (originOf(url) + "/"));
+            try {
+                var res;
+                if (method === "post") {
+                    var bits = [];
+                    var ins = f.match(/<input\b[^>]*>/gi) || [];
+                    for (var k = 0; k < ins.length; k++) {
+                        var n = (ins[k].match(/name\s*=\s*["']([^"']+)["']/i) || ["", ""])[1];
+                        if (!n) continue;
+                        var v = (ins[k].match(/value\s*=\s*["']([^"']*)["']/i) || ["", ""])[1];
+                        bits.push(encodeURIComponent(n) + "=" + encodeURIComponent(v));
+                    }
+                    h["Content-Type"] = "application/x-www-form-urlencoded";
+                    res = await this.client.post(target, h, bits.join("&"));
+                } else {
+                    res = await this.client.get(target, h);
+                }
+                var body = String(res && res.body || "");
+                if (res && res.statusCode < 400 && body && !this.pageIsAgeWall(body, target)) return body;
+            } catch (e) {}
+        }
+        return "";
+    }
+
+    async fetchHtml(url, referer) {
+        var res = await this.client.get(url, this.headers(referer));
+        var body = String(res.body || "");
+        this.assertReachable(res, body, url);
+        if (!this.pageIsAgeWall(body, url)) return body;
+        var opened = await this.openAgeGate(url, body, referer);
+        if (opened) return opened;
+        throw new Error(this.ageWallMessage(url, body));
     }
 
     // ---------- Cronologia dei link aperti ----------
@@ -429,6 +639,7 @@ class DefaultExtension extends MProvider {
     }
 
     sites() {
+        this.applyRename();
         var saved = this.savedSites();
         var added = String(this.setting(PREF_ADD) || "").trim();
         if (added && added !== this.prefs.getString(STORE_LAST_ADDED, "")) {
@@ -476,8 +687,28 @@ class DefaultExtension extends MProvider {
     }
 
     siteName(url) {
+        var names = this.readJson(STORE_NAMES, {});
+        if (names[url]) return names[url];
         for (var i = 0; i < READY.length; i++) if (READY[i][0] === url) return READY[i][1];
         return hostOf(url).replace(/^www\./, "");
+    }
+
+    applyRename() {
+        var ren = String(this.setting(PREF_RENAME) || "").trim();
+        if (!ren || ren === this.prefs.getString(STORE_LAST_RENAME, "")) return;
+        var parts = ren.split("|");
+        if (parts.length >= 2) {
+            var raw = parts[0].trim();
+            if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
+            var u = originOf(raw);
+            var name = parts.slice(1).join("|").trim().slice(0, 40);
+            if (u && name) {
+                var names = this.readJson(STORE_NAMES, {});
+                names[u] = name;
+                this.prefs.setString(STORE_NAMES, JSON.stringify(names));
+            }
+        }
+        this.prefs.setString(STORE_LAST_RENAME, ren);
     }
 
     siteFromFilters(filters) {
@@ -489,6 +720,114 @@ class DefaultExtension extends MProvider {
         return sites[idx] || "";
     }
 
+    orderKind(filters) {
+        var names = ["", "latest", "views", "rated", "longest"];
+        var idx = 0;
+        (filters || []).forEach(function (f) {
+            if (f && f.type_name === "SelectFilter" && f.name === "Ordine") idx = f.state || 0;
+        });
+        return names[idx] || "";
+    }
+
+    kindWords(kind) {
+        if (kind === "views") return ["più visti", "most viewed", "most watched", "più visualizzati"];
+        if (kind === "rated") return ["top rated", "più votati", "highest rated", "best rated", "meglio votati"];
+        if (kind === "longest") return ["più lunghi", "longest", "long videos", "longest videos"];
+        if (kind === "latest") {
+            return ["più nuovi", "più recenti", "newest", "new videos", "latest", "most recent", "recenti", "ultimi episodi",
+                "ultime uscite", "nuovi", "new", "recent", "ultimi"];
+        }
+        return ["più visti", "most viewed", "più visualizzati", "video migliori", "best videos", "best", "migliori",
+            "top rated", "più votati", "most popular", "popolari", "popular", "di tendenza", "trending", "hottest", "più bollenti", "top"];
+    }
+
+    kindTries(kind) {
+        if (kind === "views") return ["/most-viewed", "/most-watched", "/views"];
+        if (kind === "rated") return ["/top-rated", "/best-rated", "/rated"];
+        if (kind === "longest") return ["/longest", "/long-videos"];
+        if (kind === "latest") return ["/new", "/newest", "/latest", "/latest-updates", "/recent", "/videos", "/hits"];
+        return ["/best", "/most-viewed", "/most-popular", "/popular", "/trending", "/top-rated", "/videos"];
+    }
+
+    // Categorie linkate dalla home, per aprire il genere quando la ricerca è il suo nome.
+    rememberNav(site, html) {
+        var cats = [], seen = {};
+        var re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi, m;
+        while ((m = re.exec(html)) !== null && cats.length < 40) {
+            var label = decodeEntities(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+            if (label.length < 3 || label.length > 28 || !/[a-zà-ù]/i.test(label)) continue;
+            var href = (m[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i) || ["", ""])[1];
+            if (!href) continue;
+            var link = resolveUrl(href, site + "/");
+            if (!link || siteOf(link) !== siteOf(site)) continue;
+            var path = link.replace(/^https?:\/\/[^\/]+/, "");
+            if (!/\/(categor|cats?|tags?|channels?|pornstars?|models?|genres?|generi)\//i.test(path)) continue;
+            var key = label.toLowerCase();
+            if (seen[key]) continue;
+            seen[key] = true;
+            cats.push({ name: label, url: link });
+        }
+        if (!cats.length) return;
+        var cache = this.readJson(PREF_NAV, {});
+        cache[site] = cats;
+        this.prefs.setString(PREF_NAV, JSON.stringify(cache));
+    }
+
+    categoryMatch(site, text) {
+        var cats = (this.readJson(PREF_NAV, {})[site] || []);
+        var want = String(text || "").trim().toLowerCase();
+        for (var i = 0; i < cats.length; i++) {
+            if (String(cats[i].name).toLowerCase() === want) return cats[i].url;
+        }
+        return "";
+    }
+
+    sortLink(html, pageUrl, kind) {
+        var words = this.kindWords(kind);
+        var re = /<a\b([^>]*)>([\s\S]{0,200}?)<\/a>/gi, m;
+        while ((m = re.exec(html)) !== null) {
+            var label = decodeEntities(m[2].replace(/<[^>]+>/g, " ")).toLowerCase();
+            if (!label || label.length > 30) continue;
+            var ok = false;
+            for (var w = 0; w < words.length; w++) {
+                if (label === words[w] || label.indexOf(words[w] + " ") === 0) { ok = true; break; }
+            }
+            if (!ok) continue;
+            var h = (m[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i) || ["", ""])[1];
+            if (!h) continue;
+            var link = resolveUrl(h, pageUrl);
+            if (!link || siteOf(link) !== siteOf(pageUrl)) continue;
+            if (link.split("#")[0].replace(/\/+$/, "") === String(pageUrl).split("#")[0].replace(/\/+$/, "")) continue;
+            return link;
+        }
+        return "";
+    }
+
+    orderByPreferredQuality(videos) {
+        var wanted = String(this.setting(PREF_QUALITY) || "max");
+        if (!videos.length || wanted === "max") return videos;
+        var target = parseInt(wanted, 10);
+        if (!target) return videos;
+        var qOf = function (v) {
+            var m = String(v.quality).match(/(\d{3,4})\s*p/i);
+            return m ? parseInt(m[1], 10) : 0;
+        };
+        var best = -1, bestQ = -1;
+        for (var i = 0; i < videos.length; i++) {
+            var q = qOf(videos[i]);
+            if (q && q <= target && q > bestQ) { bestQ = q; best = i; }
+        }
+        if (best < 0) {
+            var above = 100000;
+            for (var j = 0; j < videos.length; j++) {
+                var q2 = qOf(videos[j]);
+                if (q2 && q2 < above) { above = q2; best = j; }
+            }
+        }
+        if (best > 0) videos.unshift(videos.splice(best, 1)[0]);
+        return videos;
+    }
+
     // Link della home con testo tipo «Più visti» / «Newest»: le liste del sito.
     async sectionUrl(site, kind) {
         var key = PREF_SECTIONS;
@@ -497,11 +836,8 @@ class DefaultExtension extends MProvider {
         if (cache[id] !== undefined) return cache[id] || site + "/";
         var html = await this.fetchHtml(site + "/", site + "/");
         // In ordine di preferenza: «Più visti» batte «Di tendenza», ecc.
-        var words = kind === "popular" ?
-            ["più visti", "most viewed", "più visualizzati", "video migliori", "best videos", "best", "migliori",
-                "top rated", "più votati", "most popular", "popolari", "popular", "di tendenza", "trending", "hottest", "più bollenti", "top"] :
-            ["più nuovi", "più recenti", "newest", "new videos", "latest", "most recent", "recenti", "ultimi episodi",
-                "ultime uscite", "nuovi", "new", "recent", "ultimi"];
+        var words = this.kindWords(kind);
+        this.rememberNav(site, html);
         var found = "", best = words.length;
         var re = /<a\b([^>]*)>([\s\S]{0,300}?)<\/a>/gi, m;
         while ((m = re.exec(html)) !== null) {
@@ -569,9 +905,7 @@ class DefaultExtension extends MProvider {
         var res = await this.listing(url, page, false);
         if (res.list.length || page > 1) return res;
         // Home senza schede (costruita da JavaScript): provo le pagine più comuni.
-        var tries = kind === "popular" ?
-            ["/best", "/most-viewed", "/most-popular", "/popular", "/trending", "/top-rated", "/videos"] :
-            ["/new", "/newest", "/latest", "/latest-updates", "/recent", "/videos"];
+        var tries = this.kindTries(kind);
         var cache = this.readJson(PREF_SECTIONS, {});
         for (var i = 0; i < tries.length; i++) {
             try {
@@ -600,8 +934,28 @@ class DefaultExtension extends MProvider {
 
         var site = this.siteFromFilters(filters);
         if (!site) return this.historyPage(text);
-        if (!text) return this.listing(site + "/", page, false);
+        var order = this.orderKind(filters);
+        if (!text) {
+            if (order) return this.siteSection(site, order, page);
+            return this.listing(site + "/", page, false);
+        }
+        if (!order) {
+            var cat = this.categoryMatch(site, text);
+            if (cat) {
+                var catRes = await this.listing(cat, page, false);
+                if (catRes.list.length >= 4) return catRes;
+            }
+        }
         var first = await this.searchUrl(site, text);
+        if (order && first) {
+            try {
+                var sortedPage = await this.fetchHtml(first, site + "/");
+                var alt = this.sortLink(sortedPage, first, order);
+                if (alt) first = alt;
+            } catch (e) {
+                if (/Webview|verifica|anti-bot/i.test(String(e && e.message))) throw e;
+            }
+        }
         if (!first) return { list: [], hasNextPage: false };
         var res = await this.listing(first, page, false);
         // Molti siti mettono sopra i risultati i video della home («consigliati»).
@@ -666,7 +1020,24 @@ class DefaultExtension extends MProvider {
                 var action = (f.match(/<form\b[^>]*\baction\s*=\s*["']([^"']*)["']/i) || ["", ""])[1];
                 var target = resolveUrl(action || "/", site + "/") || site + "/";
                 if (siteOf(target) !== siteOf(site)) continue;
-                patterns.push(target.split("?")[0] + "?" + input[1] + "={q}");
+                var extra = [];
+                var hins = f.match(/<input\b[^>]*>/gi) || [];
+                for (var hi = 0; hi < hins.length; hi++) {
+                    if (!/type\s*=\s*["']?hidden/i.test(hins[hi])) continue;
+                    var hn = (hins[hi].match(/\bname\s*=\s*["']([^"']+)["']/i) || ["", ""])[1];
+                    var hv = (hins[hi].match(/\bvalue\s*=\s*["']([^"']*)["']/i) || ["", ""])[1];
+                    if (!hn || !hv || hn === input[1]) continue;
+                    extra.push(encodeURIComponent(hn) + "=" + encodeURIComponent(hv));
+                }
+                var selects = f.match(/<select\b[\s\S]*?<\/select>/gi) || [];
+                for (var si = 0; si < selects.length; si++) {
+                    var sn = (selects[si].match(/\bname\s*=\s*["']([^"']+)["']/i) || ["", ""])[1];
+                    if (!sn || sn === input[1]) continue;
+                    var so = selects[si].match(/<option\b[^>]*\bselected\b[^>]*\bvalue\s*=\s*["']([^"']*)["']/i) ||
+                        selects[si].match(/<option\b[^>]*\bvalue\s*=\s*["']([^"']*)["']/i);
+                    if (so && so[1]) extra.push(encodeURIComponent(sn) + "=" + encodeURIComponent(so[1]));
+                }
+                patterns.push(target.split("?")[0] + "?" + input[1] + "={q}" + (extra.length ? "&" + extra.join("&") : ""));
             }
             // Ricerca costruita da JavaScript: '/filter?key=' + encodeURIComponent(q)
             var js = home.match(/["'](\/[\w\/.-]*\?(?:key|q|s|k|search|query|keyword|term)=)["']\s*\+\s*encodeURIComponent/i);
@@ -845,7 +1216,32 @@ class DefaultExtension extends MProvider {
         var untitled = all.filter(function (c) { return c._untitled; });
         all = orderCards(all.filter(function (c) { return !c._untitled; })).concat(untitled);
         all.forEach(function (c) { delete c._untitled; });
+        // «Verify your age» non è un video: se il titolo non si è potuto sostituire, si toglie.
+        all = all.filter(function (c) { return !ageJunkTitle(c.name); });
+        if (this.setting(PREF_DEBUG) === true) {
+            var fam = siteFamily(html);
+            all.forEach(function (c) { c.name += " · " + fam; });
+        }
         return all;
+    }
+
+    // Riquadri <div class="video-thumb">: il link del titolo e l'immagine sono fratelli.
+    divBlocks(html) {
+        var out = [];
+        var re = /<div\b[^>]*class=["'][^"']*\b(?:video-thumb|thumb-block|video-item|videobox)\b[^"']*["'][^>]*>/gi;
+        var m;
+        while ((m = re.exec(html)) !== null && out.length < 80) {
+            var i = m.index + m[0].length, depth = 1, start = i;
+            while (i < html.length && depth > 0 && i - start < 8000) {
+                var open = html.indexOf("<div", i);
+                var close = html.indexOf("</div", i);
+                if (close === -1) break;
+                if (open !== -1 && open < close) { depth++; i = open + 4; }
+                else { depth--; i = close + 5; }
+            }
+            if (depth === 0) out.push(html.slice(start, i - 5));
+        }
+        return out;
     }
 
     // Schede dove il link copre il riquadro e l'immagine sta accanto
@@ -853,10 +1249,13 @@ class DefaultExtension extends MProvider {
     containerCardsOf(html, pageUrl) {
         var out = [];
         var site = siteOf(pageUrl);
+        var boxes = [];
         var re = /<(article|li)\b[^>]*>([\s\S]*?)<\/\1>/gi, m;
-        while ((m = re.exec(html)) !== null) {
-            var box = m[2];
-            if (box.length > 6000) continue;
+        while ((m = re.exec(html)) !== null) boxes.push(m[2]);
+        this.divBlocks(html).forEach(function (b) { boxes.push(b); });
+        for (var bi = 0; bi < boxes.length; bi++) {
+            var box = boxes[bi];
+            if (box.length > 8000) continue;
             var img = box.match(/<img\b[^>]*>/i);
             if (!img) continue;
             var a = null, ar = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi, x;
@@ -971,9 +1370,15 @@ class DefaultExtension extends MProvider {
             if (poster) image = resolveUrl(poster[1], link);
         }
         var description = metaContent(html, ["og:description", "description", "twitter:description"]);
+        var facts = videoFacts(html);
+        var notes = [];
+        if (facts.duration) notes.push("Durata: " + facts.duration);
+        if (facts.date) notes.push("Data: " + facts.date);
+        if (this.setting(PREF_DEBUG) === true) notes.push("Parser: " + siteFamily(html));
+        if (notes.length) description = (description ? description + "\n\n" : "") + notes.join("\n");
 
         var chapters = this.episodesOf(html, link);
-        if (!chapters.length) chapters = [{ name: "Video", url: link }];
+        if (!chapters.length) chapters = [{ name: facts.duration ? "Video · " + facts.duration : "Video", url: link }];
 
         this.remember({ name: title, imageUrl: image, link: link });
         return {
@@ -1067,6 +1472,7 @@ class DefaultExtension extends MProvider {
         });
         videos.sort(function (a, b) { return (b._score || 0) - (a._score || 0); });
         videos.forEach(function (v) { delete v._score; });
+        videos = this.orderByPreferredQuality(videos);
         if (!videos.length) {
             throw new Error("Nessun video trovato in questa pagina. Il sito probabilmente carica il player in un modo che l'estensione non sa ancora leggere.");
         }
@@ -1099,7 +1505,8 @@ class DefaultExtension extends MProvider {
             out.push({ url: u, quality: qualityOf(u, objectAround(text, m.index, m.index + m[0].length)) });
         }
         // Player KVS (molti siti tube): video_url / video_alt_url con l'etichetta della qualità.
-        var kvs = /\b(video_url|video_alt_url\d*)\s*:\s*'(https?:\/\/[^']+)'/g;
+        // «function/0/» è il prefisso del player KVS: il file vero sta dopo.
+        var kvs = /\b(video_url|video_alt_url\d*)\s*:\s*'(?:function\/0\/)?(https?:\/\/[^']+)'/g;
         while ((m = kvs.exec(text)) !== null) {
             if (seen[m[2]]) continue;
             seen[m[2]] = true;
@@ -1140,6 +1547,14 @@ class DefaultExtension extends MProvider {
                 var lab = f[2].match(/["']?(?:label|res|quality|size)["']?\s*:\s*["']?(\d{3,4})/i);
                 add(f[1], lab ? parseInt(lab[1], 10) : 0);
             }
+        }
+        // Sorgente dichiarata anche fuori dal blocco del player (JSON-LD, KVS, WordPress).
+        var loose = /["'](?:file|src|videoUrl|video_url|contentUrl)["']\s*:\s*["']((?:https?:)?\/\/[^"']+)["']/gi, one;
+        while ((one = loose.exec(text)) !== null) {
+            if (NOT_VIDEO_KEY.test(keyBefore(text, one.index))) continue;
+            if (AD_HOSTS.test(one[1])) continue;
+            if (!new RegExp("\\.(" + VIDEO_EXT + ")(\\?|$)", "i").test(one[1]) && !/\/(get_file|stream|media|playlist|videoplayback)\b/i.test(one[1])) continue;
+            add(one[1]);
         }
         return out;
     }
@@ -1269,12 +1684,25 @@ class DefaultExtension extends MProvider {
                     return { type_name: "SelectOption", name: self.siteName(x), value: x };
                 }),
             });
+            filters.push({
+                type_name: "SelectFilter",
+                name: "Ordine",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Predefinito", value: "" },
+                    { type_name: "SelectOption", name: "Più recenti", value: "latest" },
+                    { type_name: "SelectOption", name: "Più visti", value: "views" },
+                    { type_name: "SelectOption", name: "Più votati", value: "rated" },
+                    { type_name: "SelectOption", name: "Più lunghi", value: "longest" },
+                ],
+            });
         }
         return filters;
     }
 
     getSourcePreferences() {
         var self = this;
+        this.applyRename();
         var saved = this.savedSites();
         var all = this.allSites(saved);
         var urls = READY.map(function (r) { return r[0]; });
@@ -1317,6 +1745,34 @@ class DefaultExtension extends MProvider {
                 title: "Immagini: presentati come il sito principale",
                 summary: "Accendilo se le miniature del sito principale restano grigie: alcuni siti danno le immagini solo alle proprie pagine. Vale per un sito alla volta: dopo averlo acceso, o dopo aver cambiato sito principale, chiudi e riapri Mangayomi. Può far sparire le miniature degli altri siti.",
                 value: false,
+            },
+        });
+        prefs.push({
+            key: PREF_QUALITY,
+            listPreference: {
+                title: "Qualità preferita",
+                summary: "Quella che parte quando apri un video, se il sito la offre. Le altre restano nel player.",
+                valueIndex: 0,
+                entries: ["Massima disponibile", "1080p", "720p", "480p", "360p"],
+                entryValues: ["max", "1080", "720", "480", "360"],
+            },
+        });
+        prefs.push({
+            key: PREF_DEBUG,
+            switchPreferenceCompat: {
+                title: "Diagnostica",
+                summary: "Aggiunge al titolo il tipo di lettura (html, json, kvs, wordpress, xv) e lo ripete nella scheda. Lasciala spenta.",
+                value: false,
+            },
+        });
+        prefs.push({
+            key: PREF_RENAME,
+            editTextPreference: {
+                title: "Rinomina un sito",
+                summary: "Scrivi indirizzo | nome (es. jav.guru | JAV Guru). Il sito principale, qui sopra, è quello di Popolari e Recenti.",
+                value: "",
+                dialogTitle: "Rinomina un sito",
+                dialogMessage: "Indirizzo del sito, una barra verticale, il nome da mostrare.",
             },
         });
         prefs.push({
