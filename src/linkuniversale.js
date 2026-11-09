@@ -2,19 +2,23 @@ const mangayomiSources = [
     {
         "name": "Link universale",
         "lang": "it",
-        "baseUrl": "https://duckduckgo.com",
+        "baseUrl": "https://adam72881.github.io/mangayomi-anime-extensions",
         "apiUrl": "",
         "iconUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/icons/linkuniversale.png",
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.3",
+        "version": "1.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
     },
 ];
 
+// Pagina ponte (GitHub Pages, ramo gh-pages): il pulsante Webview dell'app apre
+// sempre baseUrl + percorso del link. La pagina legge «#lu=<sito>» in fondo al
+// link e porta al sito vero; aperta da sola mostra l'elenco dei siti.
+const BRIDGE = "https://adam72881.github.io/mangayomi-anime-extensions";
 const PREF_HISTORY = "linkuni_history";
 const PREF_NEXT = "linkuni_next_pages";
 const PREF_ADD = "linkuni_add_site";
@@ -189,8 +193,19 @@ function resolveUrl(href, base) {
     return dir + href;
 }
 
+function tagLink(url) {
+    var clean = String(url || "").split("#")[0];
+    var host = hostOf(clean);
+    return host ? clean + "#lu=" + host : clean;
+}
+
+function tagList(res) {
+    res.list.forEach(function (c) { c.link = tagLink(c.link); });
+    return res;
+}
+
 function cleanLink(url) {
-    var raw = String(url || "").trim();
+    var raw = String(url || "").trim().replace(/#lu=[^#]*$/, "");
     try { raw = decodeURIComponent(raw); } catch (e) {}
     // Mangayomi a volte antepone il baseUrl a un link già assoluto.
     var last = raw.lastIndexOf("http");
@@ -329,7 +344,7 @@ class DefaultExtension extends MProvider {
         if (res.statusCode === 403 || res.statusCode === 503 || res.statusCode === 429 ||
             (body.length < 4000 && /<title>\s*(loading|just a moment|attention required|checking|verifica|ddos)/i.test(body)) ||
             /cf-chl-|challenge-platform\/h\/|captcha-delivery|g-recaptcha|hcaptcha\.com/i.test(body.slice(0, 20000)) && body.length < 30000) {
-            throw new Error("Il sito " + hostOf(url) + " chiede una verifica (anti-bot). Apri una volta il sito nella WebView di Mangayomi (icona del globo), superala e riprova.");
+            throw new Error("Il sito " + hostOf(url) + " chiede una verifica (anti-bot). Tocca Webview, scegli il sito dall'elenco, supera la verifica e poi tocca Riprova.");
         }
         if (res.statusCode >= 400) throw new Error("Il sito ha risposto con errore " + res.statusCode);
         return body;
@@ -368,7 +383,7 @@ class DefaultExtension extends MProvider {
             list = [{
                 name: "Incolla nella ricerca il link di un video o di un sito",
                 imageUrl: "",
-                link: "https://duckduckgo.com/",
+                link: BRIDGE + "/",
             }];
         }
         return { list: list, hasNextPage: false };
@@ -497,11 +512,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        return this.sectionListing("popular", page);
+        return tagList(await this.sectionListing("popular", page));
     }
 
     async getLatestUpdates(page) {
-        return this.sectionListing("latest", page);
+        return tagList(await this.sectionListing("latest", page));
     }
 
     async sectionListing(kind, page) {
@@ -558,6 +573,10 @@ class DefaultExtension extends MProvider {
     // ---------- Ricerca: link incollato, ricerca nel sito o nella cronologia ----------
 
     async search(query, page, filters) {
+        return tagList(await this.searchPlain(query, page, filters));
+    }
+
+    async searchPlain(query, page, filters) {
         var text = String(query || "").trim();
         var urlMatch = text.match(/https?:\/\/\S+/i);
         if (!urlMatch && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text)) urlMatch = ["https://" + text];
@@ -944,7 +963,7 @@ class DefaultExtension extends MProvider {
         return {
             name: title,
             imageUrl: image || undefined,
-            link: link,
+            link: tagLink(link),
             description: (description ? description + "\n\n" : "") + "Link: " + link,
             genre: [hostOf(link)],
             status: 5,

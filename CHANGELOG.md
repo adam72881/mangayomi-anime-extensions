@@ -1,5 +1,13 @@
 # Novità
 
+## Link universale 1.4.0
+
+- **Webview apre il sito giusto**, non più DuckDuckGo:
+  - dalla scheda di un video, **Webview** apre quel video sul suo sito;
+  - dalla lista o da una schermata di errore, **Webview** apre l'elenco dei siti (quelli aperti di recente in cima, poi i siti pronti e una casella per scrivere un indirizzo).
+- Serve per superare la verifica dell'età o anti-bot: falla nella Webview, torna indietro e tocca Riprova.
+- I video salvati in libreria con le versioni precedenti continuano a funzionare; per avere Webview sul sito giusto vanno riaperti dalla lista.
+
 ## Link universale 1.3.3
 
 - Miniature anche sui siti che non usano una normale immagine: sfondo CSS (`background-image`), attributi `data-…`, `poster`, `<source srcset>`.

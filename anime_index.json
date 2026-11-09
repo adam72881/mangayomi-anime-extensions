@@ -90,7 +90,7 @@
     {
         "name": "Link universale",
         "id": 9038114527,
-        "baseUrl": "https://duckduckgo.com",
+        "baseUrl": "https://adam72881.github.io/mangayomi-anime-extensions",
         "lang": "it",
         "typeSource": "single",
         "iconUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/icons/linkuniversale.png",
@@ -100,7 +100,7 @@
         "hasCloudflare": false,
         "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/linkuniversale.js",
         "apiUrl": "",
-        "version": "1.3.3",
+        "version": "1.4.0",
         "isManga": false,
         "itemType": 1,
         "isFullData": false,

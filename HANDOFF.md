@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.3.3 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -36,6 +36,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 
 ## Link universale — 1.2.1
 
+- **1.4.0 — Webview:** Mangayomi apre nella Webview `source.baseUrl` (lista, errore) oppure `baseUrl + link.getUrlWithoutDomain` (scheda), e per le estensioni JS `baseUrl` è fisso (`sourceBaseUrl` in `javascript/service.dart`). Quindi `baseUrl` = pagina ponte su GitHub Pages, **ramo `gh-pages`** di questo repo (`index.html`, `404.html`, `.nojekyll`): tutti i link che l'estensione dà all'app finiscono con `#lu=<host>` (`tagLink`, tolto da `cleanLink`); l'app apre `<ponte>/<percorso>?<query>#lu=<host>`, GitHub serve `404.html`, che fa `location.replace("https://<host><percorso><query>")` e ricorda l'host in localStorage. `index.html` = elenco dei siti (recenti, poi `READY` copiato a mano: **se cambi `READY`, rigenera `index.html`** con lo script in scratchpad `pages/`). Provato con Playwright.
 - **1.3.3:** `pickImage()` ha un ripiego: qualsiasi attributo `data-*|poster|srcset|content` con un'immagine, o `background(-image): url(...)`; vale anche per `<a>` senza `<img>`. Le intestazioni delle immagini in Mangayomi sono fisse per sorgente (`headers.dart`): niente Referer per sito; provato che le miniature dei siti `READY` si scaricano anche senza Referer.
 - **1.3.1:** `pickImage()` sceglie tra tutte le `<img>` della scheda la prima non segnaposto (svg, 18plus, logo, blank, data:), attributi lazy prima di `src` (PornDig metteva prima l'icona 18+ con alt «Verify your age»). Nomi ripetuti 3+ volte nella pagina → titolo da un altro link o dallo slug. Copertina scheda: og:image, poi `thumbnailUrl`, `<video poster>`, `poster:`/`preview_url:`. Script `imgcheck.js` in scratchpad controlla immagini/titoli dei siti `READY`. Dall'Italia alcuni siti (Pornhub ecc.) possono chiedere la verifica dell'età: non si aggira, si fa nella WebView.
 - **1.3.0:** interruttore `linkuni_random_site` (default spento). `sectionListing` a pagina 1 estrae un sito da `sites()` diverso dall'ultimo (`getString("linkuni_random_pick_<kind>")`), fino a 3 tentativi se errore o lista vuota; le pagine dopo usano quello salvato. La logica per sito è in `siteSection(site, kind, page)`.
