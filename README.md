@@ -37,7 +37,8 @@ Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 - Puoi anche incollare nella ricerca il **link di un video, di una serie o di una pagina**.
 
 Provata con Pornhub, xHamster, xVideos, xnxx, Eporner, YouPorn, RedTube (questi due solo 360p), Porntrex, AnimeSaturn, AnimeWorld e HentaiWorld.
-Non funziona con i siti protetti da Cloudflare o anti-bot (es. SpankBang, hanime.tv).
+Funziona anche con siti mai provati: legge il modulo di ricerca, le schede dei video e i player più comuni.
+Se un sito chiede una verifica anti-bot, l'estensione lo dice: apri il sito una volta nella WebView di Mangayomi (icona del globo), superala e riprova. Non funziona con i siti che costruiscono tutto con JavaScript (es. txxx, beeg) o che cifrano apposta il link del video.
 
 ## Installazione
 
@@ -51,6 +52,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.2.1** — regole più ampie per i siti mai provati; messaggio chiaro per i siti con verifica anti-bot.
 - **Link universale 1.2.0** — 34 siti già pronti nelle impostazioni, ricerca più precisa.
 - **Link universale 1.1.0** — salvi i tuoi siti nelle impostazioni e l'estensione fa Popolari, Recenti e ricerca da sola.
 - **Link universale 1.0.0** — nuova sorgente: incolli nella ricerca il link di un video, di una serie o di un sito e la apre come le altre (vedi sotto).

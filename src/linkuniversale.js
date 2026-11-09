@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.2.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -288,8 +288,16 @@ class DefaultExtension extends MProvider {
 
     async fetchHtml(url, referer) {
         var res = await this.client.get(url, this.headers(referer));
+        var body = String(res.body || "");
+        // Pagina di verifica anti-bot: la fa la persona nella WebView, poi i
+        // cookie della WebView valgono anche per l'estensione.
+        if (res.statusCode === 403 || res.statusCode === 503 || res.statusCode === 429 ||
+            (body.length < 4000 && /<title>\s*(loading|just a moment|attention required|checking|verifica|ddos)/i.test(body)) ||
+            /cf-chl-|challenge-platform\/h\/|captcha-delivery|g-recaptcha|hcaptcha\.com/i.test(body.slice(0, 20000)) && body.length < 30000) {
+            throw new Error("Il sito " + hostOf(url) + " chiede una verifica (anti-bot). Apri una volta il sito nella WebView di Mangayomi (icona del globo), superala e riprova.");
+        }
         if (res.statusCode >= 400) throw new Error("Il sito ha risposto con errore " + res.statusCode);
-        return String(res.body || "");
+        return body;
     }
 
     // ---------- Cronologia dei link aperti ----------
@@ -567,7 +575,9 @@ class DefaultExtension extends MProvider {
             var js = home.match(/["'](\/[\w\/.-]*\?(?:key|q|s|k|search|query|keyword|term)=)["']\s*\+\s*encodeURIComponent/i);
             if (js) patterns.push(site + js[1] + "{q}");
             formCount = patterns.length;
-        } catch (e) {}
+        } catch (e) {
+            if (/verifica/.test(String(e && e.message))) throw e;
+        }
         patterns = patterns.concat([
             site + "/search/{path}",
             site + "/search?q={q}",

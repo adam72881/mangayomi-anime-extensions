@@ -1,5 +1,11 @@
 # Novità
 
+## Link universale 1.2.1
+
+- Regole generali più ampie per i siti mai provati: player «compressi» (packer), video dichiarati nella pagina (`contentUrl`, `embedUrl`, `og:video`), sorgenti di JW Player / Video.js / Plyr anche senza «.mp4» nel nome, iframe caricati in ritardo.
+- Sito con verifica anti-bot (pagina «Loading…», «Just a moment», errore 403/503): il messaggio dice di aprire il sito una volta nella WebView di Mangayomi e superare la verifica; poi l'estensione usa gli stessi cookie.
+- Ricerca: i link a pornostar, canali e categorie non finiscono più sopra i video (YouPorn, Tube8); niente feed RSS tra i risultati.
+
 ## Link universale 1.2.0
 
 - **Impostazioni → Siti già pronti**: 34 siti provati uno per uno (lista, ricerca e video), già attivi: Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, PornDig, PornOne, Xozilla, PornHat, TNAFlix, EMPFlix, YouJizz, AnySex, 3movs, SunPorno, SexVid, PornID, OK.xxx, PornWhite, xBabe, Fapster, PornGo, Porn300, XXXBunker, ZBporn, BravoTube, YouPorn, RedTube, Tube8 (questi ultimi cinque solo 360p), AnimeSaturn, AnimeWorld, HentaiWorld. Togli la spunta a quelli che non vuoi.
