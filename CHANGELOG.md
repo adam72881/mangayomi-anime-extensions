@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.3.0
+
+- Nuova impostazione **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi (i tuoi e quelli pronti spuntati), mai lo stesso due volte di fila. Scorrendo si resta sullo stesso sito. Se il sito estratto non risponde ne prova un altro.
+
 ## Link universale 1.2.3
 
 - Tra i siti già pronti PornHat ora è la versione italiana (it.pornhat.com), con i titoli in italiano.

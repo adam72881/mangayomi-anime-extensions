@@ -29,6 +29,7 @@ Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 - **Siti già pronti**: 39 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
 - **➕ Salva un sito**: scrivi il link della pagina principale (es. `https://xhamster.com`) e apri la sorgente: il sito entra nell'elenco. Puoi salvarne quanti vuoi, uno alla volta o più insieme separati da spazio.
 - **Sito principale**: quello di Popolari e Recenti (anche uno di quelli pronti).
+- **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi.
 - **Togli i tuoi siti**: spunta quelli salvati da te da eliminare.
 
 **Nella sorgente:**
@@ -52,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.3.0** — «Sito a sorpresa»: un sito a caso a ogni apertura.
 - **Link universale 1.2.3** — PornHat in versione italiana tra i siti pronti.
 - **Link universale 1.2.2** — 5 siti pronti in più (anche FetishShrine per fetish e BDSM).
 - **Link universale 1.2.1** — regole più ampie per i siti mai provati; messaggio chiaro per i siti con verifica anti-bot.

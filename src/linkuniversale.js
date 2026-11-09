@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.3",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -22,6 +22,8 @@ const STORE_SAVED = "linkuni_saved_sites";
 const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
 const STORE_READY_OFF = "linkuni_ready_off";
+const PREF_RANDOM = "linkuni_random_site";
+const STORE_RANDOM = "linkuni_random_pick_";
 
 // Siti provati: lista, ricerca e video funzionano senza fare niente.
 const READY = [
@@ -475,8 +477,35 @@ class DefaultExtension extends MProvider {
     }
 
     async sectionListing(kind, page) {
-        var site = this.sites()[0];
-        if (!site) return this.historyPage("");
+        var sites = this.sites();
+        if (!sites.length) return this.historyPage("");
+        if (this.setting(PREF_RANDOM) !== true) return this.siteSection(sites[0], kind, page);
+
+        // Sito a sorpresa: a ogni apertura (pagina 1) un sito a caso tra quelli
+        // attivi; le pagine dopo restano sullo stesso sito.
+        var key = STORE_RANDOM + kind;
+        if (page > 1) return this.siteSection(this.prefs.getString(key, "") || sites[0], kind, page);
+        var last = this.prefs.getString(key, "");
+        var pool = sites.filter(function (x) { return x !== last; });
+        if (!pool.length) pool = sites.slice();
+        var error = null;
+        for (var t = 0; t < 3 && pool.length; t++) {
+            var pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+            try {
+                var res = await this.siteSection(pick, kind, 1);
+                if (res.list.length) {
+                    this.prefs.setString(key, pick);
+                    return res;
+                }
+            } catch (e) {
+                error = e;
+            }
+        }
+        if (error) throw error;
+        return this.siteSection(sites[0], kind, 1);
+    }
+
+    async siteSection(site, kind, page) {
         var url = await this.sectionUrl(site, kind);
         var res = await this.listing(url, page, false);
         if (res.list.length || page > 1) return res;
@@ -495,7 +524,7 @@ class DefaultExtension extends MProvider {
                 }
             } catch (e) {}
         }
-        return kind === "latest" ? this.sectionListing("popular", page) : res;
+        return kind === "latest" ? this.siteSection(site, "popular", page) : res;
     }
 
     // ---------- Ricerca: link incollato, ricerca nel sito o nella cronologia ----------
@@ -1194,6 +1223,14 @@ class DefaultExtension extends MProvider {
                 entries: READY.map(function (r) { return r[1]; }),
                 entryValues: urls,
                 values: urls.filter(function (u) { return off.indexOf(u) === -1; }),
+            },
+        });
+        prefs.push({
+            key: PREF_RANDOM,
+            switchPreferenceCompat: {
+                title: "Sito a sorpresa",
+                summary: "A ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi (i tuoi e quelli pronti spuntati), invece del sito principale.",
+                value: false,
             },
         });
         prefs.push({
