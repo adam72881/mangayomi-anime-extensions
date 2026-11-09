@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="it"><head><title>Link universale</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f5f6f8;--fg:#16181d;--card:#fff;--line:#d9dce3;--accent:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#111318;--fg:#eceef2;--card:#1b1e25;--line:#30343d;--accent:#7aa2ff}}
+body{margin:0;padding:20px 16px 40px;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,sans-serif}
+h1{font-size:22px;margin:0 0 6px}p{margin:0 0 16px;opacity:.8}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;opacity:.7;margin:24px 0 8px}
+a.site{display:block;padding:14px 16px;margin:0 0 8px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--fg);text-decoration:none;font-weight:600}
+form{display:flex;gap:8px}input{flex:1;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);font-size:16px}
+button{padding:12px 16px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:600}
+</style>
+</head><body>
+<h1>Apro il sito…</h1>
+<p id="msg">Un momento.</p>
+<script>
+// L'app apre <questa pagina>/<percorso del video>#lu=<sito>: da qui si va al sito vero.
+(function () {
+  var m = location.hash.match(/lu=([a-z0-9.-]+\.[a-z]{2,})/i);
+  var base = "/mangayomi-anime-extensions";
+  if (!m) { location.replace(base + "/"); return; }
+  var host = m[1].toLowerCase();
+  var path = location.pathname.indexOf(base) === 0 ? location.pathname.slice(base.length) : location.pathname;
+  try {
+    var recent = JSON.parse(localStorage.getItem("lu_recent") || "[]").filter(function (h) { return h !== host; });
+    recent.unshift(host);
+    localStorage.setItem("lu_recent", JSON.stringify(recent.slice(0, 12)));
+  } catch (e) {}
+  location.replace("https://" + host + (path || "/") + location.search);
+})();
+</script>
+</body></html>
