@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.3.2
+
+- Titoli puliti: niente più codici come «&colon;» o «&lpar;» al posto di due punti e parentesi (PornOne).
+
 ## Link universale 1.3.1
 
 - **Immagini e titoli delle liste**: su alcuni siti (PornDig) al posto della miniatura usciva l'icona «18+» e come titolo «Verify your age». Ora prende la miniatura vera, saltando segnaposto, loghi e icone, e il titolo vero. Le etichette ripetute su tante schede («SHORTS», «In process») vengono sostituite dal titolo.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.1",
+        "version": "1.3.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -200,6 +200,9 @@ function decodeEntities(s) {
         .replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 10)); })
         .replace(/&agrave;/g, "à").replace(/&egrave;/g, "è").replace(/&eacute;/g, "é").replace(/&igrave;/g, "ì")
         .replace(/&ograve;/g, "ò").replace(/&ugrave;/g, "ù").replace(/&nbsp;/g, " ")
+        .replace(/&colon;/g, ":").replace(/&lpar;/g, "(").replace(/&rpar;/g, ")").replace(/&comma;/g, ",")
+        .replace(/&excl;/g, "!").replace(/&quest;/g, "?").replace(/&period;/g, ".").replace(/&hellip;/g, "…")
+        .replace(/&ndash;/g, "–").replace(/&mdash;/g, "—").replace(/&rsquo;|&lsquo;/g, "’")
         .replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 }
 
