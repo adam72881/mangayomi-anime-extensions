@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.2",
+        "version": "1.3.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -149,6 +149,11 @@ function pickImage(html) {
         var ss = tags[t].match(/\b(?:data-)?srcset\s*=\s*["']([^\s"',]+)/i);
         if (ss && !placeholder.test(ss[1])) return { tag: tags[t], src: ss[1] };
     }
+    // Nessuna <img> buona: un attributo qualsiasi con dentro un'immagine
+    // (data-qualcosa, poster, srcset di <source>) o lo sfondo CSS.
+    var any = html.match(/\b(?:data-[\w-]+|poster|srcset|content)\s*=\s*["']((?:https?:)?\/\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*|\/[^"'\s,]+?\.(?:jpe?g|png|webp|avif)[^"'\s,]*)/i) ||
+        html.match(/background(?:-image)?\s*:\s*url\(\s*(?:&quot;|["'])?([^"')&]+)/i);
+    if (any && !placeholder.test(any[1])) return { tag: tags[0] || "", src: any[1] };
     return { tag: tags[0] || "", src: "" };
 }
 
@@ -749,7 +754,7 @@ class DefaultExtension extends MProvider {
         }
         while ((m = re.exec(html)) !== null) {
             var attrs = m[1], inner = m[2];
-            if (!/<img\b/i.test(inner)) continue;
+            if (!/<img\b/i.test(inner) && !pickImage(m[0]).src) continue;
             var hrefM = attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
             if (!hrefM) continue;
             var link = resolveUrl(hrefM[1], pageUrl).split("#")[0];
@@ -759,6 +764,7 @@ class DefaultExtension extends MProvider {
             if (!isContentPath(path)) continue;
 
             var picked = pickImage(inner);
+            if (!picked.src) picked = pickImage(m[0]);
             var img = picked.tag;
             var src = picked.src;
             var title = "";

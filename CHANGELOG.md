@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.3.3
+
+- Miniature anche sui siti che non usano una normale immagine: sfondo CSS (`background-image`), attributi `data-…`, `poster`, `<source srcset>`.
+
 ## Link universale 1.3.2
 
 - Titoli puliti: niente più codici come «&colon;» o «&lpar;» al posto di due punti e parentesi (PornOne).
