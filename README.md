@@ -26,7 +26,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 
 **Impostazioni della sorgente:**
-- **Siti già pronti**: 34 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
+- **Siti già pronti**: 39 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
 - **➕ Salva un sito**: scrivi il link della pagina principale (es. `https://xhamster.com`) e apri la sorgente: il sito entra nell'elenco. Puoi salvarne quanti vuoi, uno alla volta o più insieme separati da spazio.
 - **Sito principale**: quello di Popolari e Recenti (anche uno di quelli pronti).
 - **Togli i tuoi siti**: spunta quelli salvati da te da eliminare.
@@ -52,6 +52,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.2.2** — 5 siti pronti in più (anche FetishShrine per fetish e BDSM).
 - **Link universale 1.2.1** — regole più ampie per i siti mai provati; messaggio chiaro per i siti con verifica anti-bot.
 - **Link universale 1.2.0** — 34 siti già pronti nelle impostazioni, ricerca più precisa.
 - **Link universale 1.1.0** — salvi i tuoi siti nelle impostazioni e l'estensione fa Popolari, Recenti e ricerca da sola.

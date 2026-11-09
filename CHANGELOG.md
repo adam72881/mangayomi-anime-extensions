@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.2.2
+
+- Altri 5 siti già pronti: FetishShrine (fetish e BDSM), Ah-Me, PerfectGirls, PornMZ, xFreeHD. Ora sono 39.
+
 ## Link universale 1.2.1
 
 - Regole generali più ampie per i siti mai provati: player «compressi» (packer), video dichiarati nella pagina (`contentUrl`, `embedUrl`, `og:video`), sorgenti di JW Player / Video.js / Plyr anche senza «.mp4» nel nome, iframe caricati in ritardo.
