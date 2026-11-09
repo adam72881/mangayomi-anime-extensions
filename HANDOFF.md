@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.2 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.3 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,12 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.3
+
+Siti aggiunti a `READY` dopo prova (home, 2 miniature JPEG, ricerca con la parola dentro i risultati, almeno un mp4/m3u8): AlphaPorno, PornDroids, PornGem, MegaTube, HellPorno, TrendyPorn, AnyPorn, YesPorn (`function/0/`), ThisVid, TokyoMotion (`search_type=videos`, mp4 solo con Referer della pagina), XXXFiles. Sono 50.
+
+Non aggiunti (9 novembre 2026, IP della VM in Ohio): jav.guru (liste e ricerca sì; il player è un token spezzato e rovesciato, non si ricostruisce); Cloudflare/anti-bot su supjav, missav, jable, spankbang, 4tube, xgroovy, fuq, porzo, 4kporn, fullporner, noodlemagazine, gotporn, pornoxo, pornhd, pornwatchers, yourlust, xozilla, sleazyneasy (la ricerca); porntrex e whoreshub 403; porntop embed con `{video_id}`; iceporn senza file in pagina; alotporn la ricerca non filtra; eporner e porndoe mostrano la verifica di legge dell'Ohio (account/blocco), non un pulsante «ho 18 anni». crazyshit.com resta fuori (shock).
 
 ## Link universale — 1.4.2
 

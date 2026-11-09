@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.4.3
+
+- 11 siti già pronti in più, controllati (lista, miniature, titoli, ricerca e video): AlphaPorno, PornDroids, PornGem, MegaTube, HellPorno, TrendyPorn, AnyPorn, YesPorn, ThisVid, TokyoMotion, XXXFiles. Ora sono 50.
+
 ## Link universale 1.4.2
 
 - **Miniature.** Se la scheda ha prima un riquadro vuoto o l'icona «18+» e poi la foto vera, ora esce la foto. Vale anche per le immagini in `data-original` e per i siti che mettono il titolo e la miniatura uno accanto all'altra.
