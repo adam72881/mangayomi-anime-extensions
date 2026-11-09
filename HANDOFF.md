@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.1.0 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.2.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -34,7 +34,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
 
-## Link universale — 1.1.0
+## Link universale — 1.2.0
+
+- **Siti già pronti (1.2.0):** costante `READY` ([url, nome]). multiSelect `linkuni_ready_<hash degli url>`, di partenza tutti spuntati tranne quelli in `getString("linkuni_ready_off")` (aggiornato a ogni lettura, così una nuova versione con siti in più non riaccende quelli spenti). `allSites()` = siti propri + pronti accesi; «Sito principale» ha chiave `linkuni_main_<hash di allSites>`.
+- **Prove (9 novembre 2026):** script in scratchpad `batch.js <sito> <parola>` (Popolari, Recenti, ricerca, scheda, video). Non vanno: 4tube, noodlemagazine, gotporn, pornoxo, sxyprn, SpankBang, hanime.tv, fux, pornerbros, boundhub, animeunity (403/anti-bot); txxx, hdzog, tubepornclassic, beeg (app JavaScript, la pagina è vuota); DrTuber/Nuvid (video da `/player_config_json/` che risponde `[]`); porntop (embed con `{video_id}` da JavaScript); HentaiStream (link del video cifrato apposta, non si decifra).
 
 - **Siti salvati (1.1.0):** impostazione `linkuni_add_site` (testo). `sites()` aggiunge i link nuovi (solo l'origine) a `getString("linkuni_saved_sites")`, ricordando l'ultimo testo in `linkuni_last_added` per non riaggiungere un sito tolto. Mangayomi salva la preferenza la prima volta e poi non ne aggiorna più le scelte (`getSourcePreferenceEntry`), quindi «Sito principale» (listPreference) e «Togli siti» (multiSelect) hanno chiave `linkuni_main_<hash>` / `linkuni_remove_<hash>` dell'elenco: cambia l'elenco, cambia la chiave. Il principale scelto è copiato in `linkuni_main_site`. `getSourcePreferences()` non chiama `get()`.
 - **Popolari/Recenti:** link della home con testo «Più visti / Most viewed / Video migliori / Best / Top rated…» o «Più nuovi / Newest / Latest…» (priorità nell'ordine, esclusi utenti, categorie, album…), in cache `linkuni_sections`; se la pagina non ha schede prova `/best`, `/most-viewed`… o `/new`, `/latest-updates`…; Recenti vuoto → Popolari.

@@ -1,5 +1,12 @@
 # Novità
 
+## Link universale 1.2.0
+
+- **Impostazioni → Siti già pronti**: 34 siti provati uno per uno (lista, ricerca e video), già attivi: Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, PornDig, PornOne, Xozilla, PornHat, TNAFlix, EMPFlix, YouJizz, AnySex, 3movs, SunPorno, SexVid, PornID, OK.xxx, PornWhite, xBabe, Fapster, PornGo, Porn300, XXXBunker, ZBporn, BravoTube, YouPorn, RedTube, Tube8 (questi ultimi cinque solo 360p), AnimeSaturn, AnimeWorld, HentaiWorld. Togli la spunta a quelli che non vuoi.
+- **Sito principale** si sceglie tra tutti, anche quelli pronti.
+- Ricerca più precisa: legge anche i moduli con l'indirizzo pronto (`/search/%QUERY%/`), il campo «what» e gli indirizzi tipo `/videos/s=`; scarta la home ripetuta e toglie dai risultati i «consigliati» della home.
+- Liste: prima il gruppo di link che sembrano video; niente link «Deutsch»/cambio lingua né la pagina stessa; titoli «Screenshot…» sostituiti dal titolo vero; anteprime `/tmb/` scartate.
+
 ## Link universale 1.1.0
 
 - **Impostazioni → ➕ Salva un sito**: scrivi il link della pagina principale di un sito e lo trovi nell'elenco. **Sito principale** sceglie quello di Popolari e Recenti; **Togli siti** li elimina.

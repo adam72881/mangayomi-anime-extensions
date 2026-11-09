@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -21,13 +21,52 @@ const PREF_ADD = "linkuni_add_site";
 const STORE_SAVED = "linkuni_saved_sites";
 const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
+const STORE_READY_OFF = "linkuni_ready_off";
+
+// Siti provati: lista, ricerca e video funzionano senza fare niente.
+const READY = [
+    ["https://www.pornhub.com", "Pornhub"],
+    ["https://xhamster.com", "xHamster"],
+    ["https://www.xvideos.com", "xVideos"],
+    ["https://www.xnxx.com", "xnxx"],
+    ["https://www.eporner.com", "Eporner"],
+    ["https://www.porntrex.com", "Porntrex"],
+    ["https://hqporner.com", "HQporner"],
+    ["https://www.porndig.com", "PornDig"],
+    ["https://pornone.com", "PornOne"],
+    ["https://www.xozilla.com", "Xozilla"],
+    ["https://www.pornhat.com", "PornHat"],
+    ["https://www.tnaflix.com", "TNAFlix"],
+    ["https://www.empflix.com", "EMPFlix"],
+    ["https://www.youjizz.com", "YouJizz"],
+    ["https://www.anysex.com", "AnySex"],
+    ["https://www.3movs.com", "3movs"],
+    ["https://www.sunporno.com", "SunPorno"],
+    ["https://www.sexvid.xxx", "SexVid"],
+    ["https://www.pornid.xxx", "PornID"],
+    ["https://ok.xxx", "OK.xxx"],
+    ["https://www.pornwhite.com", "PornWhite"],
+    ["https://xbabe.com", "xBabe"],
+    ["https://fapster.xxx", "Fapster"],
+    ["https://www.porngo.com", "PornGo"],
+    ["https://www.porn300.com", "Porn300"],
+    ["https://www.xxxbunker.com", "XXXBunker"],
+    ["https://zbporn.com", "ZBporn (360p)"],
+    ["https://www.bravotube.net", "BravoTube (360p)"],
+    ["https://www.youporn.com", "YouPorn (360p)"],
+    ["https://www.redtube.com", "RedTube (360p)"],
+    ["https://www.tube8.com", "Tube8 (360p)"],
+    ["https://www.animesaturn.net", "AnimeSaturn"],
+    ["https://www.animeworld.ac", "AnimeWorld"],
+    ["https://www.hentaiworld.me", "HentaiWorld"],
+];
 const PREF_SEARCH = "linkuni_search_patterns";
 const PREF_SECTIONS = "linkuni_sections";
 const HISTORY_MAX = 60;
 const VIDEO_EXT = "m3u8|mp4|webm|mkv|mov|m4v";
 
 // Anteprime, miniature animate e pubblicità: sono mp4 veri, ma non il video.
-const NOT_THE_VIDEO = /\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|\/pics\//i;
+const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|\/pics\//i;
 const AD_HOSTS = /a-ads\.com|doubleclick|googlesyndication|googletagmanager|google-analytics|facebook\.com|twitter\.com|disqus|recaptcha|hcaptcha|cloudflare|wingsmob|exoclick|juicyads|trafficjunky|adsterra|popads|histats/i;
 
 // Player esterni che Mangayomi sa già leggere (estrattori integrati nell'app).
@@ -48,15 +87,15 @@ const KNOWN_HOSTS = [
 
 // Pagine di servizio, pubblicità e redirect: non sono video né serie.
 function isContentPath(path) {
-    return !/\/(login|signup|register|premium|upload|privacy|terms|dmca|contact|logout|account|out|go|redirect|click|ads?)(\/|\?|$)|[?&]utm_|\/ff\/out/i.test(path);
+    return !/\/(login|signup|register|premium|upload|privacy|terms|dmca|contact|logout|account|out|go|redirect|click|ads?|rss|feed|feeds)(\/|\?|$)|[?&]utm_|\/ff\/out/i.test(path);
 }
 
 // Testi che non sono titoli: qualità, durata, «HD», contatori.
 function weakTitle(t) {
-    return !t || t.length < 4 || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
+    return !t || t.length < 4 || /^(screenshot|thumbnail|thumb|image|preview|poster|immagine|anteprima)\b/i.test(t.trim()) || /^(\d{3,4}p|hd|4k|vr|new|\d+(:\d+)+|\d+\s*(min|sec|views?)?)(\s*(cc|hd|4k|vr))*$/i.test(t.trim());
 }
 
-const SIDE_PATH = /\/(cat|cats|category|categories|tags?|channels?|pornstars?|models?|studios?|genres?|generi|genere|users?|members?|playlists?|search|albums?|photos?|gallery|galleries|pics)(\/|\?|$)|[?&](genre|tag|category|cat)=/i;
+const SIDE_PATH = /\/(c|cat|cats|category|categories|tags?|channels?|pornstars?|models?|studios?|genres?|generi|genere|users?|members?|playlists?|search|albums?|photos?|gallery|galleries|pics)(\/|\?|$)|[?&](genre|tag|category|cat)=/i;
 
 // Prima i video/le serie, poi categorie, tag, canali ecc. Tra i video, prima il
 // gruppo di link più numeroso (es. /video-…/ su Eporner, non le /cat/).
@@ -64,15 +103,25 @@ function orderCards(cards) {
     var side = SIDE_PATH;
     var shape = function (c) {
         var p = c.link.replace(/^https?:\/\/[^\/]+/, "").split("?")[0].split("/").filter(Boolean);
-        return (p[0] || "").replace(/[0-9a-z]{6,}$/i, "*").replace(/\d+/g, "#") + "/" + p.length;
+        // «video-AbC123xyZ» e «video-Qq9…» sono lo stesso gruppo; «category» e «channel» no.
+        return (p[0] || "").replace(/(?=[0-9a-z]*\d)[0-9a-z]{6,}$/i, "*").replace(/\d+/g, "#") + "/" + p.length;
     };
-    var count = {};
-    cards.forEach(function (c) { var k = shape(c); count[k] = (count[k] || 0) + 1; });
+    // Peso di un gruppo: quante schede ha, il doppio se i link sembrano video
+    // (un numero d'identificazione o un titolo lungo nel percorso).
+    var weight = {};
+    cards.forEach(function (c) {
+        var path = c.link.replace(/^https?:\/\/[^\/]+/, "");
+        var videoLike = /\d{3,}|[a-z0-9]+(?:[-_][a-z0-9]+){3,}/i.test(path) ? 2 : 1;
+        var k = shape(c);
+        weight[k] = (weight[k] || 0) + videoLike;
+    });
+    var groups = Object.keys(weight).sort(function (a, b) { return weight[b] - weight[a]; });
+    var top = groups[0];
     return cards.map(function (c, i) {
         var path = c.link.replace(/^https?:\/\/[^\/]+/, "");
-        return { c: c, i: i, side: side.test(path) ? 1 : 0, n: count[shape(c)] };
+        return { c: c, i: i, side: side.test(path) ? 1 : 0, main: shape(c) === top && weight[top] >= 6 ? 0 : 1 };
     }).sort(function (a, b) {
-        return a.side - b.side || (b.n >= 4 ? 1 : 0) - (a.n >= 4 ? 1 : 0) || a.i - b.i;
+        return a.main - b.main || a.side - b.side || a.i - b.i;
     }).map(function (x) { return x.c; });
 }
 
@@ -191,6 +240,24 @@ function objectAround(text, start, end) {
 }
 
 const NOT_VIDEO_KEY = /image|img|thumb|poster|preview|mediabook|trailer|teaser|gif|sprite|avatar|banner/i;
+
+// Scompatta il codice «packer» (eval(function(p,a,c,k,e,d)…)): è solo codice
+// compresso, il browser lo esegue così com'è. Serve a leggere il player.
+function unpackAll(html) {
+    var out = "";
+    var re = /eval\(function\(p,a,c,k,e,[rd]\)\{[\s\S]*?\}\('([\s\S]*?)',\s*(\d+),\s*(\d+),\s*'([\s\S]*?)'\.split\('\|'\)/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        var p = m[1].replace(/\\'/g, "'"), a = parseInt(m[2], 10), c = parseInt(m[3], 10), k = m[4].split("|");
+        var enc = function (n) {
+            return (n < a ? "" : enc(Math.floor(n / a))) + ((n = n % a) > 35 ? String.fromCharCode(n + 29) : n.toString(36));
+        };
+        var dict = {};
+        while (c--) dict[enc(c)] = k[c] || enc(c);
+        out += "\n" + p.replace(/\b\w+\b/g, function (w) { return dict[w] !== undefined ? dict[w] : w; });
+    }
+    return out;
+}
 
 function base64Decode(input) {
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -311,13 +378,32 @@ class DefaultExtension extends MProvider {
                 }
             }
         }
-        if (saved.length) {
-            var main = this.setting(this.listKey("linkuni_main_", saved));
-            if (main && saved.indexOf(main) !== -1) this.prefs.setString(STORE_MAIN, main);
+        var urls = READY.map(function (r) { return r[0]; });
+        var on = this.setting(this.listKey("linkuni_ready_", urls));
+        if (on && typeof on.length === "number") {
+            this.prefs.setString(STORE_READY_OFF, JSON.stringify(urls.filter(function (u) { return on.indexOf(u) === -1; })));
         }
+        var all = this.allSites(saved);
+        var mainChoice = this.setting(this.listKey("linkuni_main_", all));
+        if (mainChoice && all.indexOf(mainChoice) !== -1) this.prefs.setString(STORE_MAIN, mainChoice);
         var chosen = this.prefs.getString(STORE_MAIN, "");
-        if (saved.indexOf(chosen) > 0) saved = [chosen].concat(saved.filter(function (x) { return x !== chosen; }));
-        return saved;
+        if (all.indexOf(chosen) > 0) all = [chosen].concat(all.filter(function (x) { return x !== chosen; }));
+        return all;
+    }
+
+    // I tuoi siti, poi quelli già provati che non hai spento.
+    allSites(saved) {
+        var off = this.readJson(STORE_READY_OFF, []);
+        var all = saved.slice();
+        READY.forEach(function (r) {
+            if (off.indexOf(r[0]) === -1 && all.indexOf(r[0]) === -1) all.push(r[0]);
+        });
+        return all;
+    }
+
+    siteName(url) {
+        for (var i = 0; i < READY.length; i++) if (READY[i][0] === url) return READY[i][1];
+        return hostOf(url).replace(/^www\./, "");
     }
 
     siteFromFilters(filters) {
@@ -412,7 +498,29 @@ class DefaultExtension extends MProvider {
         if (!text) return this.listing(site + "/", page, false);
         var first = await this.searchUrl(site, text);
         if (!first) return { list: [], hasNextPage: false };
-        return this.listing(first, page, false);
+        var res = await this.listing(first, page, false);
+        // Molti siti mettono sopra i risultati i video della home («consigliati»).
+        var home = await this.homeLinks(site);
+        // …ma solo se ne restano abbastanza: su alcuni siti i risultati sono
+        // davvero anche in home (YouPorn), e toglierli lascerebbe solo i canali.
+        var kept = res.list.filter(function (c) { return !home[c.link]; });
+        var videoLike = function (l) {
+            return l.filter(function (c) { return !SIDE_PATH.test(c.link.replace(/^https?:\/\/[^\/]+/, "")); }).length;
+        };
+        if (videoLike(kept) >= Math.max(6, videoLike(res.list) / 2)) res.list = kept;
+        return res;
+    }
+
+    async homeLinks(site) {
+        this._home = this._home || {};
+        if (!this._home[site]) {
+            var set = {};
+            try {
+                this.cardsOf(await this.fetchHtml(site + "/", site + "/"), site + "/").forEach(function (c) { set[c.link] = true; });
+            } catch (e) {}
+            this._home[site] = set;
+        }
+        return this._home[site];
     }
 
     // Come cerca il sito: il modulo di ricerca della home, altrimenti gli
@@ -428,13 +536,27 @@ class DefaultExtension extends MProvider {
         if (cache[site]) return fill(cache[site]);
 
         var patterns = [];
+        var home = "";
+        var formCount = 0;
         try {
-            var home = await this.fetchHtml(site + "/", site + "/");
+            home = await this.fetchHtml(site + "/", site + "/");
             var forms = home.match(/<form\b[\s\S]*?<\/form>/gi) || [];
             for (var i = 0; i < forms.length; i++) {
                 var f = forms[i];
+                // action che finisce con «=» (es. /videos/s=): la parola va in fondo.
+                var act = f.match(/<form\b[^>]*\baction\s*=\s*["']([^"']*=)["']/i);
+                if (act) {
+                    patterns.push(resolveUrl(act[1], site + "/") + "{path}");
+                    continue;
+                }
                 if (/method\s*=\s*["']?post/i.test(f)) continue;
-                var input = f.match(/<input\b[^>]*\bname\s*=\s*["'](q|s|k|search|query|keyword|keywords|search_query|term|searchTerm|text)["'][^>]*>/i);
+                // Modulo con l'indirizzo pronto: data-url=".../search/%QUERY%/"
+                var tpl = f.match(/\bdata-url\s*=\s*["']([^"']*%QUERY%[^"']*)["']/i);
+                if (tpl) {
+                    patterns.push(resolveUrl(tpl[1], site + "/").replace("%QUERY%", "{path}"));
+                    continue;
+                }
+                var input = f.match(/<input\b[^>]*\bname\s*=\s*["'](q|s|k|search|query|keyword|keywords|search_query|term|searchTerm|text|what|search_text|searchQuery)["'][^>]*>/i);
                 if (!input) continue;
                 var action = (f.match(/<form\b[^>]*\baction\s*=\s*["']([^"']*)["']/i) || ["", ""])[1];
                 var target = resolveUrl(action || "/", site + "/") || site + "/";
@@ -444,6 +566,7 @@ class DefaultExtension extends MProvider {
             // Ricerca costruita da JavaScript: '/filter?key=' + encodeURIComponent(q)
             var js = home.match(/["'](\/[\w\/.-]*\?(?:key|q|s|k|search|query|keyword|term)=)["']\s*\+\s*encodeURIComponent/i);
             if (js) patterns.push(site + js[1] + "{q}");
+            formCount = patterns.length;
         } catch (e) {}
         patterns = patterns.concat([
             site + "/search/{path}",
@@ -458,23 +581,35 @@ class DefaultExtension extends MProvider {
             site + "/search/{dash}/",
             site + "/tag/{dash}/",
         ]);
+        // La pagina giusta ha schede che parlano della parola cercata e non è
+        // la home ripetuta. Vince la prima molto buona, altrimenti la migliore.
+        var homeLinks = {};
+        try {
+            this.cardsOf(home || "", site + "/").slice(0, 12).forEach(function (c) { homeLinks[c.link] = true; });
+        } catch (e) {}
+        var word = text.toLowerCase().split(" ")[0];
+        var best = null;
         for (var j = 0; j < patterns.length; j++) {
             try {
                 var url = fill(patterns[j]);
                 var res = await this.client.get(url, this.headers(site + "/"));
                 if (res.statusCode >= 400) continue;
-                var html = String(res.body || "");
-                var word = text.toLowerCase().split(" ")[0];
-                var found = this.cardsOf(html, url);
+                var found = this.cardsOf(String(res.body || ""), url);
+                if (!found.length) continue;
+                var same = found.filter(function (c) { return homeLinks[c.link]; }).length;
+                if (same >= 6 && same >= found.length / 2) continue;
                 var hits = found.filter(function (c) {
                     return (c.name + " " + c.link).toLowerCase().indexOf(word) !== -1;
-                });
-                if (hits.length >= 2 || (hits.length === 1 && found.length <= 3)) {
-                    cache[site] = patterns[j];
-                    this.prefs.setString(PREF_SEARCH, JSON.stringify(cache));
-                    return url;
-                }
+                }).length;
+                var score = hits / found.length + (j < formCount && found.length >= 3 ? 0.3 : 0);
+                if (!best || score > best.score) best = { score: score, index: j, url: url };
+                if (score >= 0.5) break;
             } catch (e) {}
+        }
+        if (best && best.score >= 0.15) {
+            cache[site] = patterns[best.index];
+            this.prefs.setString(PREF_SEARCH, JSON.stringify(cache));
+            return best.url;
         }
         throw new Error("Non ho trovato come cerca questo sito. Puoi incollare nella ricerca il link della pagina dei risultati.");
     }
@@ -498,6 +633,8 @@ class DefaultExtension extends MProvider {
 
         var seen = {};
         seen[url.split("#")[0]] = true;
+        seen[url.split("#")[0].replace(/\/+$/, "")] = true;
+        seen[url.split("#")[0].replace(/\/?$/, "/")] = true;
         var cards = this.cardsOf(html, url);
         for (var i = 0; i < cards.length; i++) {
             if (seen[cards[i].link]) continue;
@@ -578,6 +715,15 @@ class DefaultExtension extends MProvider {
             out.push({ name: title, imageUrl: src ? resolveUrl(src, pageUrl) : "", link: link });
         }
         var all = this.mergeCards(this.mergeCards(out, this.containerCardsOf(html, pageUrl)), this.jsonCardsOf(html, pageUrl));
+        // Cambio lingua (de.sito.com/stessa-pagina) e link alla pagina stessa.
+        var here = hostOf(pageUrl), herePath = pageUrl.replace(/^https?:\/\/[^\/]+/, "").split("#")[0].replace(/\/+$/, "");
+        all = all.filter(function (c) {
+            var p = c.link.replace(/^https?:\/\/[^\/]+/, "").replace(/\/+$/, "");
+            return p !== herePath;
+        });
+        all = all.filter(function (c) {
+            return !(hostOf(c.link) !== here && /^[a-z]{2}(-[a-z]{2})?\./.test(hostOf(c.link)) && /^(deutsch|english|español|espanol|français|francais|italiano|português|portugues|русский|日本語|中文|nederlands|polski|türkçe|[a-z]{2})$/i.test(c.name.trim()));
+        });
         return orderCards(all);
     }
 
@@ -849,21 +995,56 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // Video senza «.mp4» nel nome: contentUrl del JSON-LD, og:video, e le
+    // sorgenti dei player (sources/file/src in JW Player, Video.js, Plyr…).
+    declaredCandidates(html, pageUrl) {
+        var text = unescapeJs(html);
+        var out = [];
+        var add = function (u, q) {
+            u = resolveUrl(u, pageUrl);
+            if (!u || NOT_THE_VIDEO.test(u) || /\.(jpe?g|png|gif|webp|svg|vtt|srt|css|js|html?|php)(\?|$)/i.test(u.split("#")[0]) && !/\.php\?.*(video|file|id)=/i.test(u)) return;
+            if (u === pageUrl || out.some(function (o) { return o.url === u; })) return;
+            out.push({ url: u, quality: q || qualityOf(u, "") });
+        };
+        var cu = text.match(/"contentUrl"\s*:\s*"([^"]+)"/i);
+        if (cu) add(cu[1]);
+        var ogv = metaContent(html, ["og:video:secure_url", "og:video:url", "og:video"]);
+        if (ogv && /\/(get|stream|video|media|play|file|dl|download)[\/_?-]/i.test(ogv)) add(ogv);
+        var src = /(?:sources\s*:\s*\[|setup\s*\(|new\s+Plyr|videojs\s*\()[\s\S]{0,3000}/gi, block;
+        while ((block = src.exec(text)) !== null) {
+            var fr = /["']?(?:file|src)["']?\s*:\s*["']((?:https?:)?\/\/[^"']+|\/[^"']+)["']([^}]{0,200})/gi, f;
+            while ((f = fr.exec(block[0])) !== null) {
+                if (/\.(jpe?g|png|gif|webp|vtt|srt)(\?|$)/i.test(f[1])) continue;
+                var lab = f[2].match(/["']?(?:label|res|quality|size)["']?\s*:\s*["']?(\d{3,4})/i);
+                add(f[1], lab ? parseInt(lab[1], 10) : 0);
+            }
+        }
+        return out;
+    }
+
     async videosFromHtml(html, pageUrl, depth) {
         var videos = [];
-        var direct = this.directCandidates(html, pageUrl);
+        html = html + unpackAll(html);
+        var direct = this.directCandidates(html, pageUrl).concat(this.declaredCandidates(html, pageUrl));
         for (var i = 0; i < direct.length; i++) {
             videos.push(this.video(direct[i].url, hostOf(pageUrl).replace(/^www\./, ""), direct[i].quality, pageUrl));
         }
         if (depth >= 2) return videos;
 
         var frames = [];
-        var re = /<iframe\b[^>]*?\b(?:data-src|src)\s*=\s*["']([^"']+)["']/gi;
+        var re = /<iframe\b[^>]*?\b(?:data-lazy-src|data-src|src)\s*=\s*["']([^"']+)["']/gi;
         var m;
         while ((m = re.exec(html)) !== null) {
             var f = resolveUrl(m[1], pageUrl);
             if (f && !AD_HOSTS.test(f) && !/youtube\.com|youtu\.be/i.test(f) && frames.indexOf(f) === -1) frames.push(f);
         }
+        // Player dichiarati nei dati della pagina (JSON-LD embedUrl, og:video che è una pagina).
+        var decl = unescapeJs(html).match(/"embedUrl"\s*:\s*"([^"]+)"/i);
+        var ogv = metaContent(html, ["og:video:secure_url", "og:video:url", "og:video", "twitter:player"]);
+        [decl ? decl[1] : "", ogv].forEach(function (u) {
+            u = resolveUrl(u, pageUrl);
+            if (u && u !== pageUrl && !new RegExp("\\.(" + VIDEO_EXT + ")(\\?|$)", "i").test(u) && !AD_HOSTS.test(u) && frames.indexOf(u) === -1) frames.push(u);
+        });
         // Link a player noti scritti negli script (non solo iframe).
         var text = unescapeJs(html);
         var hostRe = /https?:\/\/[^\s"'<>\\]*(?:dood|streamtape|filemoon|streamwish|mp4upload|ok\.ru\/videoembed|sendvid|voe\.sx|sibnet|streamlare)[^\s"'<>\\]*/gi;
@@ -949,6 +1130,7 @@ class DefaultExtension extends MProvider {
     }
 
     getFilterList() {
+        var self = this;
         var sites = this.sites();
         var filters = [{
             type_name: "HeaderFilter",
@@ -962,7 +1144,7 @@ class DefaultExtension extends MProvider {
                 name: "Sito",
                 state: 0,
                 values: sites.map(function (x) {
-                    return { type_name: "SelectOption", name: hostOf(x).replace(/^www\./, ""), value: x };
+                    return { type_name: "SelectOption", name: self.siteName(x), value: x };
                 }),
             });
         }
@@ -970,40 +1152,54 @@ class DefaultExtension extends MProvider {
     }
 
     getSourcePreferences() {
+        var self = this;
         var saved = this.savedSites();
-        var names = saved.map(function (x) { return hostOf(x).replace(/^www\./, ""); });
-        var prefs = [
-            {
-                key: PREF_ADD,
-                editTextPreference: {
-                    title: "➕ Salva un sito",
-                    summary: saved.length ?
-                        "Siti salvati: " + names.join(", ") + ". Scrivi il link della pagina principale di un altro sito per aggiungerlo." :
-                        "Scrivi il link della pagina principale (es. https://xhamster.com). Poi apri la sorgente: il sito entra nell'elenco.",
-                    value: "",
-                    dialogTitle: "Salva un sito",
-                    dialogMessage: "Link della pagina principale. Puoi metterne più di uno separati da spazio.",
-                },
-            },
-        ];
-        if (saved.length) {
-            var main = saved.indexOf(this.prefs.getString(STORE_MAIN, ""));
+        var all = this.allSites(saved);
+        var urls = READY.map(function (r) { return r[0]; });
+        var off = this.readJson(STORE_READY_OFF, []);
+        var prefs = [];
+        if (all.length) {
+            var main = all.indexOf(this.prefs.getString(STORE_MAIN, ""));
             prefs.push({
-                key: this.listKey("linkuni_main_", saved),
+                key: this.listKey("linkuni_main_", all),
                 listPreference: {
                     title: "Sito principale",
                     summary: "Quello di Popolari e Recenti, e il primo nel filtro «Sito» della ricerca.",
                     valueIndex: main < 0 ? 0 : main,
-                    entries: names,
-                    entryValues: saved,
+                    entries: all.map(function (x) { return self.siteName(x); }),
+                    entryValues: all,
                 },
             });
+        }
+        prefs.push({
+            key: this.listKey("linkuni_ready_", urls),
+            multiSelectListPreference: {
+                title: "Siti già pronti",
+                summary: "Siti provati che funzionano da soli. Quelli spuntati compaiono nel filtro «Sito»; (360p) = solo quella qualità.",
+                entries: READY.map(function (r) { return r[1]; }),
+                entryValues: urls,
+                values: urls.filter(function (u) { return off.indexOf(u) === -1; }),
+            },
+        });
+        prefs.push({
+            key: PREF_ADD,
+            editTextPreference: {
+                title: "➕ Salva un sito",
+                summary: saved.length ?
+                    "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + ". Scrivi il link della pagina principale di un altro sito per aggiungerlo." :
+                    "Un sito che non è tra quelli pronti: scrivi il link della pagina principale, poi apri la sorgente.",
+                value: "",
+                dialogTitle: "Salva un sito",
+                dialogMessage: "Link della pagina principale. Puoi metterne più di uno separati da spazio.",
+            },
+        });
+        if (saved.length) {
             prefs.push({
                 key: this.listKey("linkuni_remove_", saved),
                 multiSelectListPreference: {
-                    title: "Togli siti",
-                    summary: "Spunta i siti da togliere dall'elenco. Spariscono la prossima volta che apri la sorgente.",
-                    entries: names,
+                    title: "Togli i tuoi siti",
+                    summary: "Spunta i siti da togliere. Spariscono la prossima volta che apri la sorgente.",
+                    entries: saved.map(function (x) { return self.siteName(x); }),
                     entryValues: saved,
                     values: [],
                 },
