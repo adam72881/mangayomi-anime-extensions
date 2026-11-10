@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.4.12
+
+- Due siti pronti in più, provati con liste, ricerca, miniature e video: Sexu (480p) e PornRewind.
+
 ## Link universale 1.4.11
 
 - **Salva un sito torna al flusso che c’era fino alla 1.4.8.** Il campo è di nuovo `linkuni_add_site`. All’ingresso nella sorgente il filtro Sito riceve il sito scritto lì, insieme a quelli già salvati. La 1.4.9 e la 1.4.10 lo copiavano nel modo sbagliato e la 1.4.10 cambiava anche la chiave del campo.
