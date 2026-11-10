@@ -1,5 +1,11 @@
 # Novità
 
+## Stripchat 1.3.13
+
+- Popolare segue l’ordine della griglia in evidenza, Più recente i consigli. I pulsanti non cambiano nome.
+- Dagli elenchi (non dai preferiti) escono solo le stanze con preset da 720p in su. Nel player, se l’HD è uno spot, resta il 480p con la scritta che l’HD è protetto dal sito.
+- «Le mie preferite (account)» tiene chi ha stato public, anche se manca il link del video. In privato o in gruppo compaiono solo nell’elenco completo, con lo stato nel nome.
+
 ## Stripchat 1.3.12
 
 - «Le mie preferite (account)» mostra solo chi è in diretta e si può aprire. Le altre stanno in «Le mie preferite (anche offline)». Se nessuna è in diretta, il messaggio lo dice.

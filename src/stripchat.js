@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.12",
+        "version": "1.3.13",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,8 +22,9 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.12";
+const VERSION = "1.3.13";
 const API = "https://go.stripchat.com/api/models";
+const FRONT = "https://ita.stripchat.com/api/front/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
@@ -112,6 +113,22 @@ const COUNTRIES = [
     ["indian", "Indiane"],
     ["arab", "Arabe"],
 ];
+
+// Slug dei filtri → id che /api/front/models accetta in filterGroupTags.
+// Quelli non in mappa restano sull'API partner (lì il campo presets manca).
+const TAG_IDS = {
+    milfs: "ageMilf", mature: "ageMature", granny: "ageOld",
+    asian: "ethnicityAsian", latin: "ethnicityLatino", ebony: "ethnicityEbony",
+    white: "ethnicityWhite", indian: "ethnicityIndian", arab: "ethnicityMiddleEastern",
+    blondes: "hairColorBlonde", brunettes: "hairColorBrown", redheads: "hairColorRed",
+    petite: "bodyTypePetite", athletic: "bodyTypeAthletic", curvy: "bodyTypeCurvy", bbw: "bodyTypeBBW",
+    italian: "tagLanguageItalian", spanish: "tagLanguageSpanish", french: "tagLanguageFrench",
+    german: "tagLanguageGerman", romanian: "tagLanguageRomanian", russian: "tagLanguageRussian",
+    ukrainian: "tagLanguageUkrainian", colombian: "tagLanguageColombian", brazilian: "tagLanguageBrazilian",
+    american: "tagLanguageUSModels", japanese: "tagLanguageJapanese", chinese: "tagLanguageChinese",
+    vr: "autoTagVr", mobile: "mobile", "interactive-toys": "autoTagInteractiveToy", lovense: "autoTagLovense",
+    "dildo-or-vibrator": "doDildoOrVibrator",
+};
 
 const STATUS_TEXT = {
     public: "In diretta adesso",
@@ -207,6 +224,101 @@ class DefaultExtension extends MProvider {
         return ok;
     }
 
+    // presets assente → si tiene. Se c'è, serve almeno 720 (720p, 960p, 1080p, anche 60).
+    offersHd(m) {
+        var list = m && (m.presets || (m.broadcastSettings && m.broadcastSettings.presets));
+        if (!list) return true;
+        var best = 0;
+        for (var i = 0; i < list.length; i++) {
+            var n = parseInt(String(list[i]), 10) || 0;
+            if (n > best) best = n;
+        }
+        return best >= 720;
+    }
+
+    withStream(m) {
+        if (m && m.hlsPlaylist && (!m.stream || !m.stream.url)) m.stream = { url: m.hlsPlaylist };
+        return m;
+    }
+
+    primaryTag(gender) {
+        if (gender === "men" || gender === "couples" || gender === "trans") return gender;
+        return "girls";
+    }
+
+    // Una pagina di /api/front/models (ha presets). null = il filtro non è accettato.
+    async frontBatch(offset, opts, sort) {
+        var slug = (opts && (opts.country || opts.category)) || "";
+        if (opts && opts.isNew && !slug) slug = "new";
+        var tagId = slug === "new" ? "autoTagNew" : TAG_IDS[slug];
+        if (slug && !tagId) return null;
+        var url = FRONT + "?limit=" + PER_PAGE + "&offset=" + offset + "&primaryTag=" + this.primaryTag(opts && opts.gender);
+        if (tagId) url += "&filterGroupTags=" + encodeURIComponent(JSON.stringify([[tagId]]));
+        if (sort) url += "&sortBy=" + encodeURIComponent(sort);
+        var res = await this.apiJson(url, {
+            "Referer": "https://ita.stripchat.com/",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+        });
+        if (!res.data || !res.data.models) return null;
+        if (tagId && !res.data.models.length && !(res.data.filteredCount > 0)) return null;
+        var total = res.data.filteredCount || res.data.totalCount || 0;
+        return { raw: res.data.models, more: offset + res.data.models.length < total && res.data.models.length >= PER_PAGE };
+    }
+
+    // Riempie una pagina dell'app con stanze HD, chiedendo altre pagine API se il filtro ne toglie troppe.
+    async fillFront(page, opts, sort) {
+        var key = [opts && opts.gender, opts && opts.category, opts && opts.country, opts && opts.isNew, sort].join("|");
+        if (!this._buckets) this._buckets = {};
+        if (!this._buckets[key]) this._buckets[key] = { items: [], api: 0, more: true, miss: false };
+        var bucket = this._buckets[key];
+        var need = page * PER_PAGE;
+        var guard = 0;
+        while (bucket.items.length < need && bucket.more && bucket.api < 8 && guard < 8) {
+            guard++;
+            bucket.api++;
+            var batch;
+            try {
+                batch = await this.frontBatch((bucket.api - 1) * PER_PAGE, opts, sort);
+            } catch (e) {
+                bucket.more = false;
+                bucket.miss = true;
+                break;
+            }
+            if (!batch) {
+                bucket.more = false;
+                bucket.miss = true;
+                break;
+            }
+            if (!batch.raw.length) {
+                bucket.more = false;
+                break;
+            }
+            var seen = {};
+            bucket.items.forEach(function (m) { seen[m.id || m.username] = 1; });
+            var self = this;
+            var hd = [];
+            batch.raw.forEach(function (m) {
+                if (!self.offersHd(m)) return;
+                self.withStream(m);
+                hd.push(m);
+            });
+            this.watchable(hd, (opts && opts.gender) || "").forEach(function (m) {
+                var id = m.id || m.username;
+                if (seen[id]) return;
+                seen[id] = 1;
+                bucket.items.push(m);
+            });
+            bucket.more = batch.more;
+        }
+        if (bucket.miss && !bucket.items.length) return null;
+        var slice = bucket.items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+        return {
+            list: slice.map(function (m) { return this.card(m); }, this),
+            hasNextPage: bucket.items.length > page * PER_PAGE || bucket.more,
+        };
+    }
+
     async page(page, opts) {
         var self = this;
         var r;
@@ -229,10 +341,22 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
+        // Griglia «in evidenza»: stesso ordinamento camsLive (recScoreStripRanking).
+        // Con i cookie del login il sito può personalizzarla; senza, è l'elenco generico.
+        try {
+            var ranked = await this.fillFront(page, { gender: "" }, "recScoreStripRanking");
+            if (ranked && (ranked.list.length || page > 1)) return ranked;
+        } catch (e) {}
         return this.page(page, { gender: "girls" });
     }
 
     async getLatestUpdates(page) {
+        // «I consigli di oggi per te»: sortBy=recommendedScore, elenco diverso dalla
+        // griglia. Se l'API non dà nulla, si torna alle nuove senza errore.
+        try {
+            var tips = await this.fillFront(page, { gender: "" }, "recommendedScore");
+            if (tips && (tips.list.length || page > 1)) return tips;
+        } catch (e) {}
         return this.page(page, { gender: "girls", isNew: true });
     }
 
@@ -248,21 +372,30 @@ class DefaultExtension extends MProvider {
             country: this.pick(filters, "Paese", ""),
             isNew: show === "new",
         };
-        if (!text) return this.page(page, opts);
-        // L'API non cerca per nome: si guardano le prime 5 pagine (300 dirette)
-        // del genere scelto e si tengono i nomi che contengono il testo.
+        if (!text) {
+            var listed = await this.fillFront(page, opts, "stripRanking").catch(function () { return null; });
+            if (listed && listed.list.length) return listed;
+            return this.page(page, opts);
+        }
+        // L'API non cerca per nome: si guardano le prime pagine del genere
+        // e si tengono i nomi che contengono il testo, solo se il preset arriva a 720p.
         if (page > 1) return { list: [], hasNextPage: false };
         var self = this;
-        var pages = await Promise.all([1, 2, 3, 4, 5].map(function (p) {
-            return self.models(p, opts).catch(function () { return { raw: [] }; });
-        }));
-        var q = text.toLowerCase();
         var hits = [];
-        pages.forEach(function (r) {
-            self.watchable(r.raw, "").forEach(function (m) {
-                if (m.username.toLowerCase().indexOf(q) !== -1) hits.push(self.card(m));
+        for (var p = 0; p < 5 && hits.length < 40; p++) {
+            var batch = await this.frontBatch(p * PER_PAGE, opts, "stripRanking").catch(function () { return null; });
+            if (!batch) break;
+            var hd = [];
+            batch.raw.forEach(function (m) {
+                if (!self.offersHd(m)) return;
+                self.withStream(m);
+                hd.push(m);
             });
-        });
+            self.watchable(hd, "").forEach(function (m) {
+                if (m.username.toLowerCase().indexOf(text.toLowerCase()) !== -1) hits.push(self.card(m));
+            });
+            if (!batch.more) break;
+        }
         if (!hits.length) {
             throw new Error("Nessuna modella in diretta con «" + text + "» nel nome tra le 300 più viste. Se è offline o in privato non compare.");
         }
@@ -678,23 +811,23 @@ class DefaultExtension extends MProvider {
         this._site = found.origin;
         var gotModels = found.models;
         var more = found.more;
-        // L'API dei preferiti dà hlsPlaylist, non stream.url. watchable() vuole
-        // status public e uno stream: si copia la playlist lì, senza cambiare
-        // il criterio.
-        gotModels.forEach(function (o) {
-            if (o && (!o.stream || !o.stream.url) && o.hlsPlaylist) o.stream = { url: o.hlsPlaylist };
-        });
-        var open = {};
-        this.watchable(gotModels, "").forEach(function (o) { open[String(o.username).toLowerCase()] = o; });
+        await this.enrichFavoriteStatus(gotModels);
         var online = [];
         var rest = [];
         var seenIds = {};
+        var counts = {};
         gotModels.forEach(function (o) {
             if (!o || !o.username) return;
             var key = String(o.username).toLowerCase();
             if (seenIds[key]) return;
             seenIds[key] = true;
-            if (open[key]) online.push(open[key]);
+            var st = o.status ? String(o.status) : "";
+            counts[st || "senzastatus"] = (counts[st || "senzastatus"] || 0) + 1;
+            // In diretta pubblica: status public. Senza status, solo se isLive
+            // e non risulta un altro stato. Niente requisito stream: la risposta
+            // dei preferiti spesso non ha stream né hlsPlaylist.
+            var pub = st === "public" || (!st && o.isLive === true);
+            if (pub) online.push(o);
             else rest.push(o);
         });
         if (online.some(function (o) { return o.viewersCount; })) {
@@ -702,20 +835,57 @@ class DefaultExtension extends MProvider {
         }
         if (!includeOffline && !online.length) {
             if (page > 1) return { list: [], hasNextPage: false };
-            throw new Error("Nessuna delle tue preferite è in diretta adesso. Prova «Le mie preferite (anche offline)».");
+            var bits = Object.keys(counts).map(function (k) { return k + "×" + counts[k]; });
+            throw new Error("Nessuna delle tue preferite è in diretta adesso (" + (online.length + rest.length) + ": " + bits.join(", ") + "). Prova «Le mie preferite (anche offline)».");
         }
         var self = this;
         var show = includeOffline ? online.concat(rest) : online;
         var list = show.map(function (o) {
             var key = String(o.username).toLowerCase();
-            var live = !!open[key];
+            var pub = o.status === "public" || (!o.status && o.isLive === true);
             var known = self.seen[key];
             var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
             if (!known) self.seen[key] = Object.assign({ _at: 0 }, o);
-            c.name = (live ? "● " : "") + String(c.name).replace(/^● /, "");
+            c.name = (pub ? "● " : "") + String(c.name).replace(/^● /, "");
+            if (!pub) {
+                var label = STATUS_TEXT[o.status] || "";
+                if (label) c.name = c.name + " · " + label;
+            }
             return c;
         });
         return { list: list, hasNextPage: !!more };
+    }
+
+    // Se lo status manca, si legge da /api/front/models (status, isLive, hlsPlaylist).
+    async enrichFavoriteStatus(models) {
+        var pending = {};
+        models.forEach(function (m) {
+            if (!m || m.status) return;
+            if (m.username) pending[String(m.username).toLowerCase()] = m;
+            if (m.id) pending["#" + m.id] = m;
+        });
+        if (!Object.keys(pending).length) return;
+        for (var offset = 0; offset <= 120; offset += 60) {
+            var res;
+            try {
+                res = await this.apiJson(FRONT + "?limit=60&offset=" + offset + "&primaryTag=girls", {
+                    "Referer": "https://ita.stripchat.com/",
+                    "Accept": "application/json, text/plain, */*",
+                });
+            } catch (e) {
+                break;
+            }
+            var list = (res.data && res.data.models) || [];
+            if (!list.length) break;
+            list.forEach(function (m) {
+                var hit = pending["#" + m.id] || pending[String(m.username || "").toLowerCase()];
+                if (!hit || hit.status) return;
+                if (m.status) hit.status = m.status;
+                if (hit.isLive == null) hit.isLive = m.isLive;
+                if (hit.isOnline == null) hit.isOnline = m.isOnline;
+                if (!hit.hlsPlaylist && m.hlsPlaylist) hit.hlsPlaylist = m.hlsPlaylist;
+            });
+        }
     }
 
     // Video da numero della modella, quando non è tra le dirette dell'elenco
@@ -906,24 +1076,44 @@ class DefaultExtension extends MProvider {
             }
         }
         if (out.length && (parseInt(out[0].quality, 10) || 0) > 480) return { videos: out, note: "" };
-        var hd = names.filter(function (n) { return (parseInt(n, 10) || 0) > 480; });
-        return { videos: [], note: "HD in elenco (" + hd.join(", ") + ") ma la playlist non si apre" };
+        return { videos: [], note: "HD protetto dal sito: disponibile solo nel player di Stripchat" };
     }
 
     // Il sito può dare all'account una diretta con i nomi dei pezzi nascosti
     // («#EXT-X-MOUFLON:FILE/URI» e al posto del pezzo un finto «media.mp4»):
     // il player resta a girare. Quella si scarta e resta la diretta normale.
+    adPlaylist(body, url) {
+        var text = String(body || "");
+        var where = text + "\n" + String(url || "");
+        if (/MOUFLON-ADVERT/i.test(where)) return true;
+        if (/\/cpa\//i.test(where)) return true;
+        if (/PLAYLIST-TYPE:\s*VOD/i.test(text)) return true;
+        if (/#EXT-X-ENDLIST/i.test(text)) return true;
+        return false;
+    }
+
+    // Segue la variante (il client segue anche il 302). Scarta lo spot:
+    // MOUFLON-ADVERT, /cpa/, VOD, ENDLIST, o pezzi che non sono della stanza.
     async playable(url, headers) {
         try {
-            var body = String((await this.client.get(url, headers)).body || "");
+            var res = await this.client.get(url, headers);
+            var body = String((res && res.body) || "");
+            var finalUrl = (res && res.request && res.request.url) || url;
             if (body.indexOf("#EXT-X-STREAM-INF") !== -1) {
                 var next = body.split(/\r?\n/).filter(function (l) { return l && l.charAt(0) !== "#"; })[0];
                 if (!next) return false;
                 url = /^https?:/i.test(next) ? next : url.replace(/[^\/]*$/, "") + next;
-                body = String((await this.client.get(url, headers)).body || "");
+                res = await this.client.get(url, headers);
+                body = String((res && res.body) || "");
+                finalUrl = (res && res.request && res.request.url) || url;
             }
+            if (this.adPlaylist(body, finalUrl) || this.adPlaylist(body, url)) return false;
+            if (/#EXT-X-MOUFLON:(FILE|URI)/.test(body)) return false;
             var segs = body.split(/\r?\n/).filter(function (l) { return l && l.charAt(0) !== "#"; });
-            return segs.length > 0 && !/#EXT-X-MOUFLON:(FILE|URI)/.test(body) && !segs.some(function (l) { return /(^|\/)media\.mp4(\?|$)/.test(l); });
+            if (!segs.length || segs.some(function (l) { return /(^|\/)media\.mp4(\?|$)/.test(l); })) return false;
+            var id = (String(url).match(/\/(\d{5,})/) || [])[1];
+            if (id && !segs.some(function (l) { return l.indexOf(id) !== -1; })) return false;
+            return true;
         } catch (e) {
             return false;
         }
