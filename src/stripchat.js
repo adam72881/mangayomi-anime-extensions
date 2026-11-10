@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.9",
+        "version": "1.3.10",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.9";
+const VERSION = "1.3.10";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -693,7 +693,7 @@ class DefaultExtension extends MProvider {
         // solo quelle, e solo se il pezzo video risponde. Il file «source»
         // indovinato (_160p) punta a una playlist che risponde 404: non si usa
         // e non si decifra.
-        var out = [], seen = {};
+        var out = [];
         if (id) {
             try {
                 out = await this.publicVideos(id, u.name, headers);
@@ -703,6 +703,7 @@ class DefaultExtension extends MProvider {
         }
         if (!out.length) {
             var urls = m.stream.urls || {};
+            var seen = {};
             var add = function (u2, label) {
                 if (!u2 || seen[u2]) return;
                 seen[u2] = true;
@@ -718,19 +719,8 @@ class DefaultExtension extends MProvider {
             add(urls.original, origLabel);
             keys.forEach(function (k) { add(urls[k], k); });
             add(m.stream.url, "Diretta");
-        } else {
-            out.forEach(function (v) { seen[v.url] = true; });
         }
         if (!out.length) throw new Error("Non trovo il video della diretta di " + u.name + ". Prova dalla Webview.");
-        if (this.setting("sc_account_hd") === true) {
-            try {
-                var hd = await this.accountStreams(u.name, headers);
-                // Le qualità date al tuo account vanno prima, se sono più alte.
-                var extra = hd.filter(function (v) { return !seen[v.url]; });
-                extra.forEach(function (v) { seen[v.url] = true; });
-                if (extra.length) out = extra.concat(out);
-            } catch (e) {}
-        }
         return out;
     }
 
@@ -778,71 +768,6 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
-    setting(key) {
-        try { return new SharedPreferences().get(key); } catch (e) { return null; }
-    }
-
-    // Con il login fatto nella Webview: i dati della diretta che il sito dà al
-    // TUO account (stessa richiesta della pagina della stanza, con i tuoi
-    // cookie). Si usano solo i link del video che il sito restituisce lì; se per
-    // il tuo account non ci sono qualità più alte, non cambia niente.
-    // Non provato con un account vero: da qui stripchat.com è dietro Cloudflare.
-    async accountStreams(user, headers) {
-        var found = [];
-        var pages = [];
-        this.siteHosts().forEach(function (h) {
-            pages.push(h + "/api/front/v2/models/username/" + encodeURIComponent(user) + "/cam");
-            pages.push(h + "/" + encodeURIComponent(user));
-        });
-        for (var i = 0; i < pages.length; i++) {
-            var res;
-            try {
-                res = await this.client.get(pages[i], { "Referer": BASE + "/" + user, "Accept": i % 2 ? "text/html,application/xhtml+xml,*/*;q=0.8" : "application/json, text/plain, */*", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
-            } catch (e) {
-                continue;
-            }
-            if (res.statusCode >= 400) continue;
-            var text = String(res.body || "").replace(/\\u002[fF]/g, "/").replace(/\\\//g, "/");
-            var re = /https?:\/\/[^"'\s<>\\]+?\.m3u8[^"'\s<>\\]*/g, m;
-            while ((m = re.exec(text)) !== null) {
-                if (found.indexOf(m[0]) === -1) found.push(m[0]);
-            }
-            if (found.length) break;
-        }
-        // Ogni file trovato: le sue qualità (video e audio insieme, come su Stripchat).
-        var out = [];
-        for (var j = 0; j < found.length && j < 4; j++) {
-            var master;
-            try {
-                master = await this.client.get(found[j], headers);
-            } catch (e) {
-                continue;
-            }
-            var body = String(master.body || "");
-            if (master.statusCode >= 400 || body.indexOf("#EXTM3U") === -1) continue;
-            var lines = body.split(/\r?\n/);
-            var any = false;
-            for (var k = 0; k < lines.length; k++) {
-                if (lines[k].indexOf("#EXT-X-STREAM-INF:") !== 0) continue;
-                var next = (lines[k + 1] || "").trim();
-                if (!next || next.charAt(0) === "#") continue;
-                var name = (lines[k].match(/NAME="([^"]+)"/) || ["", ""])[1];
-                var h = (lines[k].match(/RESOLUTION=\d+x(\d+)/) || ["", ""])[1];
-                var label = name || (h ? h + "p" : "Diretta");
-                var abs = /^https?:/i.test(next) ? next : found[j].replace(/[^\/]*$/, "") + next;
-                out.push({ url: abs, originalUrl: abs, quality: label + " · account", headers: headers, _h: parseInt(label, 10) || parseInt(h, 10) || 0 });
-                any = true;
-            }
-            if (!any) out.push({ url: found[j], originalUrl: found[j], quality: "Diretta · account", headers: headers, _h: 0 });
-        }
-        // Solo se c'è davvero qualcosa sopra il 480p pubblico.
-        var best = out.reduce(function (a, v) { return Math.max(a, v._h); }, 0);
-        out.sort(function (a, b) { return b._h - a._h; });
-        out.forEach(function (v) { delete v._h; });
-        if (best <= 480 || !(await this.playable(out[0].url, headers))) return [];
-        return out;
-    }
-
     // Il sito può dare all'account una diretta con i nomi dei pezzi nascosti
     // («#EXT-X-MOUFLON:FILE/URI» e al posto del pezzo un finto «media.mp4»):
     // il player resta a girare. Quella si scarta e resta la diretta normale.
@@ -884,15 +809,6 @@ class DefaultExtension extends MProvider {
     }
 
     getSourcePreferences() {
-        return [
-            {
-                key: "sc_account_hd",
-                switchPreferenceCompat: {
-                    title: "Ho fatto il login: cerca l'HD",
-                    summary: "Dopo il login nella Webview, per ogni diretta chiede al sito le qualità date al tuo account (720p, 1080p…) e le mette in cima nel player. Senza account lascialo spento.",
-                    value: false,
-                },
-            },
-        ];
+        return [];
     }
 }

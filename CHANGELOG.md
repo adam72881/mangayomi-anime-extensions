@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.10
+
+- Tolta l'impostazione «Ho fatto il login: cerca l'HD». Non dava qualità in più: i link dell'account vengono scartati, e l'HD pubblico arriva già da solo.
+
 ## Stripchat 1.3.9
 
 - **La diretta non resta più a 480p quando il sito offre di più gratis.** L'elenco pubblico della stanza indica 720p o 1080p per chi trasmette così, e quelle qualità partono per prime. Se il sito offre solo 480p e 240p, resta così. La qualità più alta nascosta, quella che non si apre, non si usa.
