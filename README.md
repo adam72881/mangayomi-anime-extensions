@@ -55,6 +55,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Stripchat 1.1.0 / Chaturbate 1.2.0** — filtro Paese (Italiane…), solo dirette che si aprono, preferite di Stripchat con l'account.
 - **Stripchat 1.0.0** — nuova estensione per le dirette: più viste, nuove, genere, categorie, ricerca per nome, più qualità.
 - **Chaturbate 1.1.0** — accesso con il tuo account dalla Webview: le stanze che segui.
 - **Chaturbate 1.0.0** — nuova estensione per le dirette: camgirl in diretta, nuove, ricerca, filtri per genere e hashtag.

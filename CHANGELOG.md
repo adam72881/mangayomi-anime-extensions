@@ -1,5 +1,18 @@
 # Novità
 
+## Stripchat 1.1.0
+
+- **Filtro Paese**: Italiane, Spagnole, Francesi, Tedesche, Rumene, Russe, Ucraine, Colombiane, Brasiliane, Americane, Giapponesi, Cinesi, Indiane, Arabe (provati uno per uno). Non si combina con la Categoria: se scegli un Paese vale quello.
+- **Solo dirette che si aprono**: niente stanze senza video nell'elenco. Sotto «Ragazze» niente più coppie mescolate, e ~50 ragazze per pagina.
+- **Le mie preferite (account)** in Filtro → Mostra: dopo il login nella Webview legge la pagina dei preferiti del sito. Le preferite in diretta stanno in cima con «●». Non provato con un account vero.
+- Il video si trova anche per le modelle poco viste (preferite comprese).
+
+## Chaturbate 1.2.0
+
+- Hashtag **Italiane (#italian)** in cima al filtro (il filtro per Paese dell'API del sito non risponde).
+- **Solo dirette che si aprono** negli elenchi (le seguite offline restano tutte).
+- Qualità: resta «Auto», che prende già la più alta (720p). Le qualità separate avrebbero il video muto: su Chaturbate l'audio è un flusso a parte.
+
 ## Stripchat 1.0.0
 
 - Nuova estensione per le **dirette** di Stripchat, dall'API pubblica per i partner del sito (niente Cloudflare).

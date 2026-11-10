@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -32,6 +32,7 @@ const GENDERS = [
 
 const HASHTAGS = [
     ["", "Tutti"],
+    ["italian", "Italiane (#italian)"],
     ["squirt", "Squirt"],
     ["bigboobs", "Tette grandi"],
     ["lovense", "Lovense (giocattolo interattivo)"],
@@ -134,7 +135,10 @@ class DefaultExtension extends MProvider {
                 throw new Error(opts.offline ? "Non segui ancora nessuna stanza." : "Nessuna delle stanze che segui è in diretta adesso. Prova «Le mie seguite (offline)».");
             }
         }
-        var list = rooms.filter(function (r) { return r && r.username; }).map(function (r) {
+        // Solo le stanze che si aprono (diretta pubblica); le seguite offline restano tutte.
+        var list = rooms.filter(function (r) {
+            return r && r.username && (opts.offline || !r.current_show || r.current_show === "public");
+        }).map(function (r) {
             var viewers = r.num_users ? " · " + r.num_users + " spettatori" : "";
             return {
                 name: r.username + viewers,

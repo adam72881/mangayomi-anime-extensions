@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -52,6 +52,26 @@ const CATEGORIES = [
     ["anal", "Anal"],
     ["lovense", "Lovense (giocattolo interattivo)"],
     ["bdsm", "BDSM"],
+];
+
+// Paesi provati: tag=girls/<paese> dà davvero modelle di quel Paese o lingua.
+// Non si combina con la Categoria (due etichette insieme: il sito le ignora).
+const COUNTRIES = [
+    ["", "Tutti"],
+    ["italian", "Italiane"],
+    ["spanish", "Spagnole"],
+    ["french", "Francesi"],
+    ["german", "Tedesche"],
+    ["romanian", "Rumene"],
+    ["russian", "Russe"],
+    ["ukrainian", "Ucraine"],
+    ["colombian", "Colombiane"],
+    ["brazilian", "Brasiliane"],
+    ["american", "Americane"],
+    ["japanese", "Giapponesi"],
+    ["chinese", "Cinesi"],
+    ["indian", "Indiane"],
+    ["arab", "Arabe"],
 ];
 
 const STATUS_TEXT = {
@@ -122,7 +142,8 @@ class DefaultExtension extends MProvider {
     }
 
     async models(page, opts) {
-        var tag = (opts.gender || "girls") + (opts.category ? "/" + opts.category : "");
+        var extra = opts.country || opts.category;
+        var tag = (opts.gender || "girls") + (extra ? "/" + extra : "");
         var url = API + "?limit=" + PER_PAGE + "&offset=" + ((page - 1) * PER_PAGE) + "&tag=" + encodeURIComponent(tag).replace(/%2F/g, "/");
         if (opts.isNew) url += "&isNew=true";
         var data = await this.json(url);
@@ -130,11 +151,36 @@ class DefaultExtension extends MProvider {
         return { raw: list, total: (data && data.total) || 0 };
     }
 
+    // Solo le dirette che si aprono: pubbliche e con il video. Sotto «Ragazze» il
+    // sito mette anche molte coppie: si tolgono, se restano abbastanza ragazze.
+    watchable(list, gender) {
+        var ok = list.filter(function (m) { return m && m.username && m.status === "public" && m.stream && m.stream.url; });
+        if (gender === "girls") {
+            var girls = ok.filter(function (m) { return !m.gender || m.gender === "female"; });
+            if (girls.length >= 10) ok = girls;
+        }
+        return ok;
+    }
+
     async page(page, opts) {
-        var r = await this.models(page, opts);
         var self = this;
-        var cards = r.raw.filter(function (m) { return m && m.username; }).map(function (m) { return self.card(m); });
-        return { list: cards, hasNextPage: r.raw.length >= PER_PAGE && (!r.total || page * PER_PAGE < r.total) };
+        var r;
+        // Ragazze senza Paese/Categoria: il sito mescola molte coppie. Due pagine del
+        // sito per ogni pagina dell'app, così dopo averle tolte restano ~40 ragazze.
+        if ((opts.gender || "girls") === "girls" && !opts.country && !opts.category) {
+            var both = await Promise.all([this.models(page * 2 - 1, opts), this.models(page * 2, opts)]);
+            r = { raw: both[0].raw.concat(both[1].raw), total: both[1].total || both[0].total, last: both[1].raw.length };
+        } else {
+            r = await this.models(page, opts);
+            r.last = r.raw.length;
+        }
+        var seenIds = {};
+        var cards = this.watchable(r.raw, opts.gender || "girls").filter(function (m) {
+            if (seenIds[m.id]) return false;
+            seenIds[m.id] = true;
+            return true;
+        }).map(function (m) { return self.card(m); });
+        return { list: cards, hasNextPage: r.last >= PER_PAGE };
     }
 
     async getPopular(page) {
@@ -149,10 +195,13 @@ class DefaultExtension extends MProvider {
         var text = String(query || "").trim();
         var link = text.match(/stripchat\.com\/([A-Za-z0-9_-]+)/i);
         if (link) text = link[1];
+        var show = this.pick(filters, "Mostra", "");
+        if (show === "fav") return this.favorites(page);
         var opts = {
             gender: this.pick(filters, "Genere", "girls"),
             category: this.pick(filters, "Categoria", ""),
-            isNew: this.pick(filters, "Mostra", "") === "new",
+            country: this.pick(filters, "Paese", ""),
+            isNew: show === "new",
         };
         if (!text) return this.page(page, opts);
         // L'API non cerca per nome: si guardano le prime 5 pagine (300 dirette)
@@ -165,8 +214,8 @@ class DefaultExtension extends MProvider {
         var q = text.toLowerCase();
         var hits = [];
         pages.forEach(function (r) {
-            r.raw.forEach(function (m) {
-                if (m && m.username && m.username.toLowerCase().indexOf(q) !== -1) hits.push(self.card(m));
+            self.watchable(r.raw, "").forEach(function (m) {
+                if (m.username.toLowerCase().indexOf(q) !== -1) hits.push(self.card(m));
             });
         });
         if (!hits.length) {
@@ -208,6 +257,82 @@ class DefaultExtension extends MProvider {
         return fresh || known || null;
     }
 
+    // Preferite con l'account: dopo il login nella Webview i cookie passano
+    // all'estensione e la pagina /favorites del sito ha l'elenco nei suoi dati
+    // (window.__PRELOADED_STATE__). Non provato con un account: da qui
+    // stripchat.com è dietro Cloudflare.
+    async favorites(page) {
+        if (page > 1) return { list: [], hasNextPage: false };
+        var res;
+        try {
+            res = await this.client.get(BASE + "/favorites", { "Referer": BASE + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
+        } catch (e) {
+            throw new Error("Stripchat non risponde (problema di connessione). Tocca Riprova.");
+        }
+        var body = String(res.body || "");
+        if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
+            throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, superala e fai il login, poi torna qui e tocca Riprova.");
+        }
+        var m = body.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\})\s*<\/script>/);
+        var data = null;
+        if (m) {
+            try { data = JSON.parse(m[1]); } catch (e) { data = null; }
+        }
+        if (!data) throw new Error("Non riesco a leggere i preferiti di Stripchat. Aprili dalla Webview.");
+        var me = data.user && (data.user.user || data.user.me || data.user);
+        if (!me || !(me.id || me.username) || me.isGuest === true) {
+            throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
+        }
+        // L'elenco più lungo di modelle (oggetti con username e id) nei dati della pagina.
+        var best = [];
+        var walk = function (x, depth) {
+            if (!x || typeof x !== "object" || depth > 8) return;
+            if (Array.isArray(x)) {
+                var models = x.filter(function (o) { return o && typeof o === "object" && o.username && o.id && o.username !== me.username; });
+                if (models.length > best.length && models.length >= x.length / 2) best = models;
+                x.forEach(function (o) { walk(o, depth + 1); });
+                return;
+            }
+            Object.keys(x).forEach(function (k) { walk(x[k], depth + 1); });
+        };
+        walk(data, 0);
+        if (!best.length) throw new Error("Non hai ancora modelle preferite su Stripchat (o il sito le mostra in un altro modo: aprile dalla Webview).");
+        var self = this;
+        var seenIds = {};
+        var list = [];
+        best.forEach(function (o) {
+            if (seenIds[o.id]) return;
+            seenIds[o.id] = true;
+            var live = o.status === "public" || o.isLive === true || o.isOnline === true;
+            var known = self.seen[String(o.username).toLowerCase()];
+            var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + "#id=" + o.id };
+            if (!known) self.seen[String(o.username).toLowerCase()] = Object.assign({ _at: 0 }, o);
+            c.name = (live ? "● " : "") + c.name.replace(/^● /, "");
+            c._live = live;
+            list.push(c);
+        });
+        list.sort(function (a, b) { return (b._live ? 1 : 0) - (a._live ? 1 : 0); });
+        list.forEach(function (c) { delete c._live; });
+        return { list: list, hasNextPage: false };
+    }
+
+    // Video da numero della modella, quando non è tra le dirette dell'elenco
+    // (es. una preferita poco vista): gli indirizzi che usa il sito.
+    async streamById(id) {
+        var tries = [
+            "https://edge-hls.saawsedge.com/hls/" + id + "/master/" + id + "_auto.m3u8",
+            "https://edge-hls.saawsedge.com/hls/" + id + "/master/" + id + "_480p.m3u8",
+            "https://edge-hls.doppiocdn.com/hls/" + id + "/master/" + id + "_auto.m3u8",
+        ];
+        for (var i = 0; i < tries.length; i++) {
+            try {
+                var res = await this.client.get(tries[i], { "Referer": BASE + "/", "Origin": BASE, "User-Agent": UA });
+                if (res.statusCode < 400 && String(res.body || "").indexOf("#EXTM3U") !== -1) return tries[i];
+            } catch (e) {}
+        }
+        return "";
+    }
+
     async getDetail(url) {
         var u = this.user(url);
         if (!u.name) throw new Error("Link di Stripchat non riconosciuto.");
@@ -232,6 +357,10 @@ class DefaultExtension extends MProvider {
     async getVideoList(url) {
         var u = this.user(url);
         var m = await this.model(u);
+        if ((!m || !m.stream) && (u.id || (m && m.id))) {
+            var direct = await this.streamById(u.id || m.id);
+            if (direct) return [{ url: direct, originalUrl: direct, quality: "Diretta", headers: this.playerHeaders(u.name) }];
+        }
         if (!m || m.status !== "public" || !m.stream) {
             var st = m ? (STATUS_TEXT[m.status] || "non in diretta pubblica") : "offline";
             throw new Error(u.name + ": " + st.toLowerCase() + ". Riprova più tardi o scegli un'altra stanza.");
@@ -266,11 +395,17 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Solo dirette pubbliche. Scrivi il nome di una modella (si cerca tra le 300 più viste del genere scelto) o incolla il link della sua stanza.",
+                name: "Solo dirette che si aprono. Paese e Categoria non si combinano: se scegli un Paese vale quello. «Le mie preferite» vuole il login: tocca Webview e accedi a Stripchat.",
             },
             { type_name: "SelectFilter", name: "Genere", state: 0, values: options(GENDERS) },
+            { type_name: "SelectFilter", name: "Paese", state: 0, values: options(COUNTRIES) },
             { type_name: "SelectFilter", name: "Categoria", state: 0, values: options(CATEGORIES) },
-            { type_name: "SelectFilter", name: "Mostra", state: 0, values: options([["", "Tutte"], ["new", "Solo nuove"]]) },
+            {
+                type_name: "SelectFilter",
+                name: "Mostra",
+                state: 0,
+                values: options([["", "Tutte"], ["new", "Solo nuove"], ["fav", "Le mie preferite (account)"]]),
+            },
         ];
     }
 

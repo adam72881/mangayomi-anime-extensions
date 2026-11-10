@@ -23,8 +23,8 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/chaturbate.js` | Chaturbate (dirette) | 1.1.0 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.0.0 |
+| `src/chaturbate.js` | Chaturbate (dirette) | 1.2.0 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.1.0 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -259,3 +259,6 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - stripchat.com da qui = Cloudflare con captcha (403). **go.stripchat.com/api/models** (API partner) risponde senza Cloudflare: `?limit=60&offset=&tag=<genere>[/<categoria>]&isNew=true` → `models[]` con `username, id, status, viewersCount, snapshotUrl, previewUrlThumbBig, stream{url, urls{240p,480p,original}}`. `tag=girls/<x>` provato per milfs, mature, asian, latin, ebony, white, big-tits, small-tits, curvy, bbw, petite, hairy, squirt, anal, lovense, bdsm. `username=` è ignorato: la ricerca guarda le prime 5 pagine. Link `/<nome>#id=<id>`; la scheda usa la modella vista in lista (< 2 min) o la cerca nelle prime 3 pagine di ogni genere.
 - Video: master `edge-hls.saawsedge.com/hls/<id>/master/<id>_480p.m3u8` con righe `#EXT-X-MOUFLON:PSCH:v2:…` (ignorate dal player); la variante `playlistType=standard` ha pezzi mp4 normali, scaricati con 200 `video/mp4`. Non c'è decifratura nel codice.
 - Account Stripchat: non fatto (serve l'API del sito principale, dietro Cloudflare: non provabile da qui).
+
+- **Chaturbate 1.2.0:** `countries=IT` della room-list risponde vuoto (total null); `hashtags=italian` sì (11 stanze, il Paese è spesso nascosto). Elenchi filtrati su `current_show === "public"` (tranne seguite offline). Qualità separate non fatte: master LL-HLS con audio in `#EXT-X-MEDIA TYPE=AUDIO` a parte; in Mangayomi 0.9.95 le tracce audio esterne si prendono solo dal primo video (`firstVideoForTracks` = `_firstVid`), quindi una variante da sola resterebbe muta.
+- **Stripchat 1.1.0:** `tag=girls/<paese>` provati (italian 17/20 dall'Italia; british, korean, thai ignorati). Due tag insieme (`girls/italian/milfs`, ecc.) = ignorati → Paese ha la precedenza. `watchable()`: status public + stream; sotto girls tolte `maleFemale` se restano ≥ 10; senza Paese/Categoria due pagine API per pagina dell'app. Preferite: GET `/favorites` con i cookie della Webview → `window.__PRELOADED_STATE__`, utente da `data.user`, elenco = array più lungo di oggetti con username+id (non provato, Cloudflare). `streamById(id)`: `edge-hls.saawsedge.com/hls/<id>/master/<id>_auto.m3u8` (provato 200), poi `_480p`, poi doppiocdn.
