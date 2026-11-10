@@ -23,6 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
+| `src/chaturbate.js` | Chaturbate (dirette) | 1.0.0 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -242,3 +243,10 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **1.4.17 — velocità:** `fetchPage(url)` tiene in memoria la pagina del video 3 minuti (scheda e player la chiedono a pochi secondi). `getDetail` con un solo episodio = la pagina stessa chiama `startPrefetch(link)` (promessa di `resolveVideos` in `this._prefetch`, 4 minuti); `getVideoList` aspetta quella promessa al massimo 12 s, altrimenti `resolveVideos` da capo. `videosFromHtml`: iframe in parallelo, risultato dopo 1,2 s dal primo player che dà video o comunque dopo 9 s (`setTimeout` esiste in flutter_qjs: `javascript_runtime.dart` `_setupSetTimeout`). `base64Decode`: `charAt` oltre la fine dava `indexOf("") = 0` → caratteri nulli in coda (rompeva i server base64 di javhd.today).
 
 - **1.4.18 (revisione del codice):** `video()` usa `playerHeaders()` = headers + `User-Agent: UA` (in Mangayomi 0.9.95 il player riceve solo `video.headers`: `playback_media.dart` → `Media(url, httpHeaders)`; senza UA mpv manda il suo). `sites()` = memo 1,5 s di `computeSites()`; `debugOn()` memo 3 s. `cardsOf` = memo (ultime 4 pagine, confronto url+html, restituisce copie) di `computeCards`. `categoryUrlFor` = cache 3 giorni in `getString("linkuni_cat_urls")` (anche risultato vuoto) di `findCategoryUrl`. `searchUrl`: moduli insieme, poi gruppi di 4 in parallelo. `siteSection`: `kindTries` in parallelo. `getWithRetry` (1 nuovo tentativo dopo 700 ms, poi messaggio chiaro) in `fetchHtml`. `normCatUrl` non toglie più la barra finale (causava 404 e ricerca fallita su pornid/pornwhite/fetishshrine/porntrex); listing di categoria in try → ricerca normale. `saturnVideos` JSON protetto. `siteOf` gestisce co.uk/com.co ecc. FapSter tolto da `READY` (rimanda a fhgte.com o 404).
+
+## Chaturbate — 1.0.0 (10 novembre 2026)
+
+- Estensione separata (l'utente la voleva fuori da Link universale). `baseUrl` = chaturbate.com, link relativi `/<nome>/`: la Webview apre la stanza vera.
+- Elenco: `GET /api/ts/roomlist/room-list/?limit=60&offset=…` con `genders=f|c|t|m`, `hashtags=`, `keywords=`, `new_cams=true` (Recenti). JSON `rooms[]` (username, img, num_users) e `total_count`. Popolari = genders=f.
+- Diretta: `GET /api/chatvideocontext/<nome>/` → `room_status` (public/private/hidden/group/away/offline) e `hls_source` (master llhls.m3u8 con token). 404 = stanza inesistente. Video con Referer, Origin e User-Agent.
+- Provato il 10/11/2026: liste, pagine, hashtag, coppie, ricerca, link incollato, scheda, master.m3u8 risponde 200. Stripchat: da qui Cloudflare con captcha già sulla home (403), non provabile.

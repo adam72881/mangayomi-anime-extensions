@@ -108,5 +108,27 @@
         "additionalParams": "",
         "sourceCodeLanguage": 1,
         "notes": ""
+    },
+    {
+        "name": "Chaturbate",
+        "id": 7720431956,
+        "baseUrl": "https://chaturbate.com",
+        "lang": "en",
+        "typeSource": "single",
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=chaturbate.com",
+        "dateFormat": "",
+        "dateFormatLocale": "",
+        "isNsfw": true,
+        "hasCloudflare": false,
+        "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/chaturbate.js",
+        "apiUrl": "",
+        "version": "1.0.0",
+        "isManga": false,
+        "itemType": 1,
+        "isFullData": false,
+        "appMinVerReq": "0.5.0",
+        "additionalParams": "",
+        "sourceCodeLanguage": 1,
+        "notes": ""
     }
 ]

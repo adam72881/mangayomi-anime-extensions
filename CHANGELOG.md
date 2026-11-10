@@ -1,5 +1,15 @@
 # Novità
 
+## Chaturbate 1.0.0
+
+- Nuova estensione per le **dirette** di Chaturbate.
+  - **Popolari**: le camgirl in diretta, prima quelle con più spettatori.
+  - **Recenti**: le camgirl nuove sul sito.
+  - **Ricerca** per parola o nome; incollando il link di una stanza si apre quella.
+  - **Filtri**: Genere (ragazze, coppie, trans, uomini, tutti), Hashtag (squirt, milf, asian, lovense, tette grandi…), Solo nuove.
+  - La scheda dice se la stanza è in diretta, in show privato o offline; **▶ Diretta** apre il video.
+  - **Webview** apre direttamente Chaturbate.
+
 ## Link universale 1.4.18
 
 - **Video più affidabili nel player**: il player ora si presenta al server del video come un browser. Prima si presentava come «libmpv», e molti server video lo rallentavano o lo rifiutavano (rotellina infinita).
