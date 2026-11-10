@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.7 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.8 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.8
+
+Miniature jav.guru: la lista e la scheda START-663 puntano a `cdn.javmiku.com/wp-content/uploads/...`. Con le intestazioni reali delle copertine (`getHeaders` vuoto: Mangayomi per le estensioni JS non aggiunge uno User-Agent, `custom_extended_image_provider.dart` manda solo quelle intestazioni, e `MClient` aggiunge lo UA solo se ci sono già cookie per quell'host) la risposta è `403 text/html` «Just a moment», non un JPEG. Lo stesso path su `https://jav.guru` con lo User-Agent è `200 image/jpeg` (copertina 95923 byte, `ffd8ff`). Senza User-Agent anche l'origine è HTML. `coverUrl` sposta `/wp-content/uploads/` sull'origine della pagina; `getHeaders` manda lo UA iPhone già usato dalle altre estensioni. Il CDN, anche con UA, da questa rete resta HTML: non si aggira. xHamster con UA iPhone ha ancora ~54 schede e non è una pagina-gate; una pagina «Just a moment» / anti-bot senza elenco ora fa eccezione in `fetchHtml` (`isGatePage`) invece di una lista vuota. `getSourcePreferences` non chiama `get()`. Video jav.guru (1.4.7) invariato.
 
 ## Link universale — 1.4.7
 

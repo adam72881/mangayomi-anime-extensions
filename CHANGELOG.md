@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.8
+
+- **JavGuru: le miniature e la copertina non restano più grigie.** Il sito indica un indirizzo su un altro server che all'app risponde con una pagina HTML, non con una foto. Ora si usa la stessa immagine sul sito stesso, e la richiesta della copertina porta uno User-Agent: senza, Mangayomi riceve di nuovo HTML e la miniatura resta grigia.
+- **xHamster e gli altri, dopo la WebView:** se la pagina è ancora una verifica (o solo «serve JavaScript», senza elenco), non esce più «Nessun risultato». Il messaggio dice di completare la verifica nella WebView e toccare Riprova.
+
 ## Link universale 1.4.7
 
 - **JavGuru: i video partono nell'app.** Il player è scritto nella pagina in base64 e poi a pezzi invertiti: l'estensione lo ricostruisce, come farebbe il sito, e legge l'HLS (fino a 1080p). Se un server del video chiede Cloudflare o un paywall, quel server si salta; gli altri restano. JavGuru è anche tra i siti pronti.

@@ -53,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.4.8** — miniature e copertina di JavGuru; dopo la WebView una verifica rimasta non sembra più «nessun risultato».
 - **Link universale 1.4.7** — i video di JavGuru partono nell'app (il player era nascosto nella pagina).
 - **Link universale 1.4.6** — Bdsmstreak (BDSM) e AnalVids (hardcore) tra i siti pronti.
 - **Link universale 1.4.5** — BravoPorn, HomeMovies e YourAmateur; filtro Categoria; siti salvati si possono nascondere senza cancellarli.

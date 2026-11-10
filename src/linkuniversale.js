@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.7",
+        "version": "1.4.8",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -100,6 +100,11 @@ const PREF_SEARCH = "linkuni_search_patterns";
 const PREF_SECTIONS = "linkuni_sections";
 const HISTORY_MAX = 60;
 const VIDEO_EXT = "m3u8|mp4|webm|mkv|mov|m4v";
+// Mangayomi, per le estensioni JS, carica le copertine solo con getHeaders().
+// Se manca lo User-Agent non ne aggiunge uno: alcuni siti rispondono con
+// HTML (403) e la miniatura resta grigia. È lo stesso identikit già usato
+// dalle altre estensioni di questo repo, non un bypass di Cloudflare.
+const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
 // Anteprime, miniature animate e pubblicità: sono mp4 veri, ma non il video.
 const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\//i;
@@ -329,6 +334,32 @@ function siteOf(url) {
     return parts.slice(-2).join(".");
 }
 
+// WordPress spesso mette i file su un CDN. Se quel CDN risponde con una
+// pagina di verifica, la stessa path sul sito della pagina è il JPEG.
+function coverUrl(src, pageUrl) {
+    var abs = resolveUrl(src, pageUrl);
+    if (!abs) return "";
+    var path = abs.replace(/^https?:\/\/[^\/?#]+/i, "");
+    if (/^\/wp-content\/uploads\//i.test(path.split("?")[0]) && hostOf(abs) !== hostOf(pageUrl)) {
+        var origin = originOf(pageUrl);
+        if (origin) return origin + path;
+    }
+    return abs;
+}
+
+// Pagina che non è un elenco: verifica, anti-bot, solo «serve JavaScript».
+// Non va restituita come lista vuota.
+function isGatePage(html) {
+    var title = pageTitle(html);
+    if (title.length < 90 && /just a moment|attention required|access denied|checking your browser|please enable javascript|one moment please|ddos protection|verifica del browser/i.test(title)) return true;
+    var text = String(html);
+    // Il beacon di Cloudflare sta anche nelle pagine vere: conta solo se non c'è un elenco.
+    var catalog = /"thumbURL"|"pageURL"|wp-content\/uploads|<img\b[^>]+src=["']https?:\/\/[^"']+\.(?:jpe?g|png|webp)/i.test(text.slice(0, 120000));
+    if (!catalog && /cf-chl-|challenge-platform|__cf_chl|cdn-cgi\/challenge/i.test(text.slice(0, 20000))) return true;
+    if (!catalog && /javascript is required|please enable javascript/i.test(text.slice(0, 30000))) return true;
+    return false;
+}
+
 function resolveUrl(href, base) {
     href = String(href || "").trim()
         .replace(/&#x([0-9a-f]+);/gi, function (_, h) { return String.fromCharCode(parseInt(h, 16)); })
@@ -518,13 +549,14 @@ class DefaultExtension extends MProvider {
     // Intestazioni che l'app usa per caricare le immagini: sono le stesse per
     // tutta la sorgente (Mangayomi le calcola una volta sola, all'avvio).
     getHeaders(url) {
+        var h = { "User-Agent": UA };
         try {
             if (this.setting(PREF_IMG_REFERER) === true) {
                 var main = this.sites()[0];
-                if (main) return { "Referer": main + "/" };
+                if (main) h["Referer"] = main + "/";
             }
         } catch (e) {}
-        return {};
+        return h;
     }
 
     headers(referer) {
@@ -632,6 +664,9 @@ class DefaultExtension extends MProvider {
         var res = await this.client.get(url, this.headers(referer));
         var body = String(res.body || "");
         this.assertReachable(res, body, url);
+        if (isGatePage(body) && !this.looksLikeVideoPage(url, body)) {
+            throw new Error("Il sito " + hostOf(url) + " chiede ancora una verifica. Tocca Webview, completala e poi tocca Riprova. Non è una lista vuota.");
+        }
         if (!this.pageIsAgeWall(body, url)) return body;
         var opened = await this.openAgeGate(url, body, referer);
         if (opened) return opened;
@@ -1195,7 +1230,7 @@ class DefaultExtension extends MProvider {
         if (withSelf && page === 1 && this.looksLikeVideoPage(url, html)) {
             var self = {
                 name: "▶ " + (pageTitle(html) || url),
-                imageUrl: resolveUrl(metaContent(html, ["og:image", "twitter:image"]), url),
+                imageUrl: coverUrl(metaContent(html, ["og:image", "twitter:image"]), url),
                 link: url,
             };
             list.push(self);
@@ -1279,7 +1314,7 @@ class DefaultExtension extends MProvider {
             title = decodeEntities(title);
             if (weakTitle(title)) title = titles[link] || decodeEntities(inner.replace(/<[^>]+>/g, " "));
             if (!title || title.length < 2) continue;
-            out.push({ name: title, imageUrl: src ? resolveUrl(src, pageUrl) : "", link: link });
+            out.push({ name: title, imageUrl: src ? coverUrl(src, pageUrl) : "", link: link });
         }
         var all = this.mergeCards(this.mergeCards(out, this.containerCardsOf(html, pageUrl)), this.jsonCardsOf(html, pageUrl));
         // Cambio lingua (de.sito.com/stessa-pagina) e link alla pagina stessa.
@@ -1373,7 +1408,7 @@ class DefaultExtension extends MProvider {
                 decodeEntities((img[0].match(/\balt\s*=\s*["']([^"']+)/i) || ["", ""])[1]) || a.text;
             title = title.replace(/^(guarda|copertina di|poster di|watch)\s+/i, "");
             if (weakTitle(title)) continue;
-            out.push({ name: title, imageUrl: src ? resolveUrl(src, pageUrl) : "", link: a.link });
+            out.push({ name: title, imageUrl: src ? coverUrl(src, pageUrl) : "", link: a.link });
         }
         return out;
     }
@@ -1398,7 +1433,7 @@ class DefaultExtension extends MProvider {
             var title = decodeEntities(t[1].replace(/\\u([0-9a-fA-F]{4})/g, function (_, h) {
                 return String.fromCharCode(parseInt(h, 16));
             }).replace(/\\(.)/g, "$1"));
-            out.push({ name: title, imageUrl: resolveUrl(img[1], pageUrl), link: link });
+            out.push({ name: title, imageUrl: coverUrl(img[1], pageUrl), link: link });
         }
         return out;
     }
@@ -1458,12 +1493,13 @@ class DefaultExtension extends MProvider {
         var link = cleanLink(url);
         var html = await this.fetchHtml(link, originOf(link) + "/");
         var title = pageTitle(html) || link;
-        var image = resolveUrl(metaContent(html, ["og:image", "twitter:image", "thumbnailUrl"]), link);
+        var image = coverUrl(metaContent(html, ["og:image", "twitter:image", "thumbnailUrl"]), link);
         if (!image) {
-            var poster = unescapeJs(html).match(/"thumbnailUrl"\s*:\s*\[?\s*"([^"]+)"/i) ||
+            var shot = html.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']+\/wp-content\/uploads\/[^"']+)["']/i);
+            var poster = shot || unescapeJs(html).match(/"thumbnailUrl"\s*:\s*\[?\s*"([^"]+)"/i) ||
                 html.match(/<video\b[^>]*\bposter\s*=\s*["']([^"']+)["']/i) ||
                 unescapeJs(html).match(/\b(?:poster|preview_url|image)\s*:\s*["']((?:https?:)?\/\/[^"']+\.(?:jpe?g|png|webp)[^"']*)["']/i);
-            if (poster) image = resolveUrl(poster[1], link);
+            if (poster) image = coverUrl(poster[1], link);
         }
         var description = metaContent(html, ["og:description", "description", "twitter:description"]);
         var facts = videoFacts(html);
