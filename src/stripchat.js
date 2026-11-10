@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.11",
+        "version": "1.3.12",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.11";
+const VERSION = "1.3.12";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -241,7 +241,7 @@ class DefaultExtension extends MProvider {
         var link = text.match(/stripchat\.com\/([A-Za-z0-9_-]+)/i);
         if (link) text = link[1];
         var show = this.pick(filters, "Mostra", "");
-        if (show === "fav") return this.favorites(page);
+        if (show === "fav" || show === "fav_all") return this.favorites(page, show === "fav_all");
         var opts = {
             gender: this.pick(filters, "Genere", "girls"),
             category: this.pick(filters, "Categoria", ""),
@@ -615,7 +615,7 @@ class DefaultExtension extends MProvider {
     // Mangayomi 0.9.95 lo copia solo al cambio di indirizzo, come nome=valore.
     // L'API /models/favorites usa quel cookie. Se la pagina non ha l'utente, il
     // cookie non è partito: è un limite dell'app, non si inventa un token.
-    async favorites(page) {
+    async favorites(page, includeOffline) {
         var hosts = this.siteHosts();
         var notes = [];
         var found = null;
@@ -678,24 +678,43 @@ class DefaultExtension extends MProvider {
         this._site = found.origin;
         var gotModels = found.models;
         var more = found.more;
-        var self = this;
+        // L'API dei preferiti dà hlsPlaylist, non stream.url. watchable() vuole
+        // status public e uno stream: si copia la playlist lì, senza cambiare
+        // il criterio.
+        gotModels.forEach(function (o) {
+            if (o && (!o.stream || !o.stream.url) && o.hlsPlaylist) o.stream = { url: o.hlsPlaylist };
+        });
+        var open = {};
+        this.watchable(gotModels, "").forEach(function (o) { open[String(o.username).toLowerCase()] = o; });
+        var online = [];
+        var rest = [];
         var seenIds = {};
-        var list = [];
         gotModels.forEach(function (o) {
             if (!o || !o.username) return;
             var key = String(o.username).toLowerCase();
             if (seenIds[key]) return;
             seenIds[key] = true;
-            var live = o.status === "public" || o.isLive === true || o.isOnline === true;
+            if (open[key]) online.push(open[key]);
+            else rest.push(o);
+        });
+        if (online.some(function (o) { return o.viewersCount; })) {
+            online.sort(function (a, b) { return (b.viewersCount || 0) - (a.viewersCount || 0); });
+        }
+        if (!includeOffline && !online.length) {
+            if (page > 1) return { list: [], hasNextPage: false };
+            throw new Error("Nessuna delle tue preferite è in diretta adesso. Prova «Le mie preferite (anche offline)».");
+        }
+        var self = this;
+        var show = includeOffline ? online.concat(rest) : online;
+        var list = show.map(function (o) {
+            var key = String(o.username).toLowerCase();
+            var live = !!open[key];
             var known = self.seen[key];
             var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
             if (!known) self.seen[key] = Object.assign({ _at: 0 }, o);
             c.name = (live ? "● " : "") + String(c.name).replace(/^● /, "");
-            c._live = live;
-            list.push(c);
+            return c;
         });
-        list.sort(function (a, b) { return (b._live ? 1 : 0) - (a._live ? 1 : 0); });
-        list.forEach(function (c) { delete c._live; });
         return { list: list, hasNextPage: !!more };
     }
 
@@ -926,7 +945,12 @@ class DefaultExtension extends MProvider {
                 type_name: "SelectFilter",
                 name: "Mostra",
                 state: 0,
-                values: options([["", "Tutte"], ["new", "Solo nuove"], ["fav", "Le mie preferite (account)"]]),
+                values: options([
+                    ["", "Tutte"],
+                    ["new", "Solo nuove"],
+                    ["fav", "Le mie preferite (account)"],
+                    ["fav_all", "Le mie preferite (anche offline)"],
+                ]),
             },
         ];
     }

@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.12
+
+- «Le mie preferite (account)» mostra solo chi è in diretta e si può aprire. Le altre stanno in «Le mie preferite (anche offline)». Se nessuna è in diretta, il messaggio lo dice.
+
 ## Chaturbate 1.3.4
 
 - Tolta la scelta della qualità. La diretta parte sempre dalla più alta che il sito offre, e nel player restano anche le altre, con l'audio collegato. Se l'elenco delle qualità non si legge, si usa un link nuovo della diretta.
