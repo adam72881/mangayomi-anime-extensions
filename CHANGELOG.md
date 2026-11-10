@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.8
+
+- **Preferiti:** l'estensione ora legge i dati della pagina. Se il sito non dice chiaramente che hai fatto il login, l'estensione cerca lo stesso le preferite. Se il sito ti vede come ospite, il messaggio mostra come ti descrive, per capire se il login non arriva all'estensione.
+
 ## Stripchat 1.3.7
 
 - **Preferiti:** l'estensione leggeva il punto sbagliato della pagina, cioè un pezzo di codice che nomina i dati, invece dei dati veri. Ora cerca il punto in cui la pagina li scrive.

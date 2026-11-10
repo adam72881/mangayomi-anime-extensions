@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.7",
+        "version": "1.3.8",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.7";
+const VERSION = "1.3.8";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -400,6 +400,18 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // Come il sito descrive chi sta guardando, per capire perché il login non si vede.
+    userInfo(d) {
+        var u = d.user;
+        var keys = Object.keys(d).slice(0, 10).join(",");
+        if (!u || typeof u !== "object") return "chiavi: " + keys;
+        var me = u.user || u.me || u.current || u;
+        var info = function (o) {
+            return "id=" + (o && o.id !== undefined ? (o.id ? "sì" : String(o.id)) : "no") + " username=" + (o && o.username ? "sì" : "no") + " isGuest=" + (o ? String(o.isGuest) : "-") + (o && o.isLogged !== undefined ? " isLogged=" + o.isLogged : "");
+        };
+        return "user{" + Object.keys(u).slice(0, 12).join(",") + "} " + info(me) + " — chiavi: " + keys;
+    }
+
     loggedUser(data) {
         var me = data && data.user && (data.user.user || data.user.me || data.user);
         return me && (me.id || me.username) && me.isGuest !== true ? me : null;
@@ -411,7 +423,7 @@ class DefaultExtension extends MProvider {
         var walk = function (x, depth) {
             if (!x || typeof x !== "object" || depth > 8) return;
             if (Array.isArray(x)) {
-                var models = x.filter(function (o) { return o && typeof o === "object" && o.username && o.id && o.username !== me.username; });
+                var models = x.filter(function (o) { return o && typeof o === "object" && o.username && o.id && (!me || o.username !== me.username); });
                 if (models.length > best.length && models.length >= x.length / 2) best = models;
                 x.forEach(function (o) { walk(o, depth + 1); });
                 return;
@@ -501,20 +513,18 @@ class DefaultExtension extends MProvider {
             }
             var d = this.preloadedState(body);
             var me = d ? this.loggedUser(d) : null;
-            if (d && !me) { guest = true; continue; }
+            if (d && !me) guest = true;
             var models = d ? this.stateModels(d, me) : this.htmlModels(body);
             if (models.length) {
                 best = models;
                 this._site = hosts[h];
                 break;
             }
-            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + (d ? "dati letti, nessun elenco, " : "") + this.pageHints(body));
+            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + (d ? "dati letti, nessun elenco, " + this.userInfo(d) : this.pageHints(body)));
         }
         if (!best) {
-            if (guest) throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
-            if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
-            // Il messaggio sul telefono si taglia dopo poche righe: solo l'ultimo indirizzo.
-            throw new Error("Preferiti Stripchat " + VERSION + ": " + notes[notes.length - 1]);
+            if (blocked && !notes.some(function (n) { return !/Cloudflare|nessuna risposta/.test(n); })) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
+            throw new Error((guest ? "Il sito ti vede come ospite: se nella Webview hai fatto il login, mandami questo messaggio. " : "") + "Preferiti Stripchat " + VERSION + ": " + notes.join(" | "));
         }
         var self = this;
         var seenIds = {};

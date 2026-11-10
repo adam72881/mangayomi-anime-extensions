@@ -24,7 +24,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.3.7 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.3.8 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -271,6 +271,7 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 
 - **11/11/2026 — Italia:** dall'Italia Chaturbate risponde alle API con la pagina «Verify your age — Visitors in Italy must verify their age» (Yoti / Face Scan / AgeKey; scade con l'inattività). Obbligo di legge: **non si aggira**. Le estensioni riconoscono la pagina (HTML al posto del JSON, o 401/403/451 con testo di verifica età) e dicono di completarla nella Webview. Da qui (USA) le API rispondono normalmente, quindi i test cloud non vedono questo caso.
 
+- **Stripchat 1.3.8:** con 1.3.7 lo stato si legge ma `loggedUser` → null (messaggio «devi accedere») mentre la Webview è loggata su ita (366 tk). Ora si cercano le modelle anche senza utente riconosciuto; se niente, `userInfo()` mostra chiavi di `user` e id/username/isGuest. Da capire: struttura utente diversa o cookie di login non passati all'estensione.
 - **Stripchat 1.3.7:** diagnosi 1.3.6: il primo `__PRELOADED_STATE__` è codice (`"__PRELOADED_STATE__"in window))){let e=d(document.body,"loader"…`). `preloadedState` ora cerca l'assegnazione `__PRELOADED_STATE__ = {` o `= JSON.parse("…")`; diagnosi mostra il valore assegnato o i nomi `window.__X__`.
 - **Stripchat 1.3.6:** stesso errore «expecting property name» dopo 1.3.5 (forse ancora 1.3.4 sul telefono). Messaggio di errore con `VERSION`, solo l'ultimo host, inizio dello stato e due pezzi attorno a «username».
 - **Stripchat 1.3.5:** il telefono riportava «expecting property name» su entrambi gli host (321KB, username×11): letterale JS con chiavi senza virgolette. `jsToJson()` (chiavi, apici singoli, !0/!1, undefined, void 0); `htmlModels` accetta `username:'x'` e `id:1` senza virgolette.
