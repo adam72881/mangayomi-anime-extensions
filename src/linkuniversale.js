@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.17",
+        "version": "1.4.18",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -36,6 +36,7 @@ const PREF_QUALITY = "linkuni_quality";
 const PREF_DEBUG = "linkuni_debug";
 const PREF_RENAME = "linkuni_rename";
 const PREF_NAV = "linkuni_nav";
+const STORE_CAT_URLS = "linkuni_cat_urls";
 const STORE_NAMES = "linkuni_names";
 const STORE_LAST_RENAME = "linkuni_last_rename";
 const STORE_SAVED_OFF = "linkuni_saved_off";
@@ -67,7 +68,6 @@ const READY = [
     ["https://ok.xxx", "OK.xxx"],
     ["https://www.pornwhite.com", "PornWhite"],
     ["https://xbabe.com", "xBabe"],
-    ["https://fapster.xxx", "Fapster"],
     ["https://www.porngo.com", "PornGo"],
     ["https://www.porn300.com", "Porn300"],
     ["https://www.xxxbunker.com", "XXXBunker"],
@@ -395,6 +395,10 @@ function originOf(url) {
 // Stesso sito anche tra www., m. e it. (es. it.pornhub.com e www.pornhub.com).
 function siteOf(url) {
     var parts = hostOf(url).split(".");
+    // Domini come jav.com.co o sito.co.uk: il nome è il terzo pezzo da destra.
+    if (parts.length >= 3 && /^(co|com|net|org|ac|gov|ne|or)$/.test(parts[parts.length - 2]) && parts[parts.length - 1].length === 2) {
+        return parts.slice(-3).join(".");
+    }
     return parts.slice(-2).join(".");
 }
 
@@ -496,7 +500,9 @@ function normCatUrl(abs) {
     if (!host) return "";
     var proto = /^http:/i.test(origin) ? "http://" : "https://";
     var rest = String(abs).slice(origin.length).split("#")[0];
-    var path = (rest.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+    // La barra finale resta com'è sul sito: /categories/milf/ e
+    // /categories/milf non sono sempre la stessa pagina (spesso la seconda è 404).
+    var path = (rest.split("?")[0] || "/").replace(/\/{2,}$/, "/") || "/";
     var q = "";
     var qm = rest.match(/\?([^#]*)/);
     if (qm && qm[1]) {
@@ -777,7 +783,7 @@ class DefaultExtension extends MProvider {
         var why = what === "nessun video" ?
             "Nessun file mp4/HLS in pagina (" + engine + "). Se parte nel browser, tocca Webview." :
             "Nessuna scheda (" + engine + "). " + (ageWallText(html) ? "Sembra una verifica dell'età: tocca Webview." : "Non ho trovato titoli con una miniatura.");
-        if (this.setting(PREF_DEBUG) === true) why += " Diagnostica: " + fam + ".";
+        if (this.debugOn()) why += " Diagnostica: " + fam + ".";
         return why;
     }
 
@@ -851,8 +857,25 @@ class DefaultExtension extends MProvider {
         return "";
     }
 
+    // Una connessione che salta (rete del telefono, server lento) si riprova una
+    // volta; poi un messaggio chiaro invece dell'errore tecnico dell'app.
+    async getWithRetry(url, headers) {
+        try {
+            return await this.client.get(url, headers);
+        } catch (e) {
+            await new Promise(function (resolve) {
+                if (typeof setTimeout === "function") setTimeout(resolve, 700); else resolve();
+            });
+            try {
+                return await this.client.get(url, headers);
+            } catch (e2) {
+                throw new Error("Il sito " + hostOf(url) + " non risponde (problema di connessione). Controlla la rete e tocca Riprova.");
+            }
+        }
+    }
+
     async fetchHtml(url, referer) {
-        var res = await this.client.get(url, this.headers(referer));
+        var res = await this.getWithRetry(url, this.headers(referer));
         var body = String(res.body || "");
         this.assertReachable(res, body, url);
         if (isGatePage(body) && !this.looksLikeVideoPage(url, body)) {
@@ -952,7 +975,25 @@ class DefaultExtension extends MProvider {
         }
     }
 
+    // Le schermate chiedono l'elenco dei siti più volte nella stessa azione;
+    // ogni volta erano 6–8 letture delle impostazioni dall'app. Vale 1,5 s.
     sites() {
+        var memo = this._sitesMemo;
+        if (memo && Date.now() - memo.at < 1500) return memo.list.slice();
+        var list = this.computeSites();
+        this._sitesMemo = { at: Date.now(), list: list };
+        return list.slice();
+    }
+
+    debugOn() {
+        var memo = this._debugMemo;
+        if (memo && Date.now() - memo.at < 3000) return memo.on;
+        var on = this.setting(PREF_DEBUG) === true;
+        this._debugMemo = { at: Date.now(), on: on };
+        return on;
+    }
+
+    computeSites() {
         this.applyRename();
         var saved = this.savedSites();
         // Stesso flusso della 1.1.0–1.4.8: il testo confermato in «Salva un sito»
@@ -1156,6 +1197,21 @@ class DefaultExtension extends MProvider {
     // home e da /categories), oppure un link della home che finisce con la
     // parola (/big-tits/, /c/big-tits-12/). Niente: stringa vuota.
     async categoryUrlFor(site, words) {
+        // Risultato ricordato 3 giorni, anche «nessuna pagina»: prima ogni
+        // ricerca di categoria riscaricava home e /categories.
+        var origin0 = originOf(site) || site;
+        var store = this.readJson(STORE_CAT_URLS, {});
+        var ck = origin0 + "|" + words[0];
+        if (store[ck] && Date.now() - store[ck].at < 3 * 86400000) return store[ck].url;
+        var found = await this.findCategoryUrl(site, words);
+        store[ck] = { at: Date.now(), url: found };
+        var keys = Object.keys(store);
+        if (keys.length > 200) delete store[keys[0]];
+        this.prefs.setString(STORE_CAT_URLS, JSON.stringify(store));
+        return found;
+    }
+
+    async findCategoryUrl(site, words) {
         var origin = originOf(site) || site;
         var slugs = words.map(function (w) { return w.toLowerCase().replace(/[^a-z0-9]+/g, "-"); });
         var match = function (name, url) {
@@ -1334,15 +1390,18 @@ class DefaultExtension extends MProvider {
         // Home senza schede (costruita da JavaScript): provo le pagine più comuni.
         var tries = this.kindTries(kind);
         var cache = this.readJson(PREF_SECTIONS, {});
+        var self = this;
+        // Tutte insieme, vince la prima dell'elenco che ha almeno 4 schede.
+        var got = await Promise.all(tries.map(function (t) {
+            return self.listing(site + t, 1, false).catch(function () { return null; });
+        }));
         for (var i = 0; i < tries.length; i++) {
-            try {
-                var r = await this.listing(site + tries[i], 1, false);
-                if (r.list.length >= 4) {
-                    cache[site + "#" + kind] = site + tries[i];
-                    this.prefs.setString(PREF_SECTIONS, JSON.stringify(cache));
-                    return r;
-                }
-            } catch (e) {}
+            var r = got[i];
+            if (r && r.list.length >= 4) {
+                cache[site + "#" + kind] = site + tries[i];
+                this.prefs.setString(PREF_SECTIONS, JSON.stringify(cache));
+                return r;
+            }
         }
         return kind === "latest" ? this.siteSection(site, "popular", page) : res;
     }
@@ -1372,7 +1431,14 @@ class DefaultExtension extends MProvider {
                 np[key] = catUrl;
                 this.prefs.setString(PREF_NEXT, JSON.stringify(np));
             }
-            if (catUrl) return this.listing(catUrl, page, false);
+            if (catUrl) {
+                try {
+                    var byCat = await this.listing(catUrl, page, false);
+                    if (byCat.list.length || page > 1) return byCat;
+                } catch (e) {
+                    if (/Webview|verifica|anti-bot/i.test(String(e && e.message))) throw e;
+                }
+            }
             text = catWords[0];
         } else if (catWords && text) {
             text = text + " " + catWords[0];
@@ -1385,8 +1451,13 @@ class DefaultExtension extends MProvider {
         if (!order) {
             var cat = this.categoryMatch(site, text);
             if (cat) {
-                var catRes = await this.listing(cat, page, false);
-                if (catRes.list.length >= 4) return catRes;
+                // Una categoria rotta (404) non deve far fallire la ricerca.
+                try {
+                    var catRes = await this.listing(cat, page, false);
+                    if (catRes.list.length >= 4) return catRes;
+                } catch (e) {
+                    if (/Webview|verifica|anti-bot/i.test(String(e && e.message))) throw e;
+                }
             }
         }
         var first = await this.searchUrl(site, text);
@@ -1510,22 +1581,39 @@ class DefaultExtension extends MProvider {
         } catch (e) {}
         var word = text.toLowerCase().split(" ")[0];
         var best = null;
-        for (var j = 0; j < patterns.length; j++) {
-            try {
-                var url = fill(patterns[j]);
-                var res = await this.client.get(url, this.headers(site + "/"));
-                if (res.statusCode >= 400) continue;
-                var found = this.cardsOf(String(res.body || ""), url);
-                if (!found.length) continue;
+        var self = this;
+        // Prima i moduli del sito, poi gli indirizzi comuni a gruppi di 4 in
+        // parallelo (prima uno alla volta: fino a 15 richieste in fila).
+        var tryOne = function (j) {
+            var url = fill(patterns[j]);
+            return self.client.get(url, self.headers(site + "/")).then(function (res) {
+                if (res.statusCode >= 400) return null;
+                var found = self.cardsOf(String(res.body || ""), url);
+                if (!found.length) return null;
                 var same = found.filter(function (c) { return homeLinks[c.link]; }).length;
-                if (same >= 6 && same >= found.length / 2) continue;
+                if (same >= 6 && same >= found.length / 2) return null;
                 var hits = found.filter(function (c) {
                     return (c.name + " " + c.link).toLowerCase().indexOf(word) !== -1;
                 }).length;
-                var score = hits / found.length + (j < formCount && found.length >= 3 ? 0.3 : 0);
-                if (!best || score > best.score) best = { score: score, index: j, url: url };
-                if (score >= 0.5) break;
-            } catch (e) {}
+                return { score: hits / found.length + (j < formCount && found.length >= 3 ? 0.3 : 0), index: j, url: url };
+            }).catch(function () { return null; });
+        };
+        var groups = [];
+        if (formCount) groups.push(patterns.slice(0, formCount).map(function (_, i) { return i; }));
+        for (var g = formCount; g < patterns.length; g += 4) {
+            var grp = [];
+            for (var gi = g; gi < Math.min(g + 4, patterns.length); gi++) grp.push(gi);
+            groups.push(grp);
+        }
+        for (var gIdx = 0; gIdx < groups.length; gIdx++) {
+            var results = await Promise.all(groups[gIdx].map(tryOne));
+            var good = null;
+            results.forEach(function (r) {
+                if (!r) return;
+                if (!best || r.score > best.score) best = r;
+                if (r.score >= 0.5 && (!good || r.index < good.index)) good = r;
+            });
+            if (good) { best = good; break; }
         }
         if (best && best.score >= 0.15) {
             cache[site] = patterns[best.index];
@@ -1607,7 +1695,7 @@ class DefaultExtension extends MProvider {
         if (!list.length && page === 1 && withSelf) {
             list.push({ name: pageTitle(html) || url, imageUrl: "", link: url });
         }
-        if (!list.length && page === 1 && this.setting(PREF_DEBUG) === true) {
+        if (!list.length && page === 1 && this.debugOn()) {
             throw new Error(this.diagnose(html, "nessuna scheda"));
         }
         return { list: list, hasNextPage: !!next && cards.length > 0 };
@@ -1621,8 +1709,25 @@ class DefaultExtension extends MProvider {
         return this.directCandidates(html, url).length > 0;
     }
 
-    // Schede con immagine che portano ad altre pagine dello stesso sito.
+    // Le stesse schede servono più volte per la stessa pagina (lista, schede
+    // «video», verifica età): si calcolano una volta. Copie, perché chi le usa
+    // poi modifica il link.
     cardsOf(html, pageUrl) {
+        this._cardsMemo = this._cardsMemo || [];
+        for (var i = 0; i < this._cardsMemo.length; i++) {
+            var e = this._cardsMemo[i];
+            if (e.url === pageUrl && e.html === html) {
+                return e.list.map(function (c) { return { name: c.name, imageUrl: c.imageUrl, link: c.link }; });
+            }
+        }
+        var list = this.computeCards(html, pageUrl);
+        this._cardsMemo.unshift({ url: pageUrl, html: html, list: list.map(function (c) { return { name: c.name, imageUrl: c.imageUrl, link: c.link }; }) });
+        if (this._cardsMemo.length > 4) this._cardsMemo.pop();
+        return list;
+    }
+
+    // Schede con immagine che portano ad altre pagine dello stesso sito.
+    computeCards(html, pageUrl) {
         var out = [];
         var site = siteOf(pageUrl);
         var re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
@@ -1702,7 +1807,7 @@ class DefaultExtension extends MProvider {
         all.forEach(function (c) { delete c._untitled; });
         // «Verify your age» non è un video: se il titolo non si è potuto sostituire, si toglie.
         all = all.filter(function (c) { return !ageJunkTitle(c.name); });
-        if (this.setting(PREF_DEBUG) === true) {
+        if (this.debugOn()) {
             var fam = siteFamily(html);
             all.forEach(function (c) { c.name += " · " + fam; });
         }
@@ -1865,7 +1970,7 @@ class DefaultExtension extends MProvider {
         var notes = [];
         if (facts.duration) notes.push("Durata: " + facts.duration);
         if (facts.date) notes.push("Data: " + facts.date);
-        if (this.setting(PREF_DEBUG) === true) notes.push("Parser: " + siteFamily(html));
+        if (this.debugOn()) notes.push("Parser: " + siteFamily(html));
         if (notes.length) description = (description ? description + "\n\n" : "") + notes.join("\n");
 
         var chapters = this.episodesOf(html, link);
@@ -2007,6 +2112,14 @@ class DefaultExtension extends MProvider {
         return videos;
     }
 
+    // Intestazioni per il player. Senza User-Agent il player di Mangayomi si
+    // presenta come «libmpv», e molti server video lo rallentano o lo rifiutano.
+    playerHeaders(referer) {
+        var h = this.headers(referer);
+        h["User-Agent"] = UA;
+        return h;
+    }
+
     video(url, label, quality, referer) {
         var isHls = /\.m3u8(\?|$)/i.test(url);
         var name = label + (quality ? " " + quality + "p" : isHls ? " Auto" : "") + (isHls ? " (HLS)" : "");
@@ -2014,7 +2127,7 @@ class DefaultExtension extends MProvider {
             url: url,
             originalUrl: url,
             quality: name,
-            headers: this.headers(referer),
+            headers: this.playerHeaders(referer),
             _score: isHls && !quality ? 100000 : quality * 10 + (isHls ? 1 : 2),
         };
     }
@@ -2188,8 +2301,13 @@ class DefaultExtension extends MProvider {
 
     async saturnVideos(link, path) {
         var origin = originOf(link);
-        var res = await this.client.get(origin + "/api/watch/" + path, this.headers(origin + "/anime/" + path));
-        var data = JSON.parse(res.body);
+        var data = null;
+        try {
+            var res = await this.client.get(origin + "/api/watch/" + path, this.headers(origin + "/anime/" + path));
+            data = JSON.parse(res.body);
+        } catch (e) {
+            return [];
+        }
         if (!data || !data.ok) return [];
         var out = [];
         var servers = data.servers && data.servers.length ? data.servers : [{ name: "AnimeSaturn", link: data.videoUrl, embed: true }];

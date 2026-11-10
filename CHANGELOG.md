@@ -1,5 +1,19 @@
 # Novità
 
+## Link universale 1.4.18
+
+- **Video più affidabili nel player**: il player ora si presenta al server del video come un browser. Prima si presentava come «libmpv», e molti server video lo rallentavano o lo rifiutavano (rotellina infinita).
+- **Ricerca riparata su FetishShrine, PornID, PornWhite, Porntrex e simili**: le categorie ricordate perdevano la barra finale dell'indirizzo (es. `/categories/milf/` → `/categories/milf`, che dà «non trovato») e l'errore bloccava tutta la ricerca. Ora l'indirizzo resta com'è e, se una categoria non si apre, si passa alla ricerca normale.
+- **Più veloce**:
+  - l'elenco dei siti e l'interruttore Diagnostica non si rileggono più dalle impostazioni più volte per ogni azione;
+  - le schede di una pagina si analizzano una volta sola (prima fino a 3);
+  - il filtro Categoria ricorda per 3 giorni quale pagina usare su ogni sito (o che non c'è): niente più download di home e /categories a ogni ricerca;
+  - la prima ricerca su un sito nuovo prova gli indirizzi a gruppi in parallelo invece che uno alla volta.
+- **Connessione che salta**: l'estensione riprova una volta da sola; se non va, un messaggio chiaro al posto dell'errore tecnico.
+- AnimeSaturn: una risposta strana del sito non blocca più il video.
+- Domini come *.co.uk o *.com.co riconosciuti correttamente.
+- FapSter tolto dai siti pronti: molti video ora rimandano a un altro sito o non esistono più.
+
 ## Link universale 1.4.17
 
 - **Più veloce ad aprire i video**:
