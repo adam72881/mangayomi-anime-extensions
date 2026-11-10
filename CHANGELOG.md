@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.17
+
+- L'estensione usa stripchat.com per la Webview e per tutte le richieste. Il sito italiano si usa solo se stripchat.com non risponde.
+
 ## Stripchat 1.3.16
 
 - Le copertine sono l'anteprima della diretta, non la foto profilo.

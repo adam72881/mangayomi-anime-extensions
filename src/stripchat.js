@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.16",
+        "version": "1.3.17",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,9 +22,9 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.16";
+const VERSION = "1.3.17";
 const API = "https://go.stripchat.com/api/models";
-const FRONT = "https://ita.stripchat.com/api/front/models";
+const FRONT = "https://stripchat.com/api/front/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
@@ -265,20 +265,34 @@ class DefaultExtension extends MProvider {
         return "girls";
     }
 
+    // stripchat.com ovunque. ita solo se stripchat.com non risponde.
+    async apiFirst(path, refererPath) {
+        var hosts = [BASE, "https://ita.stripchat.com"];
+        var last = null;
+        for (var i = 0; i < hosts.length; i++) {
+            try {
+                var res = await this.apiJson(hosts[i] + path, {
+                    "Referer": hosts[i] + (refererPath || "/"),
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+                });
+                if (res && res.data && res.status < 500) return res;
+                last = res;
+            } catch (e) {}
+        }
+        return last || { status: 0, data: null, body: "" };
+    }
+
     // Una pagina di /api/front/models (ha presets). null = il filtro non è accettato.
     async frontBatch(offset, opts, sort) {
         var slug = (opts && (opts.country || opts.category)) || "";
         if (opts && opts.isNew && !slug) slug = "new";
         var tagId = slug === "new" ? "autoTagNew" : TAG_IDS[slug];
         if (slug && !tagId) return null;
-        var url = FRONT + "?limit=" + PER_PAGE + "&offset=" + offset + "&primaryTag=" + this.primaryTag(opts && opts.gender);
-        if (tagId) url += "&filterGroupTags=" + encodeURIComponent(JSON.stringify([[tagId]]));
-        if (sort) url += "&sortBy=" + encodeURIComponent(sort);
-        var res = await this.apiJson(url, {
-            "Referer": "https://ita.stripchat.com/",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-        });
+        var path = "/api/front/models?limit=" + PER_PAGE + "&offset=" + offset + "&primaryTag=" + this.primaryTag(opts && opts.gender);
+        if (tagId) path += "&filterGroupTags=" + encodeURIComponent(JSON.stringify([[tagId]]));
+        if (sort) path += "&sortBy=" + encodeURIComponent(sort);
+        var res = await this.apiFirst(path, "/");
         if (!res.data || !res.data.models) return null;
         if (tagId && !res.data.models.length && !(res.data.filteredCount > 0)) return null;
         var total = res.data.filteredCount || res.data.totalCount || 0;
@@ -387,7 +401,7 @@ class DefaultExtension extends MProvider {
     }
 
     async featuredModels(topLimit) {
-        var origins = ["https://stripchat.com", "https://ita.stripchat.com"];
+        var origins = [BASE, "https://ita.stripchat.com"];
         for (var i = 0; i < origins.length; i++) {
             var res = await this.apiJson(this.v2HomeUrl(origins[i], topLimit), {
                 "Referer": origins[i] + "/",
@@ -455,7 +469,7 @@ class DefaultExtension extends MProvider {
             var path = "/api/front/models?limit=60&offset=" + offset + "&primaryTag=girls&filterGroupTags="
                 + encodeURIComponent("[[\"recommended\"]]") + "&sortBy=recommendedScore" + flags;
             var res = null;
-            var origins = ["https://stripchat.com", "https://ita.stripchat.com"];
+            var origins = [BASE, "https://ita.stripchat.com"];
             for (var i = 0; i < origins.length; i++) {
                 try {
                     res = await this.apiJson(origins[i] + path, {
@@ -572,10 +586,9 @@ class DefaultExtension extends MProvider {
     // Stato vero della stanza quando non è tra le prime dell'API partner.
     async frontByName(name) {
         if (!name) return null;
-        var url = "https://ita.stripchat.com/api/front/v4/models/search/group/username?query=" + encodeURIComponent(name) + "&primaryTag=girls&limit=8";
         var res;
         try {
-            res = await this.apiJson(url, { "Referer": "https://ita.stripchat.com/", "Accept": "application/json, text/plain, */*" });
+            res = await this.apiFirst("/api/front/v4/models/search/group/username?query=" + encodeURIComponent(name) + "&primaryTag=girls&limit=8", "/");
         } catch (e) {
             return null;
         }
@@ -591,15 +604,12 @@ class DefaultExtension extends MProvider {
     // login: Mangayomi tiene i cookie dell'ultimo indirizzo visitato e toglie
     // quelli dell'altro, quindi login (e Cloudflare) valgono su uno solo dei due.
     // Si provano tutti e due e si ricorda quello che funziona.
-    // Webview: baseUrl è stripchat.com (come l'API dei preferiti che funziona nel
-    // browser). Poi ita, dove la Webview spesso finisce. Stesso schema di host di
-    // Chaturbate, senza riusarne il codice: si prova il host di base e quello
-    // italiano, e si ricorda quello che restituisce l'elenco.
+    // Preferiti e home: prima stripchat.com (baseUrl, Webview e API). ita solo se non risponde.
     siteHosts() {
-        var all = [BASE, "https://ita.stripchat.com", "https://www.stripchat.com"];
+        var all = [BASE, "https://ita.stripchat.com"];
         var first = this._site;
-        if (first && all.indexOf(first) !== -1) {
-            return [first].concat(all.filter(function (h) { return h !== first; }));
+        if (first && all.indexOf(first) !== -1 && first !== BASE) {
+            return [BASE, first];
         }
         return all;
     }
@@ -1015,10 +1025,7 @@ class DefaultExtension extends MProvider {
         for (var offset = 0; offset <= 120; offset += 60) {
             var res;
             try {
-                res = await this.apiJson(FRONT + "?limit=60&offset=" + offset + "&primaryTag=girls", {
-                    "Referer": "https://ita.stripchat.com/",
-                    "Accept": "application/json, text/plain, */*",
-                });
+                res = await this.apiFirst("/api/front/models?limit=60&offset=" + offset + "&primaryTag=girls", "/");
             } catch (e) {
                 break;
             }
@@ -1163,11 +1170,7 @@ class DefaultExtension extends MProvider {
         var tags = tag === "girls" ? ["girls"] : [tag, "girls"];
         for (var t = 0; t < tags.length; t++) {
             var pages = await Promise.all([0, 60, 120].map(function (offset) {
-                return this.apiJson("https://ita.stripchat.com/api/front/models?limit=60&offset=" + offset + "&primaryTag=" + tags[t], {
-                    "Referer": "https://ita.stripchat.com/",
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-                }).catch(function () { return { data: null }; });
+                return this.apiFirst("/api/front/models?limit=60&offset=" + offset + "&primaryTag=" + tags[t], "/").catch(function () { return { data: null }; });
             }, this));
             for (var p = 0; p < pages.length; p++) {
                 var models = (pages[p].data && pages[p].data.models) || [];
@@ -1180,12 +1183,20 @@ class DefaultExtension extends MProvider {
         }
         var page;
         try {
-            page = await this.client.get("https://ita.stripchat.com/" + encodeURIComponent(name), {
-                "Referer": "https://ita.stripchat.com/",
+            page = await this.client.get(BASE + "/" + encodeURIComponent(name), {
+                "Referer": BASE + "/",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
                 "User-Agent": UA,
             });
+            if (!page || page.statusCode >= 400) {
+                page = await this.client.get("https://ita.stripchat.com/" + encodeURIComponent(name), {
+                    "Referer": "https://ita.stripchat.com/",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+                    "User-Agent": UA,
+                });
+            }
         } catch (e) {
             return { presets: [], hls: "", source: "" };
         }
