@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.3
+
+- **La diretta restava a girare con «Ho fatto il login: cerca l'HD» attivo:** per l'account il sito dà una diretta con i pezzi del video nascosti, che il player non può aprire. Ora l'estensione la controlla prima e, se è così, usa la diretta normale.
+- **Preferiti:** la pagina del sito non ha più i dati dove li cercavo. Ora l'estensione li cerca anche nei dati sparsi nella pagina e nelle schede delle modelle. Se non li trova, il messaggio dice cosa contiene la pagina, così si può sistemare.
+
 ## Stripchat 1.3.2
 
 - **Preferiti:** il sito rispondeva «406» perché la richiesta non diceva di volere una pagina web, come fa un browser. Ora lo dice. Se c'è ancora un errore, il messaggio mostra anche il titolo della pagina ricevuta.

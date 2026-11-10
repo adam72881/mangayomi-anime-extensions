@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.2",
+        "version": "1.3.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -338,13 +338,69 @@ class DefaultExtension extends MProvider {
         return me && (me.id || me.username) && me.isGuest !== true ? me : null;
     }
 
+    // L'elenco più lungo di modelle (oggetti con username e id) nei dati della pagina.
+    stateModels(data, me) {
+        var best = [];
+        var walk = function (x, depth) {
+            if (!x || typeof x !== "object" || depth > 8) return;
+            if (Array.isArray(x)) {
+                var models = x.filter(function (o) { return o && typeof o === "object" && o.username && o.id && o.username !== me.username; });
+                if (models.length > best.length && models.length >= x.length / 2) best = models;
+                x.forEach(function (o) { walk(o, depth + 1); });
+                return;
+            }
+            Object.keys(x).forEach(function (k) { walk(x[k], depth + 1); });
+        };
+        walk(data, 0);
+        return best;
+    }
+
+    // Pagina senza __PRELOADED_STATE__: modelle dai dati JSON sparsi nella
+    // pagina («"username":"…"» con il loro id) o, in mancanza, dalle schede.
+    htmlModels(body) {
+        var text = body.replace(/\\"/g, '"').replace(/\\u002[fF]/g, "/");
+        var out = [], seen = {};
+        var re = /\{[^{}]{0,3000}?"username":"([A-Za-z0-9_-]+)"[^{}]{0,3000}?\}/g, m;
+        while ((m = re.exec(text)) !== null) {
+            var o = null;
+            try { o = JSON.parse(m[0]); } catch (e) {}
+            var id = o ? o.id : (m[0].match(/"id":(\d+)/) || [])[1];
+            if (!id || seen[m[1].toLowerCase()]) continue;
+            seen[m[1].toLowerCase()] = true;
+            out.push(o && o.id ? o : { id: id, username: m[1], status: (m[0].match(/"status":"(\w+)"/) || [])[1] });
+        }
+        if (out.length) return out;
+        var cards = /<a\b[^>]*>/g, a;
+        while ((a = cards.exec(body)) !== null) {
+            if (!/class="[^"]*model[^"]*"/i.test(a[0])) continue;
+            var name = (a[0].match(/href="(?:https?:\/\/[^"\/]+)?\/([A-Za-z0-9_-]{2,})"/) || [])[1];
+            if (!name || seen[name.toLowerCase()] || /^(favorites|girls|couples|men|trans|login|signup|tags)$/i.test(name)) continue;
+            seen[name.toLowerCase()] = true;
+            out.push({ id: "", username: name });
+        }
+        return out;
+    }
+
+    // Per capire dove il sito mette i preferiti quando non li trovo.
+    pageHints(body) {
+        var title = (body.match(/<title>([^<]{0,40})/i) || ["", "senza titolo"])[1];
+        var apis = {};
+        (body.match(/\/api\/front\/[A-Za-z0-9_\/{}-]+/g) || []).forEach(function (x) { apis[x] = 1; });
+        var globals = {};
+        (body.match(/window\.__?[A-Za-z_]+__?\s*=/g) || []).forEach(function (x) { globals[x.replace(/\s*=$/, "")] = 1; });
+        return title + ", " + Math.round(body.length / 1024) + "KB, username×" + (body.match(/username/g) || []).length +
+            ", model-list×" + (body.match(/model-list/g) || []).length +
+            (Object.keys(globals).length ? ", " + Object.keys(globals).slice(0, 4).join(" ") : "") +
+            (Object.keys(apis).length ? ", " + Object.keys(apis).slice(0, 4).join(" ") : "");
+    }
+
     // Preferite con l'account: dopo il login nella Webview i cookie passano
     // all'estensione e la pagina /favorites del sito ha l'elenco nei suoi dati.
     async favorites(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         var hosts = this.siteHosts();
-        var data = null, me = null, notes = [], blocked = false, guest = false;
-        for (var h = 0; h < hosts.length && !me; h++) {
+        var best = null, notes = [], blocked = false, guest = false;
+        for (var h = 0; h < hosts.length && !best; h++) {
             var res;
             try {
                 // Senza «Accept» da pagina web il sito risponde 406.
@@ -364,42 +420,31 @@ class DefaultExtension extends MProvider {
                 continue;
             }
             var d = this.preloadedState(body);
-            var hint = d ? "" : ", senza dati «" + ((body.match(/<title>([^<]{0,60})/i) || ["", body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60)])[1]) + "»";
-            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + hint);
-            if (!d) continue;
-            if (!this.loggedUser(d)) { guest = true; continue; }
-            data = d;
-            me = this.loggedUser(d);
-            this._site = hosts[h];
+            var me = d ? this.loggedUser(d) : null;
+            if (d && !me) { guest = true; continue; }
+            var models = d ? this.stateModels(d, me) : this.htmlModels(body);
+            if (models.length) {
+                best = models;
+                this._site = hosts[h];
+                break;
+            }
+            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + this.pageHints(body));
         }
-        if (!me) {
+        if (!best) {
             if (guest) throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
             if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
-            throw new Error("Non riesco a leggere i preferiti di Stripchat (" + notes.join("; ") + "). Mandami questo messaggio.");
+            throw new Error("Non riesco a leggere i preferiti di Stripchat [" + notes.join(" | ") + "]. Mandami questo messaggio.");
         }
-        // L'elenco più lungo di modelle (oggetti con username e id) nei dati della pagina.
-        var best = [];
-        var walk = function (x, depth) {
-            if (!x || typeof x !== "object" || depth > 8) return;
-            if (Array.isArray(x)) {
-                var models = x.filter(function (o) { return o && typeof o === "object" && o.username && o.id && o.username !== me.username; });
-                if (models.length > best.length && models.length >= x.length / 2) best = models;
-                x.forEach(function (o) { walk(o, depth + 1); });
-                return;
-            }
-            Object.keys(x).forEach(function (k) { walk(x[k], depth + 1); });
-        };
-        walk(data, 0);
-        if (!best.length) throw new Error("Non hai ancora modelle preferite su Stripchat (o il sito le mostra in un altro modo: aprile dalla Webview).");
         var self = this;
         var seenIds = {};
         var list = [];
         best.forEach(function (o) {
-            if (seenIds[o.id]) return;
-            seenIds[o.id] = true;
+            var key = String(o.username).toLowerCase();
+            if (seenIds[key]) return;
+            seenIds[key] = true;
             var live = o.status === "public" || o.isLive === true || o.isOnline === true;
             var known = self.seen[String(o.username).toLowerCase()];
-            var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + "#id=" + o.id };
+            var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
             if (!known) self.seen[String(o.username).toLowerCase()] = Object.assign({ _at: 0 }, o);
             c.name = (live ? "● " : "") + c.name.replace(/^● /, "");
             c._live = live;
@@ -552,7 +597,27 @@ class DefaultExtension extends MProvider {
         var best = out.reduce(function (a, v) { return Math.max(a, v._h); }, 0);
         out.sort(function (a, b) { return b._h - a._h; });
         out.forEach(function (v) { delete v._h; });
-        return best > 480 ? out : [];
+        if (best <= 480 || !(await this.playable(out[0].url, headers))) return [];
+        return out;
+    }
+
+    // Il sito può dare all'account una diretta con i nomi dei pezzi nascosti
+    // («#EXT-X-MOUFLON:FILE/URI» e al posto del pezzo un finto «media.mp4»):
+    // il player resta a girare. Quella si scarta e resta la diretta normale.
+    async playable(url, headers) {
+        try {
+            var body = String((await this.client.get(url, headers)).body || "");
+            if (body.indexOf("#EXT-X-STREAM-INF") !== -1) {
+                var next = body.split(/\r?\n/).filter(function (l) { return l && l.charAt(0) !== "#"; })[0];
+                if (!next) return false;
+                url = /^https?:/i.test(next) ? next : url.replace(/[^\/]*$/, "") + next;
+                body = String((await this.client.get(url, headers)).body || "");
+            }
+            var segs = body.split(/\r?\n/).filter(function (l) { return l && l.charAt(0) !== "#"; });
+            return segs.length > 0 && !/#EXT-X-MOUFLON:(FILE|URI)/.test(body) && !segs.some(function (l) { return /(^|\/)media\.mp4(\?|$)/.test(l); });
+        } catch (e) {
+            return false;
+        }
     }
 
     getFilterList() {

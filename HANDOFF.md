@@ -24,7 +24,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.3.2 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.3.3 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -271,6 +271,7 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 
 - **11/11/2026 — Italia:** dall'Italia Chaturbate risponde alle API con la pagina «Verify your age — Visitors in Italy must verify their age» (Yoti / Face Scan / AgeKey; scade con l'inattività). Obbligo di legge: **non si aggira**. Le estensioni riconoscono la pagina (HTML al posto del JSON, o 401/403/451 con testo di verifica età) e dicono di completarla nella Webview. Da qui (USA) le API rispondono normalmente, quindi i test cloud non vedono questo caso.
 
+- **Stripchat 1.3.3:** con 1.3.2 `/favorites` → 200 ma senza `__PRELOADED_STATE__` (ita: shell SPA che inizia con `window.CSP_REPORT_URI`; stripchat.com: titolo «I miei Preferiti | St…»). `htmlModels()` (JSON sparso `"username"`+id, poi `<a class="…model…" href="/nome">`) e `pageHints()` per la diagnosi dal telefono. Con HD account la diretta girava a vuoto: i link dati all'account usano MOUFLON (nomi dei pezzi nascosti, `media.mp4` finto). Decifrarlo = aggirare la protezione del sito → NON farlo; `playable()` li scarta. Le dirette dell'API partner hanno pezzi in chiaro (provato).
 - **Stripchat 1.3.2 — 406:** dal telefono (1.3.1, loggato) `/favorites` dava 406 su entrambi gli host. Mangayomi non manda `Accept`: aggiunto Accept HTML (e JSON per l'API in `accountStreams`). UA non toccato: il client usa già quello della Webview (`settings.userAgent`), che serve a Cloudflare. Non verificato dal vivo.
 - **Stripchat 1.3.1 — ita.stripchat.com:** stesso problema dei cookie per host di Chaturbate: utente loggato nella Webview su ita.stripchat.com (Preferiti visibili), estensione su stripchat.com → «Non riesco a leggere i preferiti». `siteHosts()` (ita prima) per `/favorites` e `accountStreams`; `preloadedState()` conta le graffe (prima la regex voleva `}</script>` subito dopo). Non provato dal vivo: Cloudflare blocca il cloud; provato con pagina finta.
 - **Chaturbate 1.3.3 — token monouso:** `hls_source` (`…/llhls.m3u8?token=…`, LL-HLS fMP4) risponde 200 alla prima GET e 403 dopo (provato nella stessa sessione `requests`). Mai aprirlo prima del player in Auto; con qualità fissa si legge il master e si danno le chunklist `?session=` (riusabili), altrimenti `freshAuto()` richiede un nuovo contesto.
