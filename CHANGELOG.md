@@ -1,5 +1,12 @@
 # Novità
 
+## Link universale 1.4.14
+
+- **Siti che caricano i video dopo** (la pagina arriva vuota e lo script li chiede con una seconda richiesta, es. javhd.today): l'estensione fa la stessa richiesta e mostra i video veri invece delle sole categorie.
+- **Aprire una categoria, un'attrice o una ricerca** non dà più «Nessun file mp4/HLS»: la scheda mostra i video che contiene come episodi.
+- **Server del player scritti in base64** nella pagina (pulsanti «Server 1 / Server 2»): l'estensione li legge e apre il player del server.
+- Niente più bandierine delle lingue («chi-CN», «en-US») tra i video.
+
 ## Link universale 1.4.13
 
 - Tre siti pronti in più con i video funzionanti: **FPO.xxx**, **JavBangers** (JAV) e **TubeV**.

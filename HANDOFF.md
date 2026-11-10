@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.13 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.14 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -232,3 +232,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **1.4.12 (10 novembre 2026):** `READY` + sexu.com, pornrewind.com. Provati e scartati: fpo.xxx, hdtube.porn, javbangers (lista e miniature sì, i link video rispondono 403/404), mylust (alcune qualità 410), tubev.sex (qualità dubbie 250p/100p), iceporn, javtiful, pornhits, pornxp, pornheed, pornjam, pornburst, xxxvideo.link, porntn (nessun video), bdsmx.tube, javfinder, javmost, vxxx, manysex, sexo.com (lista vuota), 4kporn, fapcat, fuqer, porndish, yourlust (verifica anti-bot), bdsmdoe (502). theporndude.com risponde 403.
 
 - **1.4.13 — attenzione ai test:** da questo ambiente cloud ogni richiesta esce con un IP diverso (6 IP su 6 richieste). I siti KVS (fpo.xxx, javbangers…) legano `get_file` all'IP della pagina, quindi da qui il video risponde 403 ma sul telefono (un IP solo) funziona. Per provarli serve pagina e video sulla stessa connessione: `python3 -I scratchpad/kvs/same_ip.py <host>` (requests.Session, tunnel riusato). Aggiunti fpo.xxx, javbangers, tubev.sex. `NOT_THE_VIDEO` scarta `/vp/<n>/` e `/p320-180.mp4` (anteprime TubeV). Video doppi tolti per URL senza query; `qualityOf` ignora numeri fuori 144–2160. hdtube.porn: 404 anche con lo stesso IP; mylust: link variabili, alcuni 410.
+
+- **1.4.14:** `withLazyList(html,url)`: se ci sono meno di 6 schede «da video» (numero o slug lungo nel link) cerca nello script `fetch('…ajax|load|list|more|page…')`, `$.get`, `axios.get`, fa la richiesta (stesso sito, Referer pagina) e aggiunge l'HTML (JSON → campo html/content/data/items). Usata in `listing` e in `getDetail`. `getDetail`: pagina senza video e con 3+ schede → le schede diventano episodi (categorie, attrici). `videosFromHtml`: attributi `data-embed|src|link|url|video|server|href|player|iframe` in base64 che decodificano in un URL → iframe da seguire (javhd.today: cloudwish.xyz e mycloudz.cc, packer + JW Player → master.m3u8 trovato; da qui il CDN non risponde, IP che cambia). Bandierine: nomi `xx-YY` / `xxxx-YY` e immagini `/flags/` scartati.

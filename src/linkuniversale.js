@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.13",
+        "version": "1.4.14",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -583,8 +583,8 @@ function qualityOf(url, objectText) {
     if (/[_\/-](hd|high)[_.\/-]|VideoUrlHigh/i.test(url + " " + objectText)) return 720;
     var near = String(objectText || "").match(/["']?(?:quality|label|res|resolution|height)["']?\s*[:=]\s*["']?(\d{3,4})/i);
     var q = near ? parseInt(near[1], 10) : 0;
-    // Numeri vicini che non sono una qualità (100, 4320…): meglio nessuna etichetta.
-    return q >= 144 && q <= 2160 ? q : 0;
+    // Numeri vicini che non sono una qualità (100, 1794…): meglio nessuna etichetta.
+    return [144, 240, 360, 480, 540, 576, 720, 1080, 1440, 2160].indexOf(q) !== -1 ? q : 0;
 }
 
 // Nome dell'attributo o della chiave appena prima del link: dice se è il video
@@ -1383,6 +1383,38 @@ class DefaultExtension extends MProvider {
         throw new Error("Non ho trovato come cerca questo sito. Puoi incollare nella ricerca il link della pagina dei risultati.");
     }
 
+    // Pagine che caricano i video dopo, con una seconda richiesta dello script
+    // (es. fetch('?ajax=1') su javhd.today): se le schede-video sono poche, la
+    // si fa anche qui e si aggiunge il suo HTML. Risposta JSON: campo html/content.
+    async withLazyList(html, url) {
+        // Schede che sembrano video: un numero o un titolo lungo nel link (le
+        // categorie tipo /big-tits/ non contano).
+        var videoCards = this.cardsOf(html, url).filter(function (c) {
+            var path = c.link.split("#")[0].replace(/^https?:\/\/[^\/]+/, "");
+            return !SIDE_PATH.test(path) && /\d{3,}|[a-z0-9]+(?:[-_][a-z0-9]+){3,}/i.test(path);
+        });
+        if (videoCards.length >= 6) return html;
+        var m = html.match(/\b(?:fetch|\$\.get|\$\.ajax|axios\.get)\(\s*\{?\s*(?:url\s*:\s*)?["'`]([^"'`]*(?:ajax|load|list|more|page)[^"'`]*)["'`]/i);
+        if (!m) return html;
+        var target = m[1].charAt(0) === "?" ? url.split("?")[0] + m[1] : resolveUrl(m[1], url);
+        if (!target || siteOf(target) !== siteOf(url) || /[{}$]/.test(target)) return html;
+        try {
+            var res = await this.client.get(target, { "Referer": url });
+            if (res.statusCode >= 400) return html;
+            var body = String(res.body || "");
+            if (/^\s*[{[]/.test(body)) {
+                try {
+                    var data = JSON.parse(body);
+                    var part = data && (data.html || data.content || data.data || data.items);
+                    if (typeof part === "string") body = part;
+                } catch (e) {}
+            }
+            return html + "\n" + body;
+        } catch (e) {
+            return html;
+        }
+    }
+
     async listing(start, page, withSelf) {
         var nextPages = this.readJson(PREF_NEXT, {});
         var url = page > 1 ? nextPages[start + "#" + page] : start;
@@ -1390,6 +1422,7 @@ class DefaultExtension extends MProvider {
 
         var html = await this.fetchHtml(url, originOf(url) + "/");
         try { this.noteCategories(originOf(url) || url, html, url); } catch (e) {}
+        html = await this.withLazyList(html, url);
         var list = [];
         if (withSelf && page === 1 && this.looksLikeVideoPage(url, html)) {
             var self = {
@@ -1486,6 +1519,10 @@ class DefaultExtension extends MProvider {
         all = all.filter(function (c) {
             var p = c.link.replace(/^https?:\/\/[^\/]+/, "").replace(/\/+$/, "");
             return p !== herePath;
+        });
+        // Bandierine delle lingue: «chi-CN», «en-US», immagini /flags/.
+        all = all.filter(function (c) {
+            return !/^[a-z]{2,4}[-_][a-z]{2}$/i.test(String(c.name).trim()) && !/\/flags?\//i.test(c.imageUrl || "");
         });
         all = all.filter(function (c) {
             return !(hostOf(c.link) !== here && /^[a-z]{2}(-[a-z]{2})?\./.test(hostOf(c.link)) && /^(deutsch|english|español|espanol|français|francais|italiano|português|portugues|русский|日本語|中文|nederlands|polski|türkçe|[a-z]{2})$/i.test(c.name.trim()));
@@ -1680,6 +1717,21 @@ class DefaultExtension extends MProvider {
         if (notes.length) description = (description ? description + "\n\n" : "") + notes.join("\n");
 
         var chapters = this.episodesOf(html, link);
+        var pathOnly = link.split("#")[0].replace(/^https?:\/\/[^\/]+/, "");
+        var videoish = this.looksLikeVideoPage(link, html) ||
+            /\/(video|videos|watch|v|embed|view_video|movie|play)[\/.?_-]|\d{4,}/i.test(pathOnly) ||
+            /jwplayer|videojs|video-js|flowplayer|plyr|kt_player|html5player|data-embed=|<iframe\b[^>]*(player|embed)/i.test(html);
+        if (!chapters.length && !videoish) {
+            // Una categoria, un'attrice, una ricerca: niente video da far partire,
+            // ma tanti video dentro. Diventano gli episodi della scheda.
+            var inside = this.cardsOf(await this.withLazyList(html, link), link).filter(function (c) {
+                return !SIDE_PATH.test(c.link.replace(/^https?:\/\/[^\/]+/, "")) && c.link.split("#")[0] !== link;
+            });
+            if (inside.length >= 3) {
+                chapters = inside.slice(0, 80).map(function (c) { return { name: c.name, url: c.link }; });
+                if (!image && inside[0].imageUrl) image = inside[0].imageUrl;
+            }
+        }
         if (!chapters.length) chapters = [{ name: facts.duration ? "Video · " + facts.duration : "Video", url: link }];
 
         this.remember({ name: title, imageUrl: image, link: link });
@@ -1884,6 +1936,14 @@ class DefaultExtension extends MProvider {
         while ((m = re.exec(html)) !== null) {
             var f = resolveUrl(m[1], pageUrl);
             if (f && !AD_HOSTS.test(f) && !/youtube\.com|youtu\.be/i.test(f) && frames.indexOf(f) === -1) frames.push(f);
+        }
+        // Server del player scritti in base64 negli attributi (data-embed="aHR0cHM6…"):
+        // il pulsante del server li decodifica e li mette nell'iframe.
+        var b64re = /\bdata-(?:embed|src|link|url|video|server|href|player|iframe)\s*=\s*["']([A-Za-z0-9+\/=_-]{16,})["']/gi, b;
+        while ((b = b64re.exec(html)) !== null) {
+            var dec = "";
+            try { dec = base64Decode(b[1].replace(/-/g, "+").replace(/_/g, "/")); } catch (e) { dec = ""; }
+            if (/^https?:\/\/[^\s"'<>]+$/.test(dec) && !AD_HOSTS.test(dec) && frames.indexOf(dec) === -1) frames.unshift(dec);
         }
         // Player dichiarati nei dati della pagina (JSON-LD embedUrl, og:video che è una pagina).
         var decl = unescapeJs(html).match(/"embedUrl"\s*:\s*"([^"]+)"/i);
