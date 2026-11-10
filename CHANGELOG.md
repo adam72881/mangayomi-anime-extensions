@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.7
+
+- **Preferiti:** l'estensione leggeva il punto sbagliato della pagina, cioè un pezzo di codice che nomina i dati, invece dei dati veri. Ora cerca il punto in cui la pagina li scrive.
+
 ## Stripchat 1.3.6
 
 - Se i preferiti non si leggono, il messaggio ora è più corto e mostra la versione e un pezzo dei dati della pagina, così si capisce cosa sistemare.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.6",
+        "version": "1.3.7",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.6";
+const VERSION = "1.3.7";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -315,10 +315,28 @@ class DefaultExtension extends MProvider {
     // le graffe (dopo può esserci «;» o altro codice nello stesso <script>).
     preloadedState(body) {
         this._stateError = "";
-        var i = body.indexOf("__PRELOADED_STATE__");
-        if (i === -1) return null;
-        var start = body.indexOf("{", i);
-        if (start === -1) return null;
+        // Il nome compare anche nel codice della pagina («"__PRELOADED_STATE__" in
+        // window»): serve il punto in cui gli viene dato il valore.
+        var re = /__PRELOADED_STATE__["']?\]?\s*=(?!=)\s*/g, m, start = -1;
+        while ((m = re.exec(body)) !== null) {
+            var after = body.slice(re.lastIndex, re.lastIndex + 12);
+            if (after.charAt(0) === "{") { start = re.lastIndex; break; }
+            var jp = after.match(/^JSON\.parse\(\s*(["'])/);
+            if (jp) {
+                var q = jp[1], k = re.lastIndex + jp[0].length, str = "";
+                while (k < body.length && body.charAt(k) !== q) {
+                    if (body.charAt(k) === "\\") { str += body.substr(k, 2); k += 2; } else { str += body.charAt(k); k++; }
+                }
+                try { return JSON.parse(JSON.parse('"' + str.replace(/\\'/g, "'").replace(/^"|([^\\])"/g, '$1\\"') + '"')); } catch (e) {
+                    this._stateError = "stato JSON.parse non leggibile";
+                    return null;
+                }
+            }
+        }
+        if (start === -1) {
+            this._stateError = "stato senza valore nella pagina";
+            return null;
+        }
         var depth = 0, inStr = false, esc = false;
         for (var j = start; j < body.length; j++) {
             var ch = body.charAt(j);
@@ -441,9 +459,11 @@ class DefaultExtension extends MProvider {
         var globals = {};
         (body.match(/window\.__?[A-Za-z_]+__?\s*=/g) || []).forEach(function (x) { globals[x.replace(/\s*=$/, "")] = 1; });
         var bits = [];
-        var at = body.indexOf("__PRELOADED_STATE__");
-        if (at !== -1) bits.push("inizio «" + body.slice(at + 19, at + 19 + 70).replace(/\s+/g, " ") + "»");
-        var um, ure = /username/g, k = 0;
+        var as = /__PRELOADED_STATE__["']?\]?\s*=(?!=)/.exec(body);
+        if (as) bits.push("valore «" + body.slice(as.index + as[0].length, as.index + as[0].length + 70).replace(/\s+/g, " ") + "»");
+        else bits.push("nomi «" + (body.match(/window\.__[A-Z_]+__/g) || []).filter(function (x, i, a) { return a.indexOf(x) === i; }).slice(0, 4).join(" ") + "»");
+        // Solo dove «username» ha un valore scritto (non il codice della pagina).
+        var um, ure = /username["']?\s*:\s*["']/g, k = 0;
         while ((um = ure.exec(body)) !== null && k < 2) {
             bits.push("«" + body.slice(Math.max(0, um.index - 15), um.index + 30).replace(/\s+/g, " ") + "»");
             k++;
