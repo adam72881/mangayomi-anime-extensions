@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.13",
+        "version": "1.3.14",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.13";
+const VERSION = "1.3.14";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://ita.stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -215,8 +215,18 @@ class DefaultExtension extends MProvider {
 
     // Solo le dirette che si aprono: pubbliche e con il video. Sotto «Ragazze» il
     // sito mette anche molte coppie: si tolgono, se restano abbastanza ragazze.
+    // In diretta pubblica: status public, e se il sito manda isLive/isOnline non devono
+    // essere falsi. La home del sito toglie chi non ha isLive. groupShow e private no.
+    isPublicLive(m) {
+        if (!m || !m.username) return false;
+        if (String(m.status || "") !== "public") return false;
+        if (m.isLive === false || m.isOnline === false) return false;
+        return true;
+    }
+
     watchable(list, gender) {
-        var ok = list.filter(function (m) { return m && m.username && m.status === "public" && m.stream && m.stream.url; });
+        var self = this;
+        var ok = list.filter(function (m) { return self.isPublicLive(m) && m.stream && m.stream.url; });
         if (gender === "girls") {
             var girls = ok.filter(function (m) { return !m.gender || m.gender === "female"; });
             if (girls.length >= 10) ok = girls;
@@ -428,11 +438,30 @@ class DefaultExtension extends MProvider {
                 });
             });
         }
+        if (!fresh) fresh = await this.frontByName(u.name);
         if (fresh) {
             fresh._at = Date.now();
             this.seen[key] = fresh;
         }
         return fresh || known || null;
+    }
+
+    // Stato vero della stanza quando non è tra le prime dell'API partner.
+    async frontByName(name) {
+        if (!name) return null;
+        var url = "https://ita.stripchat.com/api/front/v4/models/search/group/username?query=" + encodeURIComponent(name) + "&primaryTag=girls&limit=8";
+        var res;
+        try {
+            res = await this.apiJson(url, { "Referer": "https://ita.stripchat.com/", "Accept": "application/json, text/plain, */*" });
+        } catch (e) {
+            return null;
+        }
+        var models = (res.data && res.data.models) || [];
+        var key = String(name).toLowerCase();
+        for (var i = 0; i < models.length; i++) {
+            if (models[i] && String(models[i].username).toLowerCase() === key) return this.withStream(models[i]);
+        }
+        return null;
     }
 
     // Il sito ha anche ita.stripchat.com, ed è lì che resta la Webview dopo il

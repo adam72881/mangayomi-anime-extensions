@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.14
+
+- Popolare, Più recente, ricerca e filtri mostrano solo chi è in diretta pubblica. Le stanze spente o in show privato non compaiono. Resta il filtro da 720p in su.
+
 ## Stripchat 1.3.13
 
 - Popolare segue l’ordine della griglia in evidenza, Più recente i consigli. I pulsanti non cambiano nome.
