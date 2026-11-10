@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.9",
+        "version": "1.4.10",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -26,7 +26,8 @@ const mangayomiSources = [
 const BRIDGE = "https://adam72881.github.io/mangayomi-anime-extensions";
 const PREF_HISTORY = "linkuni_history";
 const PREF_NEXT = "linkuni_next_pages";
-const PREF_ADD = "linkuni_add_site";
+const PREF_ADD = "linkuni_add_site_v2";
+const PREF_ADD_OLD = "linkuni_add_site";
 const STORE_SAVED = "linkuni_saved_sites";
 const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
@@ -403,7 +404,7 @@ function tagList(res, mainHost) {
 // Indirizzo di un sito, da un testo libero: con o senza schema, con slash,
 // virgole o più link. Stesso host una volta sola (https al posto di http).
 function normalizeSiteInput(text) {
-    var parts = String(text || "").split(/[\s,;]+/);
+        var parts = String(text || "").replace(/[\u200b\u200c\u200d\ufeff]/g, "").split(/[\s,;]+/);
     var out = [];
     var at = {};
     for (var i = 0; i < parts.length; i++) {
@@ -843,7 +844,13 @@ class DefaultExtension extends MProvider {
     // Mangayomi tiene fissa una lista di scelte una volta creata: per questo le
     // due liste hanno una chiave nuova ogni volta che l'elenco cambia.
     savedSites() {
-        return this.readJson(STORE_SAVED, []);
+        // La stessa istanza JS resta in memoria (getCachedExtensionService).
+        // Il salvataggio su disco è in coda: una lettura subito dopo può
+        // ancora vedere l'elenco vecchio. La copia in memoria è quella vera
+        // finché il processo vive.
+        if (this._liveSaved) return this._liveSaved.slice();
+        var stored = this.readJson(STORE_SAVED, []);
+        return stored && stored.length ? stored : [];
     }
 
     listKey(prefix, sites) {
@@ -865,19 +872,31 @@ class DefaultExtension extends MProvider {
     // aprendo la sorgente: se no il sito resta nel campo e non compare da nessuna parte.
     // Non chiama sites() né applyRename(). get() del campo, se la chiave non è
     // ancora salvata, richiama getSourcePreferences: lì _readingPrefs è già vero.
+    readAddField(key) {
+        try {
+            var value = this.setting(key);
+            if (value == null) return "";
+            return String(value).trim();
+        } catch (e) {
+            return "";
+        }
+    }
+
     takeAddedSites() {
         var saved = this.savedSites().slice();
-        var added = "";
-        try { added = String(this.setting(PREF_ADD) || "").trim(); } catch (e) { return saved; }
-        if (!added) return saved;
+        // Il campo nuovo, altrimenti quello della 1.4.9. get() su una chiave
+        // assente crea la riga vuota: se il campo nuovo è vuoto si legge il vecchio.
+        var added = this.readAddField(PREF_ADD) || this.readAddField(PREF_ADD_OLD);
+        if (!added) {
+            this._liveSaved = saved.slice();
+            return saved;
+        }
         var last = String(this.prefs.getString(STORE_LAST_ADDED, "") || "");
         var parsed = normalizeSiteInput(added);
         var fresh = added !== last;
         if (!parsed.length) {
-            if (fresh) {
-                this.prefs.setString(STORE_ADD_NOTE, "Non ho riconosciuto un indirizzo in «" + added.slice(0, 60) + "».");
-                this.prefs.setString(STORE_LAST_ADDED, added);
-            }
+            if (fresh) this.prefs.setString(STORE_ADD_NOTE, "Non ho riconosciuto un indirizzo in «" + added.slice(0, 60) + "».");
+            this._liveSaved = saved.slice();
             return saved;
         }
         var dismissed = this.readJson(STORE_DISMISS, []);
@@ -894,8 +913,9 @@ class DefaultExtension extends MProvider {
             var host = hostOf(origin);
             if (!fresh && dismissed.indexOf(origin) !== -1) continue;
             if (byHost[host] === undefined) {
-                byHost[host] = saved.length;
-                saved.push(origin);
+                saved.unshift(origin);
+                byHost = {};
+                for (var n = 0; n < saved.length; n++) byHost[hostOf(saved[n])] = n;
                 changed = true;
             } else if (saved[byHost[host]] !== origin && origin.indexOf("https://") === 0) {
                 saved[byHost[host]] = origin;
@@ -904,6 +924,7 @@ class DefaultExtension extends MProvider {
                 hiddenHit = true;
             }
         }
+        this._liveSaved = saved.slice();
         if (changed) this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
         if (fresh) {
             this.prefs.setString(STORE_LAST_ADDED, added);
@@ -925,6 +946,7 @@ class DefaultExtension extends MProvider {
                 var before = saved.length;
                 saved = saved.filter(function (x) { return remove.indexOf(x) === -1; });
                 if (saved.length !== before) {
+                    this._liveSaved = saved.slice();
                     this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
                     this.prefs.setString(STORE_DISMISS, JSON.stringify(dismissed));
                     var offLeft = this.readJson(STORE_SAVED_OFF, []).filter(function (u) { return remove.indexOf(u) === -1; });
@@ -2075,7 +2097,7 @@ class DefaultExtension extends MProvider {
                 key: this.listKey("linkuni_main_", all),
                 listPreference: {
                     title: "Sito principale",
-                    summary: "Quello di Popolari e Recenti, e il primo nel filtro «Sito» della ricerca.",
+                    summary: (saved.length ? "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + ". " : "") + "Popolari e Recenti usano il sito scelto qui. Si cambia toccando la riga.",
                     valueIndex: main < 0 ? 0 : main,
                     entries: all.map(function (x) { return self.siteName(x); }),
                     entryValues: all,
@@ -2132,11 +2154,11 @@ class DefaultExtension extends MProvider {
         var hidden = saved.filter(function (u) { return savedOff.indexOf(u) !== -1; });
         var addNote = String(this.prefs.getString(STORE_ADD_NOTE, "") || "");
         var addSummary = saved.length
-            ? "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + "."
-            : "Scrivi il link della pagina principale, anche senza https. Più siti: separali con uno spazio o una virgola.";
-        if (hidden.length) addSummary += " Nascosti, non cancellati (spunta in «I tuoi siti attivi»): " + hidden.map(function (x) { return self.siteName(x); }).join(", ") + ".";
+            ? "Salvati: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + "."
+            : "Scrivi il link della pagina principale, anche senza https.";
+        if (hidden.length) addSummary += " Nascosti (spunta in «I tuoi siti attivi»): " + hidden.map(function (x) { return self.siteName(x); }).join(", ") + ".";
         if (addNote) addSummary += " " + addNote;
-        addSummary += " Riapri queste impostazioni per vedere l'elenco aggiornato; nel filtro Sito entra rientrando nella sorgente.";
+        addSummary += " Dopo OK chiudi queste impostazioni e riaprile: il nome compare qui e in «Sito principale».";
         prefs.push({
             key: PREF_ADD,
             editTextPreference: {

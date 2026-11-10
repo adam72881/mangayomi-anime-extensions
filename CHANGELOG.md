@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.10
+
+- **Salva un sito, di nuovo.** Dopo OK la schermata già aperta non cambia: Mangayomi non ricostruisce le altre righe. Si chiudono le impostazioni e si riaprono. Allora «Sito principale» scrive «I tuoi siti: …» e, toccando la riga, il sito è in elenco; «I tuoi siti attivi» lo elenca. Se dopo la riapertura il campo è di nuovo vuoto e il sito non c'è, si riscrive il link e si riapre una volta ancora: l'app può aver tenuto una riga vuota davanti a quella con l'indirizzo.
+- Il campo nuovo non cancella i siti già salvati. Quelli della versione precedente, se il campo vecchio li contiene ancora, entrano nell'elenco da soli.
+
 ## Link universale 1.4.9
 
 - **Salva un sito.** Confermare il link non aggiornava l'elenco: il testo restava nel campo e «Sito principale» / «I tuoi siti attivi» / il filtro Sito continuavano a leggere la lista vecchia, finché la sorgente non veniva riletta. Ora il link entra nell'elenco quando si riaprono le impostazioni. Rientra nel filtro Sito quando si esce e si rientra nella sorgente (o con Reset). Un indirizzo senza https, con uno slash finale, o ripetuto, conta una volta sola. I siti già salvati non si cancellano. Se il sito c'è ma è nascosto, il riassunto lo dice invece di sembrare non salvato.

@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.9 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.10 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,12 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.10
+
+Salva un sito, di nuovo. Il contratto di Mangayomi v0.9.95, riprodotto senza l'app: una sola istanza JS (`getCachedExtensionService`), `setString`/`setPreferenceSetting` in `dbWriteQueue` (invisibili finché la coda non gira), `findFirst` sulla riga con id più basso, la schermata mostra la riga già salvata e non quella appena calcolata se la chiave esiste. `ShioriSettingRow` mostra al massimo 3 righe; `ShioriValueRow` sulla riga fa vedere solo il sito selezionato, l'elenco si apre toccandola.
+
+Sequenza provata: la prima apertura crea la riga vuota del campo; dopo che quella riga c'è, si scrive `https://Nuovo.Example/video/1/`; si chiude e si riapre. «Sito principale» ha `https://nuovo.example` (prima voce) e il testo «I tuoi siti: nuovo.example»; «I tuoi siti attivi» lo contiene. La schermata già aperta no: è la fotografia di prima del OK (57 voci, senza il sito nuovo). Se il OK viene accodato prima dell'inserimento della riga vuota, Isar tiene due righe e `get()` legge quella vuota: il sito non compare finché non si riscrive il link (aggiorna la prima riga) e si riapre. Il campo è `linkuni_add_site_v2`; se è vuoto si legge ancora `linkuni_add_site`. Nessun `sites()` / `applyRename()` dentro `getSourcePreferences`. Non è una prova sull'iPhone e non si sa quale versione o quale URL avesse Adam.
 
 ## Link universale — 1.4.9
 
