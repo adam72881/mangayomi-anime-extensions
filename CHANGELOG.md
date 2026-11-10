@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.2
+
+- **Preferiti:** il sito rispondeva «406» perché la richiesta non diceva di volere una pagina web, come fa un browser. Ora lo dice. Se c'è ancora un errore, il messaggio mostra anche il titolo della pagina ricevuta.
+
 ## Stripchat 1.3.1
 
 - **Preferiti dopo il login:** la Webview resta su ita.stripchat.com, mentre l'estensione cercava i preferiti su stripchat.com, dove l'accesso non c'era. Ora prova tutti e due gli indirizzi e ricorda quello che funziona (vale anche per l'HD con l'account).

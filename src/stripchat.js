@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.1",
+        "version": "1.3.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -347,7 +347,12 @@ class DefaultExtension extends MProvider {
         for (var h = 0; h < hosts.length && !me; h++) {
             var res;
             try {
-                res = await this.client.get(hosts[h] + "/favorites", { "Referer": hosts[h] + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
+                // Senza «Accept» da pagina web il sito risponde 406.
+                res = await this.client.get(hosts[h] + "/favorites", {
+                    "Referer": hosts[h] + "/",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+                });
             } catch (e) {
                 notes.push(hosts[h].replace("https://", "") + ": nessuna risposta");
                 continue;
@@ -359,7 +364,8 @@ class DefaultExtension extends MProvider {
                 continue;
             }
             var d = this.preloadedState(body);
-            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + (d ? "" : ", senza dati"));
+            var hint = d ? "" : ", senza dati «" + ((body.match(/<title>([^<]{0,60})/i) || ["", body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60)])[1]) + "»";
+            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + hint);
             if (!d) continue;
             if (!this.loggedUser(d)) { guest = true; continue; }
             data = d;
@@ -504,7 +510,7 @@ class DefaultExtension extends MProvider {
         for (var i = 0; i < pages.length; i++) {
             var res;
             try {
-                res = await this.client.get(pages[i], { "Referer": BASE + "/" + user, "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
+                res = await this.client.get(pages[i], { "Referer": BASE + "/" + user, "Accept": i % 2 ? "text/html,application/xhtml+xml,*/*;q=0.8" : "application/json, text/plain, */*", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
             } catch (e) {
                 continue;
             }
