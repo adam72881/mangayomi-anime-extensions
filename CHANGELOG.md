@@ -1,5 +1,20 @@
 # Novità
 
+## Stripchat 1.0.0
+
+- Nuova estensione per le **dirette** di Stripchat, dall'API pubblica per i partner del sito (niente Cloudflare).
+  - **Popolari**: le dirette più viste. **Recenti**: le modelle nuove.
+  - **Filtri**: Genere (ragazze, coppie, trans, uomini), Categoria (MILF, Asiatiche, Latine, Tette grandi, Squirt, Lovense, BDSM…), Solo nuove.
+  - **Ricerca per nome** tra le 300 dirette più viste del genere scelto; incollando il link di una stanza si apre quella.
+  - Video in più qualità (originale, 480p, 240p); miniatura = istantanea della diretta.
+
+## Chaturbate 1.1.0
+
+- **Account**: tocca **Webview** (si apre Chaturbate) e fai il login: l'app salva l'accesso.
+  - Filtro **Mostra → Le mie seguite (in diretta)** e **(offline)**.
+  - Impostazione **Popolari = le stanze che segui**.
+  - Senza login lo dice chiaramente invece di mostrare la lista normale.
+
 ## Chaturbate 1.0.0
 
 - Nuova estensione per le **dirette** di Chaturbate.

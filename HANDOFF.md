@@ -23,7 +23,8 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/chaturbate.js` | Chaturbate (dirette) | 1.0.0 |
+| `src/chaturbate.js` | Chaturbate (dirette) | 1.1.0 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.0.0 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -250,3 +251,11 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - Elenco: `GET /api/ts/roomlist/room-list/?limit=60&offset=…` con `genders=f|c|t|m`, `hashtags=`, `keywords=`, `new_cams=true` (Recenti). JSON `rooms[]` (username, img, num_users) e `total_count`. Popolari = genders=f.
 - Diretta: `GET /api/chatvideocontext/<nome>/` → `room_status` (public/private/hidden/group/away/offline) e `hls_source` (master llhls.m3u8 con token). 404 = stanza inesistente. Video con Referer, Origin e User-Agent.
 - Provato il 10/11/2026: liste, pagine, hashtag, coppie, ricerca, link incollato, scheda, master.m3u8 risponde 200. Stripchat: da qui Cloudflare con captcha già sulla home (403), non provabile.
+
+- **Chaturbate 1.1.0 — account:** login nella Webview (baseUrl = chaturbate.com); i cookie della Webview passano all'estensione (`MClient` → `getCookiesPref`). Seguite: stessa `room-list` con `follow=true` (+ `offline=true`), come fa il sito (`r[showType]=!0`, showType «follow»/«offline» da `followed-cams`). Senza login il sito ignora `follow` e manda la lista normale con `is_following: false` → messaggio «accedi». Preferenza `cb_popular_follow`. Non provato con un account vero.
+
+## Stripchat — 1.0.0 (10 novembre 2026)
+
+- stripchat.com da qui = Cloudflare con captcha (403). **go.stripchat.com/api/models** (API partner) risponde senza Cloudflare: `?limit=60&offset=&tag=<genere>[/<categoria>]&isNew=true` → `models[]` con `username, id, status, viewersCount, snapshotUrl, previewUrlThumbBig, stream{url, urls{240p,480p,original}}`. `tag=girls/<x>` provato per milfs, mature, asian, latin, ebony, white, big-tits, small-tits, curvy, bbw, petite, hairy, squirt, anal, lovense, bdsm. `username=` è ignorato: la ricerca guarda le prime 5 pagine. Link `/<nome>#id=<id>`; la scheda usa la modella vista in lista (< 2 min) o la cerca nelle prime 3 pagine di ogni genere.
+- Video: master `edge-hls.saawsedge.com/hls/<id>/master/<id>_480p.m3u8` con righe `#EXT-X-MOUFLON:PSCH:v2:…` (ignorate dal player); la variante `playlistType=standard` ha pezzi mp4 normali, scaricati con 200 `video/mp4`. Non c'è decifratura nel codice.
+- Account Stripchat: non fatto (serve l'API del sito principale, dietro Cloudflare: non provabile da qui).

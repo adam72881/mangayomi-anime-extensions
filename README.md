@@ -17,7 +17,8 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
-> | Chaturbate 🔞 | chaturbate.com | any | live cams: popular, new, search, gender and hashtag filters |
+> | Chaturbate 🔞 | chaturbate.com | any | live cams: popular, new, search, gender and hashtag filters, followed rooms with your account |
+> | Stripchat 🔞 | stripchat.com | any | live cams: popular, new, gender and category filters, name search, quality picker |
 > | Link universale 🔞 | any site | any | save any site in the settings: popular, latest and search adapt to it; or paste a video, series or site link |
 >
 > No Cloudflare/anti-bot bypass: logins only use your own account.
@@ -54,6 +55,8 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Stripchat 1.0.0** — nuova estensione per le dirette: più viste, nuove, genere, categorie, ricerca per nome, più qualità.
+- **Chaturbate 1.1.0** — accesso con il tuo account dalla Webview: le stanze che segui.
 - **Chaturbate 1.0.0** — nuova estensione per le dirette: camgirl in diretta, nuove, ricerca, filtri per genere e hashtag.
 - **Link universale 1.4.11** — «Salva un sito» torna al flusso precedente: il sito scritto entra nel filtro Sito aprendo la sorgente.
 - **Link universale 1.4.9** — «Salva un sito» entra nell'elenco; niente interruttore per le immagini; categorie del sito principale quando la pagina le ha; la WebView della scheda resta sul video.

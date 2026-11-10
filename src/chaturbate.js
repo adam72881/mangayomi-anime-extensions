@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -115,12 +115,25 @@ class DefaultExtension extends MProvider {
 
     async rooms(page, opts) {
         var url = BASE + "/api/ts/roomlist/room-list/?limit=" + PER_PAGE + "&offset=" + ((page - 1) * PER_PAGE);
-        if (opts.gender) url += "&genders=" + opts.gender;
+        if (opts.gender && !opts.follow) url += "&genders=" + opts.gender;
         if (opts.hashtag) url += "&hashtags=" + encodeURIComponent(opts.hashtag);
         if (opts.keywords) url += "&keywords=" + encodeURIComponent(opts.keywords);
         if (opts.newCams) url += "&new_cams=true";
+        // Stanze seguite: stessa lista con follow=true (offline=true per quelle
+        // non in diretta). Funziona solo con l'accesso fatto nella Webview: i
+        // cookie della Webview passano all'estensione. Senza accesso il sito
+        // ignora follow e manda la lista normale, con is_following falso.
+        if (opts.follow) url += "&follow=true" + (opts.offline ? "&offline=true" : "");
         var data = await this.json(url);
         var rooms = (data && data.rooms) || [];
+        if (opts.follow && page === 1) {
+            if (rooms.length && !rooms.some(function (r) { return r.is_following; })) {
+                throw new Error("Per vedere le stanze che segui devi accedere al tuo account: tocca Webview (si apre Chaturbate), fai il login, poi torna qui e tocca Riprova.");
+            }
+            if (!rooms.length) {
+                throw new Error(opts.offline ? "Non segui ancora nessuna stanza." : "Nessuna delle stanze che segui è in diretta adesso. Prova «Le mie seguite (offline)».");
+            }
+        }
         var list = rooms.filter(function (r) { return r && r.username; }).map(function (r) {
             var viewers = r.num_users ? " · " + r.num_users + " spettatori" : "";
             return {
@@ -133,8 +146,14 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: rooms.length >= PER_PAGE && (!total || page * PER_PAGE < total) };
     }
 
-    // Popolari: le camgirl in diretta, prima quelle con più spettatori.
+    setting(key) {
+        try { return new SharedPreferences().get(key); } catch (e) { return null; }
+    }
+
+    // Popolari: le camgirl in diretta, prima quelle con più spettatori; oppure,
+    // se l'hai scelto nelle impostazioni, le stanze che segui.
     async getPopular(page) {
+        if (this.setting("cb_popular_follow") === true) return this.rooms(page, { follow: true });
         return this.rooms(page, { gender: "f" });
     }
 
@@ -152,8 +171,15 @@ class DefaultExtension extends MProvider {
         }
         var gender = this.pick(filters, "Genere", "f");
         var hashtag = this.pick(filters, "Hashtag", "");
-        var newCams = this.pick(filters, "Mostra", "") === "new";
-        return this.rooms(page, { gender: gender, hashtag: hashtag, keywords: text, newCams: newCams });
+        var show = this.pick(filters, "Mostra", "");
+        return this.rooms(page, {
+            gender: gender,
+            hashtag: hashtag,
+            keywords: text,
+            newCams: show === "new",
+            follow: show === "follow" || show === "follow_off",
+            offline: show === "follow_off",
+        });
     }
 
     user(url) {
@@ -213,15 +239,34 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Solo stanze in diretta adesso. Scrivi un nome o una parola, oppure incolla il link di una stanza.",
+                name: "Scrivi un nome o una parola, oppure incolla il link di una stanza. «Le mie seguite» vuole l'accesso: tocca Webview e fai il login su Chaturbate.",
             },
             { type_name: "SelectFilter", name: "Genere", state: 0, values: options(GENDERS) },
             { type_name: "SelectFilter", name: "Hashtag", state: 0, values: options(HASHTAGS) },
-            { type_name: "SelectFilter", name: "Mostra", state: 0, values: options([["", "Tutte"], ["new", "Solo nuove"]]) },
+            {
+                type_name: "SelectFilter",
+                name: "Mostra",
+                state: 0,
+                values: options([
+                    ["", "Tutte"],
+                    ["new", "Solo nuove"],
+                    ["follow", "Le mie seguite (in diretta)"],
+                    ["follow_off", "Le mie seguite (offline)"],
+                ]),
+            },
         ];
     }
 
     getSourcePreferences() {
-        return [];
+        return [
+            {
+                key: "cb_popular_follow",
+                switchPreferenceCompat: {
+                    title: "Popolari = le stanze che segui",
+                    summary: "Serve l'accesso: apri la sorgente, tocca Webview (si apre Chaturbate), fai il login e torna indietro. Il login resta salvato nell'app.",
+                    value: false,
+                },
+            },
+        ];
     }
 }
