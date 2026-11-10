@@ -1,6 +1,23 @@
 <!doctype html>
 <html lang="it"><head><title>Link universale</title>
 <meta charset="utf-8">
+<script>
+// Il pulsante WebView della lista apre solo questo indirizzo (baseUrl).
+// Se il sito principale è già noto, si va lì subito, senza elenco.
+(function () {
+  var host = "";
+  try {
+    var q = new URLSearchParams(location.search).get("m") || "";
+    var hm = (location.hash || "").match(/(?:^|[#&])m=([a-z0-9.-]+\.[a-z]{2,})/i);
+    host = (q || (hm && hm[1]) || localStorage.getItem("lu_main") || "").toLowerCase();
+  } catch (e) {}
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host) && host.indexOf("github.") < 0) {
+    try { localStorage.setItem("lu_main", host); } catch (e) {}
+    location.replace("https://" + host + "/");
+  }
+})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <style>

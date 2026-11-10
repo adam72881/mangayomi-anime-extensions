@@ -19,8 +19,11 @@ button{padding:12px 16px;border:0;border-radius:12px;background:var(--accent);co
 <script>
 // L'app apre <questa pagina>/<percorso del video>#lu=<sito>: da qui si va al sito vero.
 (function () {
-  var m = location.hash.match(/lu=([a-z0-9.-]+\.[a-z]{2,})/i);
+  var hash = location.hash || "";
+  var m = hash.match(/lu=([a-z0-9.-]+\.[a-z]{2,})/i);
+  var main = hash.match(/(?:^|[#&])m=([a-z0-9.-]+\.[a-z]{2,})/i);
   var base = "/mangayomi-anime-extensions";
+  if (main) { try { localStorage.setItem("lu_main", main[1].toLowerCase()); } catch (e) {} }
   if (!m) { location.replace(base + "/"); return; }
   var host = m[1].toLowerCase();
   var path = location.pathname.indexOf(base) === 0 ? location.pathname.slice(base.length) : location.pathname;
