@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.14",
+        "version": "1.4.15",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -96,7 +96,7 @@ const READY = [
     ["https://www.sexu.com", "Sexu (480p)"],
     ["https://www.pornrewind.com", "PornRewind"],
     ["https://www.fpo.xxx", "FPO.xxx"],
-    ["https://www.javbangers.com", "JavBangers (JAV)"],
+    ["https://www.javbangers.com", "JavBangers"],
     ["https://www.tubev.sex", "TubeV"],
     ["https://zbporn.com", "ZBporn (360p)"],
     ["https://www.bravotube.net", "BravoTube (360p)"],
@@ -328,6 +328,13 @@ function pickImage(html) {
         if (any) consider(tags[0] || "", any[1]);
     }
     return { tag: best.tag || tags[0] || "", src: best.score >= 0 ? best.src : "" };
+}
+
+// Siti JAV (giapponesi/asiatici): vanno nel filtro «Sito JAV», separati dagli altri.
+// Basta «jav» nel nome del sito, più i siti pronti JAV che non lo hanno.
+function isJavSite(url) {
+    var h = hostOf(url);
+    return /jav|tokyomotion|avhwa|sextb|7mmtv|missav|supjav|mythav/i.test(h);
 }
 
 function hostOf(url) {
@@ -965,11 +972,19 @@ class DefaultExtension extends MProvider {
 
     siteFromFilters(filters) {
         var sites = this.sites();
-        var idx = 0;
+        var normal = sites.filter(function (x) { return !isJavSite(x); });
+        var jav = sites.filter(function (x) { return isJavSite(x); });
+        var idx = 0, javIdx = 0, sawNormal = false;
         (filters || []).forEach(function (f) {
-            if (f && f.type_name === "SelectFilter" && f.name === "Sito") idx = f.state || 0;
+            if (!f || f.type_name !== "SelectFilter") return;
+            if (f.name === "Sito") { idx = f.state || 0; sawNormal = true; }
+            if (f.name === "Sito JAV") javIdx = f.state || 0;
         });
-        return sites[idx] || "";
+        // «Sito JAV» scelto (non «—») vince; poi «Sito» se l'hai cambiato;
+        // se non hai toccato niente, il sito principale (anche se è JAV).
+        if (javIdx > 0 && jav[javIdx - 1]) return jav[javIdx - 1];
+        if (sawNormal && idx > 0 && normal[idx]) return normal[idx];
+        return sites[0] || "";
     }
 
     orderKind(filters) {
@@ -2042,18 +2057,32 @@ class DefaultExtension extends MProvider {
         var filters = [{
             type_name: "HeaderFilter",
             name: sites.length ?
-                "Scrivi per cercare nel sito scelto qui sotto, oppure incolla il link di un video, di una serie o di un sito." :
+                "Scrivi per cercare nel sito scelto qui sotto («Sito», o «Sito JAV» se ne scegli uno), oppure incolla il link di un video, di una serie o di un sito." :
                 "Aggiungi i tuoi siti nelle impostazioni della sorgente. Intanto puoi incollare nella ricerca il link di un video o di un sito.",
         }];
         if (sites.length) {
-            filters.push({
-                type_name: "SelectFilter",
-                name: "Sito",
-                state: 0,
-                values: sites.map(function (x) {
-                    return { type_name: "SelectOption", name: self.siteName(x), value: x };
-                }),
-            });
+            var normal = sites.filter(function (x) { return !isJavSite(x); });
+            var jav = sites.filter(function (x) { return isJavSite(x); });
+            if (normal.length) {
+                filters.push({
+                    type_name: "SelectFilter",
+                    name: "Sito",
+                    state: 0,
+                    values: normal.map(function (x) {
+                        return { type_name: "SelectOption", name: self.siteName(x), value: x };
+                    }),
+                });
+            }
+            if (jav.length) {
+                filters.push({
+                    type_name: "SelectFilter",
+                    name: "Sito JAV",
+                    state: 0,
+                    values: [{ type_name: "SelectOption", name: "— (usa «Sito»)", value: "" }].concat(jav.map(function (x) {
+                        return { type_name: "SelectOption", name: self.siteName(x), value: x };
+                    })),
+                });
+            }
             filters.push({
                 type_name: "SelectFilter",
                 name: "Ordine",

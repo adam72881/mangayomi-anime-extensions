@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.15
+
+- **Filtro «Sito JAV»**: i siti JAV stanno in un elenco a parte, sotto «Sito». Scegline uno per cercare lì; lasciato su «—» vale «Sito». Se non tocchi niente si cerca nel sito principale.
+- Sono JAV i siti con «jav» nel nome (anche quelli salvati da te, es. javhd.today) più TokyoMotion.
+
 ## Link universale 1.4.14
 
 - **Siti che caricano i video dopo** (la pagina arriva vuota e lo script li chiede con una seconda richiesta, es. javhd.today): l'estensione fa la stessa richiesta e mostra i video veri invece delle sole categorie.
