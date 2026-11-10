@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.12",
+        "version": "1.4.13",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -95,6 +95,9 @@ const READY = [
     ["https://www.youramateurporn.com", "YourAmateur"],
     ["https://www.sexu.com", "Sexu (480p)"],
     ["https://www.pornrewind.com", "PornRewind"],
+    ["https://www.fpo.xxx", "FPO.xxx"],
+    ["https://www.javbangers.com", "JavBangers (JAV)"],
+    ["https://www.tubev.sex", "TubeV"],
     ["https://zbporn.com", "ZBporn (360p)"],
     ["https://www.bravotube.net", "BravoTube (360p)"],
     ["https://www.youporn.com", "YouPorn (360p)"],
@@ -115,8 +118,9 @@ const VIDEO_EXT = "m3u8|mp4|webm|mkv|mov|m4v";
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
 // Anteprime, miniature animate e pubblicità: sono mp4 veri, ma non il video.
-const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\//i;
-const AD_HOSTS = /a-ads\.com|doubleclick|googlesyndication|googletagmanager|google-analytics|facebook\.com|twitter\.com|disqus|recaptcha|hcaptcha|cloudflare|wingsmob|exoclick|juicyads|trafficjunky|adsterra|popads|histats/i;
+// Anteprime al passaggio del dito: /vp/50/p320-180.mp4 (TubeV e simili).
+const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\/|\/vp\/\d+\/|\/p\d{2,4}-\d{2,4}\.(?:mp4|webm)/i;
+const AD_HOSTS = /a-ads\.com|doubleclick|googlesyndication|googletagmanager|google-analytics|facebook\.com|twitter\.com|disqus|recaptcha|hcaptcha|cloudflare|wingsmob|exoclick|juicyads|trafficjunky|adsterra|popads|histats|gsrv\.dev|tsyndicate|magsrv|realsrv|ad-delivery|adnxs|adtng|\bvast\b/i;
 
 // Player esterni che Mangayomi sa già leggere (estrattori integrati nell'app).
 const KNOWN_HOSTS = [
@@ -578,7 +582,9 @@ function qualityOf(url, objectText) {
     if (m) return parseInt(m[1], 10);
     if (/[_\/-](hd|high)[_.\/-]|VideoUrlHigh/i.test(url + " " + objectText)) return 720;
     var near = String(objectText || "").match(/["']?(?:quality|label|res|resolution|height)["']?\s*[:=]\s*["']?(\d{3,4})/i);
-    return near ? parseInt(near[1], 10) : 0;
+    var q = near ? parseInt(near[1], 10) : 0;
+    // Numeri vicini che non sono una qualità (100, 4320…): meglio nessuna etichetta.
+    return q >= 144 && q <= 2160 ? q : 0;
 }
 
 // Nome dell'attributo o della chiave appena prima del link: dice se è il video
@@ -1760,10 +1766,14 @@ class DefaultExtension extends MProvider {
         var html = await this.fetchHtml(link, originOf(link) + "/");
         videos = videos.concat(await this.videosFromHtml(html, link, 0));
 
+        // Stesso file con parametri diversi (?rnd=…, ?v=…): uno solo, quello
+        // con l'etichetta di qualità se c'è.
+        videos.sort(function (a, b) { return (b._score || 0) - (a._score || 0); });
         var seen = {};
         videos = videos.filter(function (v) {
-            if (seen[v.url]) return false;
-            seen[v.url] = true;
+            var k = String(v.url).split("?")[0].replace(/\/+$/, "");
+            if (seen[k]) return false;
+            seen[k] = true;
             return true;
         });
         videos.sort(function (a, b) { return (b._score || 0) - (a._score || 0); });

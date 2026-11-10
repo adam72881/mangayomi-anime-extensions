@@ -1,5 +1,12 @@
 # Novità
 
+## Link universale 1.4.13
+
+- Tre siti pronti in più con i video funzionanti: **FPO.xxx**, **JavBangers** (JAV) e **TubeV**.
+- I video di anteprima che partono passando il dito sulle schede (es. «p320-180.mp4») non finiscono più nella lista delle qualità.
+- Lo stesso video non compare due volte nella lista, e niente etichette di qualità sbagliate come «100p».
+- Niente video pubblicitari tra le qualità (server di pubblicità comuni esclusi).
+
 ## Link universale 1.4.12
 
 - Due siti pronti in più, provati con liste, ricerca, miniature e video: Sexu (480p) e PornRewind.

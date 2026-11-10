@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.12 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.13 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -230,3 +230,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 4. Push su `main`. In app: Browse → refresh repository → aggiorna la sorgente.
 
 - **1.4.12 (10 novembre 2026):** `READY` + sexu.com, pornrewind.com. Provati e scartati: fpo.xxx, hdtube.porn, javbangers (lista e miniature sì, i link video rispondono 403/404), mylust (alcune qualità 410), tubev.sex (qualità dubbie 250p/100p), iceporn, javtiful, pornhits, pornxp, pornheed, pornjam, pornburst, xxxvideo.link, porntn (nessun video), bdsmx.tube, javfinder, javmost, vxxx, manysex, sexo.com (lista vuota), 4kporn, fapcat, fuqer, porndish, yourlust (verifica anti-bot), bdsmdoe (502). theporndude.com risponde 403.
+
+- **1.4.13 — attenzione ai test:** da questo ambiente cloud ogni richiesta esce con un IP diverso (6 IP su 6 richieste). I siti KVS (fpo.xxx, javbangers…) legano `get_file` all'IP della pagina, quindi da qui il video risponde 403 ma sul telefono (un IP solo) funziona. Per provarli serve pagina e video sulla stessa connessione: `python3 -I scratchpad/kvs/same_ip.py <host>` (requests.Session, tunnel riusato). Aggiunti fpo.xxx, javbangers, tubev.sex. `NOT_THE_VIDEO` scarta `/vp/<n>/` e `/p320-180.mp4` (anteprime TubeV). Video doppi tolti per URL senza query; `qualityOf` ignora numeri fuori 144–2160. hdtube.porn: 404 anche con lo stesso IP; mylust: link variabili, alcuni 410.
