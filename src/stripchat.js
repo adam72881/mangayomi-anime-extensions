@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.18",
+        "version": "1.3.19",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.18";
+const VERSION = "1.3.19";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -136,6 +136,7 @@ const STATUS_TEXT = {
     p2p: "In show privato",
     groupShow: "In show di gruppo",
     virtualPrivate: "In show privato",
+    p2pVoice: "In show privato",
     idle: "Assente un momento",
     off: "Offline",
 };
@@ -373,23 +374,46 @@ class DefaultExtension extends MProvider {
         return { list: cards, hasNextPage: r.last >= PER_PAGE };
     }
 
+    guestCard(session) {
+        if (session && session.user) return null;
+        var host = ((session && session.origin) || "https://ita.stripchat.com").replace("https://", "");
+        return {
+            name: "Ospite · " + VERSION + " · " + host + " · user=no",
+            imageUrl: "",
+            link: "/#ospite",
+        };
+    }
+
+    diagText(session, where) {
+        var host = ((session && session.origin) || "https://ita.stripchat.com").replace("https://", "");
+        var who = session && session.user ? "sì" : "no";
+        return (where ? where + ": " : "") + "Stripchat " + VERSION + " · " + host + " · user=" + who + ".";
+    }
+
+    withDiag(result, page) {
+        if (!result || page !== 1) return result;
+        var note = this.guestCard(this._session);
+        if (!note) return result;
+        return { list: [note].concat(result.list || []), hasNextPage: !!result.hasNextPage };
+    }
+
     async getPopular(page) {
         // «Show di sesso dal vivo in evidenza» = blocco topStreamsModels, nello
         // stesso ordine. Se il blocco non arriva non si mette un altro elenco.
         if (page === 1 && this._session && !this._session.user) this._session = null;
         var featured = await this.fillFeatured(page);
-        if (featured && (featured.list.length || page > 1)) return featured;
-        throw new Error("Popolare: Stripchat non ha mandato il blocco «in evidenza». Non mostro un altro elenco al posto suo.");
+        if (featured && (featured.list.length || page > 1)) return this.withDiag(featured, page);
+        var session = this._session;
+        throw new Error(this.diagText(session, "Popolare") + " Il blocco «in evidenza» non è arrivato. Non mostro un altro elenco.");
     }
 
     async getLatestUpdates(page) {
-        // «See all» di Today's Recommendations: /girls/recommended,
-        // filterGroupTags [["recommended"]] e sortBy=recommendedScore.
-        try {
-            var tips = await this.fillRecommended(page);
-            if (tips && (tips.list.length || page > 1)) return tips;
-        } catch (e) {}
-        return this.page(page, { gender: "girls", isNew: true });
+        // «I consigli di oggi per te»: filterGroupTags [["recommended"]] e
+        // sortBy=recommendedScore. Se non arriva, niente altro elenco.
+        if (page === 1 && this._session && !this._session.user) this._session = null;
+        var tips = await this.fillRecommended(page);
+        if (tips && (tips.list.length || page > 1)) return this.withDiag(tips, page);
+        throw new Error(this.diagText(this._session, "Più recente") + " I consigli di oggi non sono arrivati. Non mostro un altro elenco.");
     }
 
     v2HomeUrl(origin, topLimit) {
@@ -477,12 +501,18 @@ class DefaultExtension extends MProvider {
     }
 
     async fillRecommended(page) {
+        var session = await this.ensureSession();
         var key = "recommended";
         if (!this._buckets) this._buckets = {};
         if (!this._buckets[key]) this._buckets[key] = { items: [], api: 0, more: true, miss: false };
         var bucket = this._buckets[key];
         var need = page * PER_PAGE;
         var flags = "&userRole=user&nic=true&rcmGrp=A&rbCnGr=true&iem=true&decMb=true&dmv=false&ctryTop=true&mlfv=false&rectf=false&iig=true&sac=true";
+        var origins = [];
+        if (session && session.origin) origins.push(session.origin);
+        ["https://ita.stripchat.com", BASE].forEach(function (host) {
+            if (origins.indexOf(host) === -1) origins.push(host);
+        });
         var guard = 0;
         while (bucket.items.length < need && bucket.more && bucket.api < 8 && guard < 8) {
             guard++;
@@ -491,13 +521,9 @@ class DefaultExtension extends MProvider {
             var path = "/api/front/models?limit=60&offset=" + offset + "&primaryTag=girls&filterGroupTags="
                 + encodeURIComponent("[[\"recommended\"]]") + "&sortBy=recommendedScore" + flags;
             var res = null;
-            var origins = [BASE, "https://ita.stripchat.com"];
             for (var i = 0; i < origins.length; i++) {
                 try {
-                    res = await this.apiJson(origins[i] + path, {
-                        "Referer": origins[i] + "/girls/recommended",
-                        "Accept": "application/json, text/plain, */*",
-                    });
+                    res = await this.apiJson(origins[i] + path, this.sessionHeaders(origins[i], session, origins[i] + "/girls/recommended"));
                 } catch (e) {
                     res = null;
                 }
@@ -514,7 +540,7 @@ class DefaultExtension extends MProvider {
             var self = this;
             models.forEach(function (m) {
                 var id = m && (m.id || m.username);
-                if (!id || seen[id] || !self.keepListed(m)) return;
+                if (!id || seen[id] || !self.keepFeatured(m)) return;
                 seen[id] = 1;
                 bucket.items.push(m);
             });
@@ -543,32 +569,51 @@ class DefaultExtension extends MProvider {
         };
         if (!text) {
             var listed = await this.fillFront(page, opts, "stripRanking").catch(function () { return null; });
-            if (listed && listed.list.length) return listed;
-            return this.page(page, opts);
+            if (listed && listed.list.length) return this.withDiag(listed, page);
+            return this.withDiag(await this.page(page, opts), page);
         }
-        // L'API non cerca per nome: si guardano le prime pagine del genere
-        // e si tengono i nomi che contengono il testo, solo se il preset arriva a 720p.
+        // Il sito cerca con /api/front/v4/models/search/suggestion?query=
+        // (provato: DianaGlow_ è il primo risultato, status public).
         if (page > 1) return { list: [], hasNextPage: false };
+        if (this._session && !this._session.user) this._session = null;
+        var session = await this.ensureSession();
+        var origins = [];
+        if (session && session.origin) origins.push(session.origin);
+        ["https://ita.stripchat.com", BASE].forEach(function (host) {
+            if (origins.indexOf(host) === -1) origins.push(host);
+        });
+        var tag = this.primaryTag(opts.gender);
+        var path = "/api/front/v4/models/search/suggestion?query=" + encodeURIComponent(text) + "&primaryTag=" + tag + "&limit=60";
+        var res = null;
+        var last = "nessuna risposta";
+        for (var i = 0; i < origins.length; i++) {
+            try {
+                res = await this.apiJson(origins[i] + path, this.sessionHeaders(origins[i], session, origins[i] + "/search/" + encodeURIComponent(text)));
+            } catch (e) {
+                res = null;
+                last = "nessuna risposta";
+                continue;
+            }
+            if (res && res.data && res.data.models) { last = ""; break; }
+            last = res ? "HTTP " + res.status : "nessuna risposta";
+            res = null;
+        }
+        if (!res || !res.data) throw new Error(this.diagText(session, "Ricerca") + " La ricerca non ha risposto (" + last + ").");
+        var models = res.data.models || [];
+        if (!models.length) throw new Error(this.diagText(session, "Ricerca") + " Nessun risultato per «" + text + "».");
         var self = this;
-        var hits = [];
-        for (var p = 0; p < 5 && hits.length < 40; p++) {
-            var batch = await this.frontBatch(p * PER_PAGE, opts, "stripRanking").catch(function () { return null; });
-            if (!batch) break;
-            var hd = [];
-            batch.raw.forEach(function (m) {
-                if (!self.offersHd(m)) return;
-                self.withStream(m);
-                hd.push(m);
-            });
-            self.watchable(hd, "").forEach(function (m) {
-                if (m.username.toLowerCase().indexOf(text.toLowerCase()) !== -1) hits.push(self.card(m));
-            });
-            if (!batch.more) break;
-        }
-        if (!hits.length) {
-            throw new Error("Nessuna modella in diretta con «" + text + "» nel nome tra le 300 più viste. Se è offline o in privato non compare.");
-        }
-        return { list: hits, hasNextPage: false };
+        var hits = models.map(function (m) {
+            if (!m || !m.username) return null;
+            self.withStream(m);
+            var c = self.card(m);
+            if (!self.keepFeatured(m)) {
+                var label = STATUS_TEXT[m.status] || "Non in diretta";
+                c.name = m.username + " · " + label;
+            }
+            return c;
+        }).filter(function (c) { return !!c; });
+        if (!hits.length) throw new Error(this.diagText(session, "Ricerca") + " Nessun risultato per «" + text + "».");
+        return this.withDiag({ list: hits, hasNextPage: false }, 1);
     }
 
     user(url) {
@@ -1232,7 +1277,7 @@ class DefaultExtension extends MProvider {
             if (page > 1) return { list: [], hasNextPage: false };
             throw new Error("Nessuna delle tue preferite è in diretta adesso. Prova «Le mie preferite (anche offline)».");
         }
-        return { list: list, hasNextPage: !!more };
+        return this.withDiag({ list: list, hasNextPage: !!more }, page);
     }
 
     // Se lo status manca, si legge da /api/front/models (status, isLive, hlsPlaylist).
@@ -1283,7 +1328,12 @@ class DefaultExtension extends MProvider {
 
     async getDetail(url) {
         var u = this.user(url);
-        if (!u.name) throw new Error("Link di Stripchat non riconosciuto.");
+        if (!u.name) {
+            if (String(url || "").indexOf("#ospite") !== -1) {
+                throw new Error("Stripchat " + VERSION + ": il sito non ha riconosciuto l'accesso. Popolare, consigli e preferiti sono quelli da ospite finché il login non arriva alle richieste.");
+            }
+            throw new Error("Link di Stripchat non riconosciuto.");
+        }
         var m = await this.model(u);
         var status = m ? String(m.status || "off") : "off";
         var live = !!(m && status === "public" && m.stream && m.stream.url);

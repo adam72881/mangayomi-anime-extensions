@@ -1,5 +1,11 @@
 # Novità
 
+## Stripchat 1.3.19
+
+- La ricerca usa la stessa chiamata del sito. Se non risponde, compare un errore.
+- Più recente mostra i consigli di oggi, nell'ordine del sito. Se non arrivano, compare un errore.
+- Se il sito non riconosce l'accesso, in cima all'elenco c'è la versione, l'indirizzo e user=no.
+
 ## Stripchat 1.3.18
 
 - Preferiti: prima si chiede la config del sito su ita.stripchat.com, poi su stripchat.com. Se lo stesso cookie c'è due volte, si tiene l'ultimo valore non vuoto.
