@@ -1,5 +1,9 @@
 # Novità
 
+## Chaturbate 1.3.4
+
+- Tolta la scelta della qualità. La diretta parte sempre dalla più alta che il sito offre, e nel player restano anche le altre, con l'audio collegato. Se l'elenco delle qualità non si legge, si usa un link nuovo della diretta.
+
 ## Stripchat 1.3.11
 
 - **Preferiti:** se la Webview è loggata ma l'elenco non esce, il messaggio dice versione, sito, stato HTTP, dimensione della pagina, se l'utente c'è, se c'è il token, e solo i nomi dei cookie (mai i valori). Su iPhone Mangayomi copia quei cookie solo quando cambia l'indirizzo.

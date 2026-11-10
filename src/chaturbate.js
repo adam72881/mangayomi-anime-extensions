@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.3",
+        "version": "1.3.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -271,35 +271,25 @@ class DefaultExtension extends MProvider {
         }
         var src = String(ctx.hls_source);
         var headers = { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA };
-        var wanted = String(this.setting("cb_quality") || "auto");
-        // Il link principale (llhls.m3u8?token=…) vale UNA sola apertura: se lo
-        // apre l'estensione, al player arriva un 403 e la diretta gira a vuoto.
-        // In Auto va passato al player intatto; i link delle singole qualità
-        // invece restano validi.
+        // Il link principale (llhls.m3u8?token=…) vale UNA sola apertura. Si legge
+        // per conoscere le qualità; al player si danno le singole, che restano
+        // valide. La più alta è la prima. Se il file non si legge, un link nuovo.
         var auto = {
             url: src,
             originalUrl: src,
             quality: "Auto",
-            // Il player senza User-Agent si presenta come «libmpv»: meglio come la pagina.
             headers: headers,
         };
-        if (wanted === "auto") return [auto];
         var master = "";
         try {
             master = String((await this.client.get(src, headers)).body || "");
         } catch (e) {}
         var variants = this.variants(master, src);
         if (!variants.length || !variants[0].audio) return [await this.freshAuto(user, auto)];
-
-        // Qualità scelta: il video di quella qualità e l'audio, che su Chaturbate
-        // è un flusso a parte. L'app collega l'audio del PRIMO video a tutti:
-        // stesso audio per ogni qualità, e niente «Auto» nella lista (avrebbe
-        // l'audio doppio).
-        var target = parseInt(wanted, 10) || 1080;
-        var first = variants.filter(function (v) { return v.height <= target; })[0] || variants[variants.length - 1];
-        var ordered = [first].concat(variants.filter(function (v) { return v !== first; }));
-        var audio = first.audio;
-        return ordered.map(function (v) {
+        // L'audio è un flusso a parte. L'app lo prende dal primo video e lo usa
+        // per tutte le qualità: stesso audio, e niente link «Auto» (audio doppio).
+        var audio = variants[0].audio;
+        return variants.map(function (v) {
             return {
                 url: v.url,
                 originalUrl: v.url,
@@ -377,16 +367,6 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         return [
-            {
-                key: "cb_quality",
-                listPreference: {
-                    title: "Qualità",
-                    summary: "Auto: il player prende la più alta (spesso 1080p). Se scegli una qualità, nel player trovi anche le altre. Se una diretta resta muta o si blocca, torna su Auto.",
-                    valueIndex: 0,
-                    entries: ["Auto (consigliata)", "1080p", "720p", "480p", "360p", "240p"],
-                    entryValues: ["auto", "1080", "720", "480", "360", "240"],
-                },
-            },
             {
                 key: "cb_popular_follow",
                 switchPreferenceCompat: {
