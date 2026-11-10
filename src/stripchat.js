@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.17",
+        "version": "1.3.18",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.17";
+const VERSION = "1.3.18";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -374,14 +374,12 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        // «Featured Free Sex Cam Shows» = blocco topStreamsModels della home v2.
-        // Da ospite i nomi non sono quelli dell'account; con i cookie della Webview
-        // la stessa risposta è quella di Adam. Poi solo diretta pubblica e preset ≥720.
-        try {
-            var featured = await this.fillFeatured(page);
-            if (featured && (featured.list.length || page > 1)) return featured;
-        } catch (e) {}
-        return this.page(page, { gender: "girls" });
+        // «Show di sesso dal vivo in evidenza» = blocco topStreamsModels, nello
+        // stesso ordine. Se il blocco non arriva non si mette un altro elenco.
+        if (page === 1 && this._session && !this._session.user) this._session = null;
+        var featured = await this.fillFeatured(page);
+        if (featured && (featured.list.length || page > 1)) return featured;
+        throw new Error("Popolare: Stripchat non ha mandato il blocco «in evidenza». Non mostro un altro elenco al posto suo.");
     }
 
     async getLatestUpdates(page) {
@@ -401,19 +399,43 @@ class DefaultExtension extends MProvider {
     }
 
     async featuredModels(topLimit) {
-        var origins = [BASE, "https://ita.stripchat.com"];
+        var session = await this.ensureSession();
+        var origins = [];
+        if (session && session.origin) origins.push(session.origin);
+        ["https://ita.stripchat.com", BASE].forEach(function (host) {
+            if (origins.indexOf(host) === -1) origins.push(host);
+        });
+        var last = "vuoto";
         for (var i = 0; i < origins.length; i++) {
-            var res = await this.apiJson(this.v2HomeUrl(origins[i], topLimit), {
-                "Referer": origins[i] + "/",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-            });
-            var blocks = (res.data && res.data.blocks) || [];
+            var res;
+            try {
+                res = await this.apiJson(this.v2HomeUrl(origins[i], topLimit), this.sessionHeaders(origins[i], session, origins[i] + "/"));
+            } catch (e) {
+                last = "nessuna risposta";
+                continue;
+            }
+            if (!res.data) {
+                last = "HTTP " + res.status;
+                continue;
+            }
+            var blocks = res.data.blocks || [];
             for (var j = 0; j < blocks.length; j++) {
                 if (blocks[j] && blocks[j].id === "topStreamsModels" && (blocks[j].models || []).length) return blocks[j].models;
             }
+            last = "senza topStreamsModels";
         }
-        return [];
+        throw new Error("Popolare: blocco in evidenza assente (" + last + ").");
+    }
+
+    // Nel blocco in evidenza si tiene l'ordine del sito. Il filtro ≥720p
+    // toglieva le prime stanze (spesso solo 480p) e faceva salire modelle
+    // molto più in basso, che sembravano un altro elenco.
+    keepFeatured(m) {
+        if (!m || !m.username) return false;
+        if (m.status && String(m.status) !== "public") return false;
+        if (m.isLive === false || m.isOnline === false) return false;
+        this.withStream(m);
+        return true;
     }
 
     keepListed(m) {
@@ -440,7 +462,7 @@ class DefaultExtension extends MProvider {
             var self = this;
             models.forEach(function (m) {
                 var id = m && (m.id || m.username);
-                if (!id || seen[id] || !self.keepListed(m)) return;
+                if (!id || seen[id] || !self.keepFeatured(m)) return;
                 seen[id] = 1;
                 items.push(m);
             });
@@ -810,13 +832,23 @@ class DefaultExtension extends MProvider {
     // Stesse intestazioni della pagina: il sito manda il token dell'accesso
     // (initialClient.jwtToken) come Authorization. Senza, l'API dei preferiti
     // risponde vuota (ospite, 200) o «invalid token» (401). Non si inventa.
-    apiHeaders(origin, token) {
+    apiHeaders(origin, token, session) {
         var headers = {
             "Referer": origin + "/favorites",
+            "Origin": origin,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+            "User-Agent": UA,
         };
         if (token) headers.Authorization = token;
+        if (session && session.origin === origin) {
+            if (session.cookie) headers.Cookie = session.cookie;
+            if (session.user && session.csrf) {
+                headers["X-Session-CSRF"] = session.csrf;
+                headers["X-Session-Verify"] = "1";
+            }
+            if (!token && session.jwt) headers.Authorization = session.jwt;
+        }
         return headers;
     }
 
@@ -831,8 +863,8 @@ class DefaultExtension extends MProvider {
     // Schede dei preferiti. Senza il cookie di accesso l'API risponde 200 con
     // models vuoto (provato). Con l'accesso, le schede stanno in
     // /models/favorites; l'id utente, se c'è, si legge da config o dalla pagina.
-    async favoriteModels(origin, viewer, token, page, includeOffline) {
-        var headers = this.apiHeaders(origin, token);
+    async favoriteModels(origin, viewer, token, page, includeOffline, session) {
+        var headers = this.apiHeaders(origin, token, session);
         var offset = (page - 1) * PER_PAGE;
         var q = "offset=" + offset + "&sortBy=bestMatch&limit=60&mlfv=false";
         var listed = await this.apiJson(origin + "/api/front/models/favorites?" + q, headers);
@@ -914,70 +946,260 @@ class DefaultExtension extends MProvider {
         return hits;
     }
 
-    // Preferite con l'account. Il login della Webview è un cookie di sessione:
-    // Mangayomi 0.9.95 lo copia solo al cambio di indirizzo, come nome=valore.
-    // L'API /models/favorites usa quel cookie. Se la pagina non ha l'utente, il
-    // cookie non è partito: è un limite dell'app, non si inventa un token.
-    async favorites(page, includeOffline) {
-        var hosts = this.siteHosts();
+    // Il sito, dopo i cookie, chiede /api/front/v3/config/initial: lì c'è l'utente
+    // e il csrf. La pagina HTML da sola può restare «user: null» anche con il
+    // nome del cookie di sessione. La Webview di Adam è su ita.stripchat.com:
+    // si prova prima quello. I valori dei cookie non si scrivono da nessuna parte.
+    cookieHeader(res) {
+        var headers = (res && res.request && res.request.headers) || {};
+        var raw = "";
+        Object.keys(headers).forEach(function (k) {
+            if (String(k).toLowerCase() === "cookie") raw = String(headers[k] || "");
+        });
+        return raw;
+    }
+
+    cookiePairs(raw) {
+        var pairs = [];
+        String(raw || "").split(";").forEach(function (part) {
+            var t = part.trim();
+            if (!t) return;
+            var i = t.indexOf("=");
+            if (i <= 0) return;
+            pairs.push({ name: t.slice(0, i).trim(), value: t.slice(i + 1).trim() });
+        });
+        return pairs;
+    }
+
+    // Se lo stesso nome c'è due volte, resta l'ultimo valore non vuoto.
+    packCookies(raw, onlyAuth) {
+        var pairs = this.cookiePairs(raw);
+        var order = [];
+        var map = {};
+        var dup = 0;
+        pairs.forEach(function (p) {
+            if (Object.prototype.hasOwnProperty.call(map, p.name)) dup++;
+            else order.push(p.name);
+            if (p.value || !Object.prototype.hasOwnProperty.call(map, p.name)) map[p.name] = p.value;
+            if (p.value) map[p.name] = p.value;
+        });
+        var names = order.filter(function (n) {
+            if (!map[n]) return false;
+            if (!onlyAuth) return true;
+            return /session|remember|csrf|family|guest|locale|cf_|clearance|firstVisit|alreadyVisited|agreement/i.test(n);
+        });
+        var sessionNames = this.sessionCookie(order);
+        return {
+            header: names.map(function (n) { return n + "=" + map[n]; }).join("; "),
+            names: order,
+            dup: dup,
+            sessionNames: sessionNames,
+            sessionPresent: sessionNames.some(function (n) { return !!map[n]; }),
+            sessionEmpty: sessionNames.length > 0 && sessionNames.every(function (n) { return !map[n]; }),
+            hasCsrf: order.indexOf("__Secure-csrf_token") !== -1 || order.indexOf("csrf_token") !== -1,
+            hasFamily: order.indexOf("__Secure-family_id") !== -1 || order.indexOf("family_id") !== -1,
+        };
+    }
+
+    readClient(data) {
+        var client = data && data.initial && data.initial.client;
+        if (!client && data && data.configV3) client = data.configV3.initialClient;
+        var user = client && client.user;
+        var id = user && (user.id || user.userId || (user.user && user.user.id));
+        var dynamic = data && (data.dynamic || data.initialDynamic);
+        var jwt = "";
+        if (dynamic && typeof dynamic.jwtToken === "string") jwt = dynamic.jwtToken;
+        else if (client && typeof client.jwtToken === "string") jwt = client.jwtToken;
+        return {
+            user: id ? { id: String(id), username: user.username || (user.user && user.user.username) || "" } : null,
+            csrf: client && typeof client.csrfToken === "string" ? client.csrfToken : "",
+            jwt: jwt,
+            hasFavorites: dynamic && typeof dynamic.hasFavorites === "boolean" ? dynamic.hasFavorites : null,
+        };
+    }
+
+    async getJson(url, headers) {
+        var res = await this.client.get(url, headers);
+        var body = String(res.body || "");
+        var data = null;
+        try { data = JSON.parse(body); } catch (e) {}
+        return { status: res.statusCode, data: data, body: body, res: res };
+    }
+
+    baseHeaders(origin) {
+        return {
+            "Referer": origin + "/",
+            "Origin": origin,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+            "User-Agent": UA,
+        };
+    }
+
+    // Legge la sessione senza inventare token. Prima i cookie che aggiunge l'app,
+    // poi gli stessi senza doppioni vuoti, poi solo i cookie di accesso se l'header
+    // intero non basta. ita prima: è l'indirizzo della Webview.
+    async probeOrigin(origin) {
+        var headers = this.baseHeaders(origin);
+        var res;
+        try {
+            res = await this.getJson(origin + "/api/front/v3/config/initial", headers);
+        } catch (e) {
+            return { origin: origin, failed: true, note: { host: origin.replace("https://", ""), status: "nessuna risposta", user: "null", jwt: "no", fav: "n.d.", cookies: "0", mode: "app", api: "" } };
+        }
+        var sent = this.cookieHeader(res.res);
+        var packed = this.packCookies(sent, false);
+        var info = this.readClient(res.data);
+        var mode = "app";
+        var cookie = "";
+        if (!info.user && (packed.dup || packed.sessionEmpty)) {
+            var again = this.packCookies(sent, false);
+            if (again.header) {
+                try {
+                    var res2 = await this.getJson(origin + "/api/front/v3/config/initial", Object.assign({}, headers, { "Cookie": again.header }));
+                    var info2 = this.readClient(res2.data);
+                    if (info2.user) { info = info2; mode = "dedup"; cookie = again.header; res = res2; }
+                } catch (e2) {}
+            }
+        }
+        if (!info.user && packed.sessionNames.length) {
+            var short = this.packCookies(sent, true);
+            if (short.header && short.header !== sent) {
+                try {
+                    var res3 = await this.getJson(origin + "/api/front/v3/config/initial", Object.assign({}, headers, { "Cookie": short.header }));
+                    var info3 = this.readClient(res3.data);
+                    if (info3.user) { info = info3; mode = "corti"; cookie = short.header; res = res3; }
+                } catch (e3) {}
+            }
+        }
+        var dynHeaders = this.baseHeaders(origin);
+        if (cookie) dynHeaders.Cookie = cookie;
+        var dyn;
+        try { dyn = await this.getJson(origin + "/api/front/v3/config/dynamic", dynHeaders); } catch (e4) { dyn = { data: null }; }
+        var extra = this.readClient(dyn.data);
+        if (!info.jwt && extra.jwt) info.jwt = extra.jwt;
+        if (extra.hasFavorites !== null) info.hasFavorites = extra.hasFavorites;
+        var note = {
+            host: origin.replace("https://", ""),
+            status: String(res.status),
+            bytes: String(res.body || "").length,
+            user: info.user ? "sì" : "null",
+            jwt: info.jwt ? "sì" : "no",
+            fav: info.hasFavorites === true ? "sì" : info.hasFavorites === false ? "no" : "n.d.",
+            cookies: packed.names.length + " (sessione=" + (packed.sessionNames.length ? packed.sessionNames.slice(0, 4).join("+") : "NO")
+                + (packed.sessionEmpty ? " vuoto" : packed.sessionPresent ? " presente" : "")
+                + ", doppi=" + packed.dup
+                + ", csrf=" + (packed.hasCsrf ? "sì" : "no")
+                + ", family=" + (packed.hasFamily ? "sì" : "no") + ")",
+            mode: mode,
+            api: "",
+        };
+        if (res.status === 403 || res.status === 503 || /just a moment|attention required/i.test(String(res.body || "").slice(0, 4000))) {
+            note.api = "Cloudflare";
+        }
+        return {
+            origin: origin,
+            user: info.user,
+            csrf: info.csrf,
+            jwt: info.jwt,
+            cookie: cookie,
+            hasFavorites: info.hasFavorites,
+            mode: mode,
+            sessionPresent: packed.sessionPresent,
+            sessionEmpty: packed.sessionEmpty,
+            note: note,
+        };
+    }
+
+    async ensureSession() {
+        if (this._session) return this._session;
+        var hosts = ["https://ita.stripchat.com", BASE];
         var notes = [];
+        var best = null;
+        for (var i = 0; i < hosts.length; i++) {
+            var probe = await this.probeOrigin(hosts[i]);
+            notes.push(probe.note);
+            if (!best) best = probe;
+            if (probe.user) { best = probe; break; }
+        }
+        best.notes = notes;
+        best._at = Date.now();
+        if (best.user) this._session = best;
+        else if (!this._session || !this._session.user) this._session = best;
+        return best;
+    }
+
+    sessionHeaders(origin, session, referer) {
+        var headers = this.baseHeaders(origin);
+        if (referer) headers.Referer = referer;
+        if (session && session.origin === origin) {
+            if (session.cookie) headers.Cookie = session.cookie;
+            if (session.user && session.csrf) {
+                headers["X-Session-CSRF"] = session.csrf;
+                headers["X-Session-Verify"] = "1";
+            }
+            if (session.user && session.jwt) headers.Authorization = session.jwt;
+        }
+        return headers;
+    }
+
+    // Preferite con l'account. Basta il login nella Webview: si leggono i cookie
+    // che l'app allega e si chiede la stessa config che usa il sito.
+    async favorites(page, includeOffline) {
+        if (this._session && !this._session.user) this._session = null;
+        var session = await this.ensureSession();
+        var hosts = [];
+        if (session && session.origin) hosts.push(session.origin);
+        ["https://ita.stripchat.com", BASE].forEach(function (host) {
+            if (hosts.indexOf(host) === -1) hosts.push(host);
+        });
+        var notes = (session && session.notes) ? session.notes.slice() : [];
         var found = null;
         var authed = false;
         for (var h = 0; h < hosts.length && !found; h++) {
             var origin = hosts[h];
-            var note = { host: origin.replace("https://", ""), status: "nessuna risposta", bytes: 0, user: "null", jwt: "no", cookies: [], api: "" };
-            var res;
-            try {
-                res = await this.client.get(origin + "/favorites", {
-                    "Referer": origin + "/",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-                });
-            } catch (e) {
-                notes.push(note);
-                continue;
+            var note = null;
+            for (var n = 0; n < notes.length; n++) if (notes[n].host === origin.replace("https://", "")) note = notes[n];
+            if (!note) note = { host: origin.replace("https://", ""), status: "?", user: "null", jwt: "no", fav: "n.d.", cookies: "0", mode: "app", api: "" };
+            if (note.api === "Cloudflare") continue;
+            var viewer = session && session.origin === origin ? session.user : null;
+            var token = session && session.origin === origin ? session.jwt : "";
+            if (!viewer && session && session.origin !== origin) {
+                var other = await this.probeOrigin(origin);
+                viewer = other.user;
+                token = other.jwt;
+                if (other.user) session = other;
+                note = other.note;
             }
-            var body = String(res.body || "");
-            note.status = String(res.statusCode);
-            note.bytes = body.length;
-            note.cookies = this.cookieNames(res);
-            if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
-                note.api = "Cloudflare";
-                notes.push(note);
-                continue;
-            }
-            var state = this.preloadedState(body);
-            var viewer = this.viewerFrom(state);
-            var token = this.jwtFrom(state);
-            note.user = viewer ? "sì" : "null";
-            note.jwt = token ? "sì" : "no";
             var got;
             try {
-                got = await this.favoriteModels(origin, viewer, token, page, includeOffline);
+                got = await this.favoriteModels(origin, viewer, token, page, includeOffline, session && session.origin === origin ? session : null);
             } catch (e) {
                 note.api = "API muta";
-                notes.push(note);
                 continue;
             }
-            note.api = got.auth ? "accesso" : "ospite";
-            notes.push(note);
+            note.api = (viewer || (got && got.auth)) ? "accesso" : "ospite";
+            note.user = viewer ? "sì" : "null";
             if (got.models.length || (includeOffline && got.offline && got.offline.length)) found = { origin: origin, models: got.models, offline: got.offline || [], more: got.more };
-            else if (got.auth) authed = true;
+            else if (viewer || got.auth) authed = true;
         }
         if (!found) {
             var lines = notes.map(function (n) {
-                return n.host + " HTTP " + n.status + ", " + Math.round(n.bytes / 1024) + "KB, user=" + n.user + ", jwt=" + n.jwt + ", cookie " + this.cookieSummary(n.cookies) + (n.api ? ", " + n.api : "");
-            }, this);
-            var anySession = notes.some(function (n) { return this.sessionCookie(n.cookies).length; }, this);
+                return n.host + " HTTP " + n.status + ", " + (n.bytes ? Math.round(n.bytes / 1024) + "KB, " : "") + "user=" + n.user + ", jwt=" + n.jwt + ", preferiti=" + (n.fav || "n.d.") + ", cookie " + n.cookies + ", modo=" + (n.mode || "app") + (n.api ? ", " + n.api : "");
+            });
+            var anySession = session && (session.sessionPresent || session.sessionEmpty);
             var cf = notes.length && notes.every(function (n) { return n.api === "Cloudflare" || n.status === "nessuna risposta"; });
             if (authed) throw new Error("Preferiti Stripchat " + VERSION + ": il sito ti riconosce ma l'elenco è vuoto. " + lines.join(" | "));
             if (cf) throw new Error("Stripchat " + VERSION + " chiede una verifica (Cloudflare). Tocca Webview, aspetta la pagina, poi Riprova. " + lines.join(" | "));
             var limit = !anySession
-                ? " Manca il cookie di sessione (stripchat_com_sessionId o sessionId): tra i cookie copiati non c'è. Chaturbate funziona perché il suo cookie di login arriva all'estensione; quello di Stripchat è HttpOnly e Mangayomi 0.9.95 sull'iPhone spesso non lo copia (solo al cambio di indirizzo, solo nome=valore). Dopo il login apri un'altra pagina di Stripchat nella Webview e tocca Riprova. È un limite dell'app."
-                : " Il cookie di sessione c'è ma questo host non ha restituito i preferiti.";
+                ? " Manca il cookie di sessione tra quelli copiati dalla Webview."
+                : session.sessionEmpty
+                    ? " Il cookie di sessione copiato è vuoto: un valore vecchio ha coperto quello del login. È un limite di come Mangayomi salva i cookie (solo nome=valore, senza dominio)."
+                    : " Il cookie di sessione c'è, ma /api/front/v3/config/initial risponde comunque da ospite su ita e su stripchat.com. Il sito tiene anche la sessione nel localStorage della Webview: Mangayomi non la manda con le richieste dell'estensione.";
             throw new Error("Preferiti Stripchat " + VERSION + ". " + lines.join(" | ") + "." + limit);
         }
         this._site = found.origin;
+        this._session = session && session.origin === found.origin ? session : this._session;
         var gotModels = found.models || [];
         var offlineModels = includeOffline ? (found.offline || []) : [];
         var more = found.more;

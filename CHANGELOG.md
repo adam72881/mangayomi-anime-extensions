@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.18
+
+- Preferiti: prima si chiede la config del sito su ita.stripchat.com, poi su stripchat.com. Se lo stesso cookie c'è due volte, si tiene l'ultimo valore non vuoto.
+- Popolare è solo il blocco «in evidenza», nell'ordine del sito. Se quel blocco non arriva, compare un errore invece di un altro elenco.
+
 ## Stripchat 1.3.17
 
 - L'estensione usa stripchat.com per la Webview e per tutte le richieste. Il sito italiano si usa solo se stripchat.com non risponde.
