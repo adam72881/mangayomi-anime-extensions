@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.1
+
+- **Preferiti dopo il login:** la Webview resta su ita.stripchat.com, mentre l'estensione cercava i preferiti su stripchat.com, dove l'accesso non c'era. Ora prova tutti e due gli indirizzi e ricorda quello che funziona (vale anche per l'HD con l'account).
+- I dati della pagina dei preferiti si leggono in modo più robusto. Se non ci riesce, il messaggio dice cosa ha risposto ogni indirizzo.
+
 ## Chaturbate 1.3.3
 
 - **La diretta resta a caricare all'infinito:** il link della diretta ora vale per una sola apertura. L'estensione lo apriva per leggere le qualità e al player arrivava già scaduto (errore 403). In **Auto** il link passa intatto al player; con una qualità scelta l'estensione usa i link delle singole qualità, che restano validi.

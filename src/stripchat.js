@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.3.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -301,31 +301,75 @@ class DefaultExtension extends MProvider {
         return fresh || known || null;
     }
 
+    // Il sito ha anche ita.stripchat.com, ed è lì che resta la Webview dopo il
+    // login: Mangayomi tiene i cookie dell'ultimo indirizzo visitato e toglie
+    // quelli dell'altro, quindi login (e Cloudflare) valgono su uno solo dei due.
+    // Si provano tutti e due e si ricorda quello che funziona.
+    siteHosts() {
+        var first = this._site || "https://ita.stripchat.com";
+        return [first, first === BASE ? "https://ita.stripchat.com" : BASE];
+    }
+
+    // window.__PRELOADED_STATE__ = {…} della pagina: l'oggetto preso contando
+    // le graffe (dopo può esserci «;» o altro codice nello stesso <script>).
+    preloadedState(body) {
+        var i = body.indexOf("__PRELOADED_STATE__");
+        if (i === -1) return null;
+        var start = body.indexOf("{", i);
+        if (start === -1) return null;
+        var depth = 0, inStr = false, esc = false;
+        for (var j = start; j < body.length; j++) {
+            var ch = body.charAt(j);
+            if (inStr) {
+                if (esc) esc = false;
+                else if (ch === "\\") esc = true;
+                else if (ch === '"') inStr = false;
+            } else if (ch === '"') inStr = true;
+            else if (ch === "{") depth++;
+            else if (ch === "}" && --depth === 0) {
+                try { return JSON.parse(body.slice(start, j + 1)); } catch (e) { return null; }
+            }
+        }
+        return null;
+    }
+
+    loggedUser(data) {
+        var me = data && data.user && (data.user.user || data.user.me || data.user);
+        return me && (me.id || me.username) && me.isGuest !== true ? me : null;
+    }
+
     // Preferite con l'account: dopo il login nella Webview i cookie passano
-    // all'estensione e la pagina /favorites del sito ha l'elenco nei suoi dati
-    // (window.__PRELOADED_STATE__). Non provato con un account: da qui
-    // stripchat.com è dietro Cloudflare.
+    // all'estensione e la pagina /favorites del sito ha l'elenco nei suoi dati.
     async favorites(page) {
         if (page > 1) return { list: [], hasNextPage: false };
-        var res;
-        try {
-            res = await this.client.get(BASE + "/favorites", { "Referer": BASE + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
-        } catch (e) {
-            throw new Error("Stripchat non risponde (problema di connessione). Tocca Riprova.");
+        var hosts = this.siteHosts();
+        var data = null, me = null, notes = [], blocked = false, guest = false;
+        for (var h = 0; h < hosts.length && !me; h++) {
+            var res;
+            try {
+                res = await this.client.get(hosts[h] + "/favorites", { "Referer": hosts[h] + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
+            } catch (e) {
+                notes.push(hosts[h].replace("https://", "") + ": nessuna risposta");
+                continue;
+            }
+            var body = String(res.body || "");
+            if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
+                blocked = true;
+                notes.push(hosts[h].replace("https://", "") + ": Cloudflare");
+                continue;
+            }
+            var d = this.preloadedState(body);
+            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + (d ? "" : ", senza dati"));
+            if (!d) continue;
+            if (!this.loggedUser(d)) { guest = true; continue; }
+            data = d;
+            me = this.loggedUser(d);
+            this._site = hosts[h];
         }
-        var body = String(res.body || "");
-        if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
-            throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, superala e fai il login, poi torna qui e tocca Riprova.");
-        }
-        var m = body.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\})\s*<\/script>/);
-        var data = null;
-        if (m) {
-            try { data = JSON.parse(m[1]); } catch (e) { data = null; }
-        }
-        if (!data) throw new Error("Non riesco a leggere i preferiti di Stripchat. Aprili dalla Webview.");
-        var me = data.user && (data.user.user || data.user.me || data.user);
-        if (!me || !(me.id || me.username) || me.isGuest === true) {
-            throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
+        if (!me) {
+            if (guest) throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
+            if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
+            throw new Error("Non riesco a leggere i preferiti di Stripchat (" + notes.join("; ") + "). Mandami questo messaggio.");
         }
         // L'elenco più lungo di modelle (oggetti con username e id) nei dati della pagina.
         var best = [];
@@ -452,10 +496,11 @@ class DefaultExtension extends MProvider {
     // Non provato con un account vero: da qui stripchat.com è dietro Cloudflare.
     async accountStreams(user, headers) {
         var found = [];
-        var pages = [
-            BASE + "/api/front/v2/models/username/" + encodeURIComponent(user) + "/cam",
-            BASE + "/" + encodeURIComponent(user),
-        ];
+        var pages = [];
+        this.siteHosts().forEach(function (h) {
+            pages.push(h + "/api/front/v2/models/username/" + encodeURIComponent(user) + "/cam");
+            pages.push(h + "/" + encodeURIComponent(user));
+        });
         for (var i = 0; i < pages.length; i++) {
             var res;
             try {

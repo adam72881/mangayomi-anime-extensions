@@ -24,7 +24,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.3.0 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.3.1 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -271,6 +271,7 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 
 - **11/11/2026 — Italia:** dall'Italia Chaturbate risponde alle API con la pagina «Verify your age — Visitors in Italy must verify their age» (Yoti / Face Scan / AgeKey; scade con l'inattività). Obbligo di legge: **non si aggira**. Le estensioni riconoscono la pagina (HTML al posto del JSON, o 401/403/451 con testo di verifica età) e dicono di completarla nella Webview. Da qui (USA) le API rispondono normalmente, quindi i test cloud non vedono questo caso.
 
+- **Stripchat 1.3.1 — ita.stripchat.com:** stesso problema dei cookie per host di Chaturbate: utente loggato nella Webview su ita.stripchat.com (Preferiti visibili), estensione su stripchat.com → «Non riesco a leggere i preferiti». `siteHosts()` (ita prima) per `/favorites` e `accountStreams`; `preloadedState()` conta le graffe (prima la regex voleva `}</script>` subito dopo). Non provato dal vivo: Cloudflare blocca il cloud; provato con pagina finta.
 - **Chaturbate 1.3.3 — token monouso:** `hls_source` (`…/llhls.m3u8?token=…`, LL-HLS fMP4) risponde 200 alla prima GET e 403 dopo (provato nella stessa sessione `requests`). Mai aprirlo prima del player in Auto; con qualità fissa si legge il master e si danno le chunklist `?session=` (riusabili), altrimenti `freshAuto()` richiede un nuovo contesto.
 - **Chaturbate 1.3.2 — it.chaturbate.com:** dopo verifica e login la Webview resta su it.chaturbate.com. Mangayomi (`MClient.setCookie` a ogni navigazione) salva i cookie dell'URL visitato e cancella quelli degli host collegati (`removeCookiesForHost` con `_hostsMatch` largo), quindi i cookie solo-host di chaturbate.com si perdono. `json(path, check)` prova `this._host` (default chaturbate.com) e poi l'altro; per le seguite `check` = almeno una stanza con `is_following`. Le API rispondono su entrambi gli host (provato). Utente: login come gloriasissypopa, sito mostrava Following (1/10), estensione dava ancora «verifica dell'età».
 
