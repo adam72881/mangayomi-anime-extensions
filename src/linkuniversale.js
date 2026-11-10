@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.16",
+        "version": "1.4.17",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -724,7 +724,10 @@ function base64Decode(input) {
     var out = "";
     for (var i = 0; i < str.length; i += 4) {
         var a = chars.indexOf(str.charAt(i)), b = chars.indexOf(str.charAt(i + 1));
-        var c = chars.indexOf(str.charAt(i + 2)), d = chars.indexOf(str.charAt(i + 3));
+        // charAt oltre la fine dà "" e indexOf("") è 0: senza questo controllo
+        // in fondo comparivano caratteri nulli (indirizzi dei server rotti).
+        var c = i + 2 < str.length ? chars.indexOf(str.charAt(i + 2)) : -1;
+        var d = i + 3 < str.length ? chars.indexOf(str.charAt(i + 3)) : -1;
         out += String.fromCharCode((a << 2) | (b >> 4));
         if (c >= 0) out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
         if (d >= 0) out += String.fromCharCode(((c & 3) << 6) | d);
@@ -859,6 +862,32 @@ class DefaultExtension extends MProvider {
         var opened = await this.openAgeGate(url, body, referer);
         if (opened) return opened;
         throw new Error(this.ageWallMessage(url, body));
+    }
+
+    // Pagina del video: la scheda e il player la chiedono tutti e due a pochi
+    // secondi di distanza. Si tiene in memoria 3 minuti (l'istanza dell'estensione
+    // resta viva tra scheda e player), così si scarica una volta sola.
+    async fetchPage(url) {
+        this._pages = this._pages || {};
+        var key = String(url).split("#")[0];
+        var hit = this._pages[key];
+        if (hit && Date.now() - hit.at < 180000) return hit.html;
+        var html = await this.fetchHtml(key, originOf(key) + "/");
+        this._pages[key] = { at: Date.now(), html: html };
+        var keys = Object.keys(this._pages);
+        if (keys.length > 30) delete this._pages[keys[0]];
+        return html;
+    }
+
+    // Il video si cerca già mentre guardi la scheda: quando tocchi Guarda è pronto.
+    startPrefetch(link) {
+        this._prefetch = this._prefetch || {};
+        var key = String(link).split("#")[0];
+        if (this._prefetch[key] && Date.now() - this._prefetch[key].at < 240000) return;
+        var job = this.resolveVideos(key).catch(function () { return null; });
+        this._prefetch[key] = { at: Date.now(), job: job };
+        var keys = Object.keys(this._prefetch);
+        if (keys.length > 10) delete this._prefetch[keys[0]];
     }
 
     // ---------- Cronologia dei link aperti ----------
@@ -1821,7 +1850,7 @@ class DefaultExtension extends MProvider {
 
     async getDetail(url) {
         var link = cleanLink(url);
-        var html = await this.fetchHtml(link, originOf(link) + "/");
+        var html = await this.fetchPage(link);
         var title = pageTitle(html) || link;
         var image = coverUrl(metaContent(html, ["og:image", "twitter:image", "thumbnailUrl"]), link);
         if (!image) {
@@ -1857,6 +1886,9 @@ class DefaultExtension extends MProvider {
         }
         if (!chapters.length) chapters = [{ name: facts.duration ? "Video · " + facts.duration : "Video", url: link }];
 
+        if (chapters.length === 1 && String(chapters[0].url).split("#")[0] === link.split("#")[0]) {
+            try { this.startPrefetch(link); } catch (e) {}
+        }
         this.remember({ name: title, imageUrl: image, link: link });
         return {
             name: title,
@@ -1915,6 +1947,21 @@ class DefaultExtension extends MProvider {
 
     async getVideoList(url) {
         var link = cleanLink(url);
+        var pre = this._prefetch && this._prefetch[link.split("#")[0]];
+        if (pre && Date.now() - pre.at < 240000) {
+            var ready = await Promise.race([
+                pre.job,
+                new Promise(function (resolve) {
+                    if (typeof setTimeout === "function") setTimeout(function () { resolve(null); }, 12000);
+                }),
+            ]);
+            if (ready && ready.length) return ready;
+        }
+        return this.resolveVideos(link);
+    }
+
+    async resolveVideos(url) {
+        var link = cleanLink(url);
         var videos = [];
 
         if (new RegExp("\\.(" + VIDEO_EXT + ")(\\?|$)", "i").test(link)) {
@@ -1938,7 +1985,7 @@ class DefaultExtension extends MProvider {
             } catch (e) {}
         }
 
-        var html = await this.fetchHtml(link, originOf(link) + "/");
+        var html = await this.fetchPage(link);
         videos = videos.concat(await this.videosFromHtml(html, link, 0));
 
         // Stesso file con parametri diversi (?rnd=…, ?v=…): uno solo, quello
@@ -2082,12 +2129,34 @@ class DefaultExtension extends MProvider {
             if (frames.indexOf(m[0]) === -1) frames.push(m[0]);
         }
 
-        for (var k = 0; k < frames.length && k < 8; k++) {
-            try {
-                videos = videos.concat(await this.videosFromFrame(frames[k], pageUrl, depth));
-            } catch (e) {}
-        }
-        return videos;
+        // Tutti i player insieme. Appena uno dà un video si aspettano gli altri
+        // al massimo 1,2 secondi; in ogni caso non oltre 9 secondi in tutto.
+        // Prima si aprivano uno dopo l'altro: ~15 s prima che partisse il player.
+        var self = this;
+        var list = frames.slice(0, 8);
+        if (!list.length) return videos;
+        var collected = await new Promise(function (resolve) {
+            var results = [], pending = list.length, done = false, graceSet = false;
+            var finish = function () {
+                if (done) return;
+                done = true;
+                resolve(results);
+            };
+            var timer = typeof setTimeout === "function" ? setTimeout : null;
+            if (timer) timer(finish, 9000);
+            list.forEach(function (f) {
+                self.videosFromFrame(f, pageUrl, depth).catch(function () { return []; }).then(function (got) {
+                    if (done) return;
+                    if (got && got.length) {
+                        results = results.concat(got);
+                        if (!graceSet && timer) { graceSet = true; timer(finish, 1200); }
+                    }
+                    pending -= 1;
+                    if (pending === 0) finish();
+                });
+            });
+        });
+        return videos.concat(collected);
     }
 
     async videosFromFrame(frameUrl, referer, depth) {

@@ -1,5 +1,14 @@
 # Novità
 
+## Link universale 1.4.17
+
+- **Più veloce ad aprire i video**:
+  - il video si cerca già mentre guardi la scheda: quando tocchi Guarda di solito è pronto;
+  - la pagina del video si scarica una volta sola (prima due: scheda e player);
+  - i server del player si aprono tutti insieme; appena uno risponde si aspettano gli altri al massimo 1,2 secondi (prima uno dopo l'altro, fino a ~15 secondi su javhd.today).
+- **javhd.today**: ora ci sono tutti e due i server nella lista dei video (mycloudz e cloudwish). Se uno resta a caricare, scegli l'altro dal player.
+- Corretto un errore nella lettura dei server scritti in base64: l'indirizzo finiva con caratteri nulli e il server non si apriva.
+
 ## Link universale 1.4.16
 
 - **Filtro Categoria per tutti i siti**: le stesse 27 categorie (MILF, Anal, BDSM, Giapponesi, Lesbiche, Tette grandi…) qualunque sito scegli. L'estensione apre la pagina di quella categoria sul sito (xHamster, Eporner, xVideos, Porntrex, YouJizz, javhd.today…); se il sito non ne ha una, cerca la parola. Con un testo nella ricerca, cerca testo + categoria.
