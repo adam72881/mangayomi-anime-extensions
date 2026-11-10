@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.9
+
+- **La diretta non resta più a 480p quando il sito offre di più gratis.** L'elenco pubblico della stanza indica 720p o 1080p per chi trasmette così, e quelle qualità partono per prime. Se il sito offre solo 480p e 240p, resta così. La qualità più alta nascosta, quella che non si apre, non si usa.
+- **Preferiti:** il filtro «Le mie preferite» legge l'elenco dall'API del sito, con l'accesso fatto nella Webview. Senza login dice di entrare, invece di un elenco vuoto.
+
 ## Stripchat 1.3.8
 
 - **Preferiti:** l'estensione ora legge i dati della pagina. Se il sito non dice chiaramente che hai fatto il login, l'estensione cerca lo stesso le preferite. Se il sito ti vede come ospite, il messaggio mostra come ti descrive, per capire se il login non arriva all'estensione.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.8",
+        "version": "1.3.9",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.8";
+const VERSION = "1.3.9";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -176,7 +176,7 @@ class DefaultExtension extends MProvider {
 
     thumb(m) {
         // Prima l'istantanea della diretta, poi la foto del profilo.
-        return m.snapshotUrl || m.popularSnapshotUrl || m.previewUrlThumbBig || m.previewUrl || m.avatarUrl || "";
+        return m.snapshotUrl || m.popularSnapshotUrl || m.previewUrlThumbBig || m.previewUrl || m.previewUrlThumbSmall || m.avatarUrl || "";
     }
 
     card(m) {
@@ -486,64 +486,149 @@ class DefaultExtension extends MProvider {
             (Object.keys(apis).length ? ", " + Object.keys(apis).slice(0, 4).join(" ") : "");
     }
 
-    // Preferite con l'account: dopo il login nella Webview i cookie passano
-    // all'estensione e la pagina /favorites del sito ha l'elenco nei suoi dati.
+    // Chi è loggato, dai dati della pagina /favorites. Da ospite user è null
+    // (provato il 10/11/2026 su ita.stripchat.com): i preferiti non sono schede
+    // nell'HTML, il sito li chiede dopo all'API.
+    viewerFrom(data) {
+        var client = data && data.configV3 && data.configV3.initialClient;
+        var user = client && client.user;
+        if (!user || typeof user !== "object") return null;
+        var id = user.id || (user.user && user.user.id);
+        if (!id) return null;
+        return { id: String(id), username: user.username || (user.user && user.user.username) || "" };
+    }
+
+    jwtFrom(data) {
+        var client = data && data.configV3 && data.configV3.initialClient;
+        var token = client && client.jwtToken;
+        return typeof token === "string" ? token : "";
+    }
+
+    // Stesse intestazioni della pagina: il sito manda il token dell'accesso
+    // (initialClient.jwtToken) come Authorization. Senza, l'API dei preferiti
+    // risponde vuota (ospite, 200) o «invalid token» (401). Non si inventa.
+    apiHeaders(origin, token) {
+        var headers = {
+            "Referer": origin + "/favorites",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+        };
+        if (token) headers.Authorization = token;
+        return headers;
+    }
+
+    async apiJson(url, headers) {
+        var res = await this.client.get(url, headers);
+        var body = String(res.body || "");
+        var data = null;
+        try { data = JSON.parse(body); } catch (e) {}
+        return { status: res.statusCode, data: data, body: body };
+    }
+
+    // Id dei preferiti, poi le schede. L'endpoint delle schede, senza accesso,
+    // risponde {models:[]} anche se gli si passa un id vero (provato).
+    async favoriteModels(origin, viewer, token, page) {
+        var headers = this.apiHeaders(origin, token);
+        var idsRes = await this.apiJson(origin + "/api/front/users/" + encodeURIComponent(viewer.id) + "/favorites", headers);
+        if (idsRes.status === 401 || idsRes.status === 403) return { auth: false, models: [], more: false };
+        var ids = [];
+        var bag = idsRes.data || {};
+        var rawIds = bag.modelIds || bag.favoriteIds || bag.ids || bag.data || [];
+        if (Array.isArray(rawIds)) {
+            rawIds.forEach(function (x) {
+                var id = x && typeof x === "object" ? (x.id || x.modelId) : x;
+                if (id) ids.push(String(id));
+            });
+        }
+        var offset = (page - 1) * PER_PAGE;
+        var slice = ids.slice(offset, offset + PER_PAGE);
+        var models = [];
+        if (slice.length) {
+            var q = slice.map(function (id) { return "favoriteIds[]=" + encodeURIComponent(id); }).join("&");
+            var batch = await this.apiJson(origin + "/api/front/models/favorites?" + q, headers);
+            if (batch.status === 401 || batch.status === 403) return { auth: false, models: [], more: false };
+            models = (batch.data && batch.data.models) || [];
+            if (!models.length) {
+                var self = this;
+                var oneByOne = await Promise.all(slice.map(function (id) {
+                    return self.apiJson(origin + "/api/front/models/" + encodeURIComponent(id), headers).catch(function () { return { data: null }; });
+                }));
+                oneByOne.forEach(function (r) {
+                    if (r.data && r.data.username && r.data.id) models.push(r.data);
+                });
+            }
+        }
+        if (page === 1) {
+            var off = await this.apiJson(origin + "/api/front/models/favorites/offline?limit=" + PER_PAGE + "&offset=0", headers);
+            ((off.data && off.data.models) || []).forEach(function (m) {
+                if (m && m.username) models.push(m);
+            });
+        }
+        return { auth: true, models: models, more: ids.length > offset + PER_PAGE };
+    }
+
+    // Preferite con l'account. Il login si fa nella Webview: i cookie arrivano
+    // con la pagina e il token che il sito scrive nei dati della pagina si
+    // rimanda all'API, come fa la pagina stessa.
     async favorites(page) {
-        if (page > 1) return { list: [], hasNextPage: false };
         var hosts = this.siteHosts();
-        var best = null, notes = [], blocked = false, guest = false;
-        for (var h = 0; h < hosts.length && !best; h++) {
+        var session = null, blocked = false;
+        for (var h = 0; h < hosts.length && !session; h++) {
             var res;
             try {
-                // Senza «Accept» da pagina web il sito risponde 406.
                 res = await this.client.get(hosts[h] + "/favorites", {
                     "Referer": hosts[h] + "/",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
                 });
             } catch (e) {
-                notes.push(hosts[h].replace("https://", "") + ": nessuna risposta");
                 continue;
             }
             var body = String(res.body || "");
             if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
                 blocked = true;
-                notes.push(hosts[h].replace("https://", "") + ": Cloudflare");
                 continue;
             }
-            var d = this.preloadedState(body);
-            var me = d ? this.loggedUser(d) : null;
-            if (d && !me) guest = true;
-            var models = d ? this.stateModels(d, me) : this.htmlModels(body);
-            if (models.length) {
-                best = models;
-                this._site = hosts[h];
-                break;
-            }
-            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + (d ? "dati letti, nessun elenco, " + this.userInfo(d) : this.pageHints(body)));
+            var state = this.preloadedState(body);
+            var viewer = this.viewerFrom(state);
+            if (!viewer) continue;
+            session = { origin: hosts[h], viewer: viewer, token: this.jwtFrom(state) };
         }
-        if (!best) {
-            if (blocked && !notes.some(function (n) { return !/Cloudflare|nessuna risposta/.test(n); })) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
-            throw new Error((guest ? "Il sito ti vede come ospite: se nella Webview hai fatto il login, mandami questo messaggio. " : "") + "Preferiti Stripchat " + VERSION + ": " + notes.join(" | "));
+        if (!session) {
+            if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
+            throw new Error("Per vedere le preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
+        }
+        this._site = session.origin;
+        var got;
+        try {
+            got = await this.favoriteModels(session.origin, session.viewer, session.token, page);
+        } catch (e) {
+            throw new Error("Stripchat non ha risposto con i preferiti. Controlla la rete e tocca Riprova.");
+        }
+        if (!got.auth) throw new Error("L'accesso non è arrivato alle richieste. Tocca Webview, entra di nuovo nel tuo account Stripchat, poi torna qui e tocca Riprova.");
+        if (!got.models.length) {
+            if (page > 1) return { list: [], hasNextPage: false };
+            throw new Error("Non hai ancora preferite su Stripchat, oppure in questo momento l'elenco è vuoto.");
         }
         var self = this;
         var seenIds = {};
         var list = [];
-        best.forEach(function (o) {
+        got.models.forEach(function (o) {
+            if (!o || !o.username) return;
             var key = String(o.username).toLowerCase();
             if (seenIds[key]) return;
             seenIds[key] = true;
             var live = o.status === "public" || o.isLive === true || o.isOnline === true;
-            var known = self.seen[String(o.username).toLowerCase()];
+            var known = self.seen[key];
             var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
-            if (!known) self.seen[String(o.username).toLowerCase()] = Object.assign({ _at: 0 }, o);
-            c.name = (live ? "● " : "") + c.name.replace(/^● /, "");
+            if (!known) self.seen[key] = Object.assign({ _at: 0 }, o);
+            c.name = (live ? "● " : "") + String(c.name).replace(/^● /, "");
             c._live = live;
             list.push(c);
         });
         list.sort(function (a, b) { return (b._live ? 1 : 0) - (a._live ? 1 : 0); });
         list.forEach(function (c) { delete c._live; });
-        return { list: list, hasNextPage: false };
+        return { list: list, hasNextPage: !!got.more };
     }
 
     // Video da numero della modella, quando non è tra le dirette dell'elenco
@@ -588,32 +673,54 @@ class DefaultExtension extends MProvider {
         var u = this.user(url);
         var m = await this.model(u);
         if ((!m || !m.stream) && (u.id || (m && m.id))) {
-            var direct = await this.streamById(u.id || m.id);
-            if (direct) return [{ url: direct, originalUrl: direct, quality: "Diretta", headers: this.playerHeaders(u.name) }];
+            var hid = u.id || m.id;
+            var earlyHeaders = this.playerHeaders(u.name);
+            try {
+                var early = await this.publicVideos(hid, u.name, earlyHeaders);
+                if (early.length) return early;
+            } catch (e) {}
+            var direct = await this.streamById(hid);
+            if (direct) return [{ url: direct, originalUrl: direct, quality: "Diretta", headers: earlyHeaders }];
         }
         if (!m || m.status !== "public" || !m.stream) {
             var st = m ? (STATUS_TEXT[m.status] || "non in diretta pubblica") : "offline";
             throw new Error(u.name + ": " + st.toLowerCase() + ". Riprova più tardi o scegli un'altra stanza.");
         }
-        var urls = m.stream.urls || {};
         var headers = this.playerHeaders(u.name);
+        var id = (m && m.id) || u.id;
+        // L'API partner elenca solo 240p e 480p. La pagina pubblica della stanza
+        // elenca anche 720p e 1080p quando il sito le offre a tutti: si usano
+        // solo quelle, e solo se il pezzo video risponde. Il file «source»
+        // indovinato (_160p) punta a una playlist che risponde 404: non si usa
+        // e non si decifra.
         var out = [], seen = {};
-        var add = function (u2, label) {
-            if (!u2 || seen[u2]) return;
-            seen[u2] = true;
-            out.push({ url: u2, originalUrl: u2, quality: label, headers: headers });
-        };
-        // Prima la qualità più alta.
-        var keys = Object.keys(urls).filter(function (k) { return k !== "original"; }).sort(function (a, b) {
-            return (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0);
-        });
-        var origLabel = "Originale";
-        Object.keys(urls).forEach(function (k) {
-            if (k !== "original" && urls[k] === urls.original) origLabel = "Originale · " + k;
-        });
-        add(urls.original, origLabel);
-        keys.forEach(function (k) { add(urls[k], k); });
-        add(m.stream.url, "Diretta");
+        if (id) {
+            try {
+                out = await this.publicVideos(id, u.name, headers);
+            } catch (e) {
+                out = [];
+            }
+        }
+        if (!out.length) {
+            var urls = m.stream.urls || {};
+            var add = function (u2, label) {
+                if (!u2 || seen[u2]) return;
+                seen[u2] = true;
+                out.push({ url: u2, originalUrl: u2, quality: label, headers: headers });
+            };
+            var keys = Object.keys(urls).filter(function (k) { return k !== "original"; }).sort(function (a, b) {
+                return (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0);
+            });
+            var origLabel = "Originale";
+            Object.keys(urls).forEach(function (k) {
+                if (k !== "original" && urls[k] === urls.original) origLabel = "Originale · " + k;
+            });
+            add(urls.original, origLabel);
+            keys.forEach(function (k) { add(urls[k], k); });
+            add(m.stream.url, "Diretta");
+        } else {
+            out.forEach(function (v) { seen[v.url] = true; });
+        }
         if (!out.length) throw new Error("Non trovo il video della diretta di " + u.name + ". Prova dalla Webview.");
         if (this.setting("sc_account_hd") === true) {
             try {
@@ -624,6 +731,50 @@ class DefaultExtension extends MProvider {
                 if (extra.length) out = extra.concat(out);
             } catch (e) {}
         }
+        return out;
+    }
+
+    // Qualità che la pagina pubblica della stanza elenca (broadcastSettings.presets).
+    // Il master sta su edge-hls.doppiocdn.media, lo stesso host di hlsPlaylist
+    // dell'API pubblica /api/front/models (60 stanze su 60, 10/11/2026).
+    // Si tiene una qualità solo se playable() trova pezzi video veri.
+    async publicVideos(id, name, headers) {
+        var page;
+        try {
+            page = await this.client.get("https://ita.stripchat.com/" + encodeURIComponent(name), {
+                "Referer": "https://ita.stripchat.com/",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+                "User-Agent": UA,
+            });
+        } catch (e) {
+            return [];
+        }
+        var body = String((page && page.body) || "");
+        if (page.statusCode >= 400 || body.indexOf("broadcastSettings") === -1) return [];
+        var found = body.match(/"broadcastSettings":\{[^{}]*"presets":\[([^\]]*)\]/);
+        if (!found) return [];
+        var names = [];
+        var re = /"(\d+p\d*)"/g, mm;
+        while ((mm = re.exec(found[1])) !== null) {
+            if (names.indexOf(mm[1]) === -1) names.push(mm[1]);
+        }
+        names.sort(function (a, b) {
+            var pa = a.match(/^(\d+)p(\d+)?$/), pb = b.match(/^(\d+)p(\d+)?$/);
+            var ra = (parseInt(pa[1], 10) * 1000) + (pa[2] ? parseInt(pa[2], 10) : 0);
+            var rb = (parseInt(pb[1], 10) * 1000) + (pb[2] ? parseInt(pb[2], 10) : 0);
+            return rb - ra;
+        });
+        var best = names.length ? (parseInt(names[0], 10) || 0) : 0;
+        if (best <= 480) return [];
+        var out = [];
+        for (var i = 0; i < names.length && i < 6; i++) {
+            var url = "https://edge-hls.doppiocdn.media/hls/" + id + "/master/" + id + "_" + names[i] + ".m3u8";
+            if (await this.playable(url, headers)) {
+                out.push({ url: url, originalUrl: url, quality: names[i], headers: headers });
+            }
+        }
+        if (!out.length || (parseInt(out[0].quality, 10) || 0) <= 480) return [];
         return out;
     }
 
