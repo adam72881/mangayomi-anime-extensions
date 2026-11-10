@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.2.0
+
+- Nuova impostazione **«Ho fatto il login: cerca l'HD»**. Dopo il login nella Webview, per ogni diretta chiede al sito i dati della stanza con il tuo account (come la pagina della stanza) e, se il sito ti dà qualità più alte (720p, 1080p…), le mette in cima nel player con «· account». Se non te le dà, restano 480p e 240p.
+- Usa solo i link che il sito restituisce al tuo account. Non provato con un account vero.
+
 ## Chaturbate 1.3.0
 
 - **Impostazione Qualità**: Auto (consigliata), 1080p, 720p, 480p, 360p, 240p.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -385,7 +385,79 @@ class DefaultExtension extends MProvider {
         keys.forEach(function (k) { add(urls[k], k); });
         add(m.stream.url, "Diretta");
         if (!out.length) throw new Error("Non trovo il video della diretta di " + u.name + ". Prova dalla Webview.");
+        if (this.setting("sc_account_hd") === true) {
+            try {
+                var hd = await this.accountStreams(u.name, headers);
+                // Le qualità date al tuo account vanno prima, se sono più alte.
+                var extra = hd.filter(function (v) { return !seen[v.url]; });
+                extra.forEach(function (v) { seen[v.url] = true; });
+                if (extra.length) out = extra.concat(out);
+            } catch (e) {}
+        }
         return out;
+    }
+
+    setting(key) {
+        try { return new SharedPreferences().get(key); } catch (e) { return null; }
+    }
+
+    // Con il login fatto nella Webview: i dati della diretta che il sito dà al
+    // TUO account (stessa richiesta della pagina della stanza, con i tuoi
+    // cookie). Si usano solo i link del video che il sito restituisce lì; se per
+    // il tuo account non ci sono qualità più alte, non cambia niente.
+    // Non provato con un account vero: da qui stripchat.com è dietro Cloudflare.
+    async accountStreams(user, headers) {
+        var found = [];
+        var pages = [
+            BASE + "/api/front/v2/models/username/" + encodeURIComponent(user) + "/cam",
+            BASE + "/" + encodeURIComponent(user),
+        ];
+        for (var i = 0; i < pages.length; i++) {
+            var res;
+            try {
+                res = await this.client.get(pages[i], { "Referer": BASE + "/" + user, "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" });
+            } catch (e) {
+                continue;
+            }
+            if (res.statusCode >= 400) continue;
+            var text = String(res.body || "").replace(/\\u002[fF]/g, "/").replace(/\\\//g, "/");
+            var re = /https?:\/\/[^"'\s<>\\]+?\.m3u8[^"'\s<>\\]*/g, m;
+            while ((m = re.exec(text)) !== null) {
+                if (found.indexOf(m[0]) === -1) found.push(m[0]);
+            }
+            if (found.length) break;
+        }
+        // Ogni file trovato: le sue qualità (video e audio insieme, come su Stripchat).
+        var out = [];
+        for (var j = 0; j < found.length && j < 4; j++) {
+            var master;
+            try {
+                master = await this.client.get(found[j], headers);
+            } catch (e) {
+                continue;
+            }
+            var body = String(master.body || "");
+            if (master.statusCode >= 400 || body.indexOf("#EXTM3U") === -1) continue;
+            var lines = body.split(/\r?\n/);
+            var any = false;
+            for (var k = 0; k < lines.length; k++) {
+                if (lines[k].indexOf("#EXT-X-STREAM-INF:") !== 0) continue;
+                var next = (lines[k + 1] || "").trim();
+                if (!next || next.charAt(0) === "#") continue;
+                var name = (lines[k].match(/NAME="([^"]+)"/) || ["", ""])[1];
+                var h = (lines[k].match(/RESOLUTION=\d+x(\d+)/) || ["", ""])[1];
+                var label = name || (h ? h + "p" : "Diretta");
+                var abs = /^https?:/i.test(next) ? next : found[j].replace(/[^\/]*$/, "") + next;
+                out.push({ url: abs, originalUrl: abs, quality: label + " · account", headers: headers, _h: parseInt(label, 10) || parseInt(h, 10) || 0 });
+                any = true;
+            }
+            if (!any) out.push({ url: found[j], originalUrl: found[j], quality: "Diretta · account", headers: headers, _h: 0 });
+        }
+        // Solo se c'è davvero qualcosa sopra il 480p pubblico.
+        var best = out.reduce(function (a, v) { return Math.max(a, v._h); }, 0);
+        out.sort(function (a, b) { return b._h - a._h; });
+        out.forEach(function (v) { delete v._h; });
+        return best > 480 ? out : [];
     }
 
     getFilterList() {
@@ -410,6 +482,15 @@ class DefaultExtension extends MProvider {
     }
 
     getSourcePreferences() {
-        return [];
+        return [
+            {
+                key: "sc_account_hd",
+                switchPreferenceCompat: {
+                    title: "Ho fatto il login: cerca l'HD",
+                    summary: "Dopo il login nella Webview, per ogni diretta chiede al sito le qualità date al tuo account (720p, 1080p…) e le mette in cima nel player. Senza account lascialo spento.",
+                    value: false,
+                },
+            },
+        ];
     }
 }

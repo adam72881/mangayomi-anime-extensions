@@ -24,7 +24,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.0 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.1.0 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.2.0 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -266,3 +266,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Qualità (10/11/2026):** Chaturbate, 14 stanze: 12 con 1080p nel master pubblico, 2 con 720p; mpv apre la variante più alta. Etichetta «fino a Np» dal master (1.2.1). Stripchat: le modelle trasmettono spesso 1080p/1440p, ma il master pubblico `_auto`/`_480p` ha solo 480p e 240p. Un suffisso non documentato (`_160p`) restituisce la sorgente a 1440p: **non usato**, perché non è offerto dal sito al pubblico (probabilmente qualità per utenti registrati/abbonati).
 
 - **Chaturbate 1.3.0 — qualità:** preferenza `cb_quality` (auto default). Non auto: `variants()` legge il master (STREAM-INF + AUDIO di gruppo da `#EXT-X-MEDIA TYPE=AUDIO`), video ordinati con prima la qualità ≤ scelta, ognuno con `audios: [{file: audio del primo, label}]` (l'app usa le tracce audio del primo video per tutti), niente master nella lista (audio doppio). Provato con ffmpeg: variante 1080p/720p + chunklist audio → mp4 con video e audio. Non provato nel player dell'app.
+
+- **Stripchat 1.2.0 — HD con l'account:** preferenza `sc_account_hd` (default spenta). `accountStreams(user)`: GET `/api/front/v2/models/username/<nome>/cam`, poi la pagina `/<nome>`, con i cookie della Webview; prende gli URL `.m3u8` presenti nella risposta (solo quelli dati dal sito), ne legge le varianti (NAME/RESOLUTION) e le mette prima solo se ce n'è una > 480p. Provato solo con risposte finte (Cloudflare da qui). Il suffisso `_160p` (sorgente senza account) resta non usato.
