@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.0
+
+- **Molte più categorie** (provate una per una): All'aperto, Da telefono, VR, Giocattoli interattivi, Cam2cam, Privati economici, Over 60, Bionde, More, Rosse, Sedere grande, Atletiche, Tatuate, Piercing, Con gli occhiali, Lingerie, Cosplay, Ufficio, Doccia, Show con l'olio, Balli, Striptease, Fumo, Piedi, Masturbazione, Ditalino, Dildo e vibratori, Pompini, Deepthroat, Doppia penetrazione, Fisting, Ahegao, Sculacciate, Giochi di ruolo, Lesbiche, Sesso di gruppo (oltre a quelle di prima).
+- «In evidenza» non è una categoria del sito: è l'ordine normale dell'elenco, cioè **Popolari**.
+
 ## Chaturbate 1.3.2
 
 - **Seguite e verifica dopo il login sulla versione italiana**: la Webview finisce su it.chaturbate.com, mentre l'estensione chiedeva tutto a chaturbate.com. Se su un indirizzo il sito chiede ancora la verifica o non riconosce il login, ora l'estensione prova l'altro (chaturbate.com ↔ it.chaturbate.com) e ricorda quello che funziona.
