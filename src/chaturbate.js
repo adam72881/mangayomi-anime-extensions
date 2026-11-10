@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.2.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -227,10 +227,19 @@ class DefaultExtension extends MProvider {
             throw new Error(user + " non è in diretta pubblica adesso (" + st.toLowerCase() + "). Riprova più tardi o scegli un'altra stanza.");
         }
         var src = String(ctx.hls_source);
+        // La qualità più alta della diretta (spesso 1080p): il player con questo
+        // file sceglie già la più alta da solo. Le qualità una per una no: l'audio
+        // è un flusso a parte e resterebbero mute.
+        var label = "Diretta (HLS)";
+        try {
+            var master = await this.client.get(src, { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA });
+            var heights = (String(master.body || "").match(/RESOLUTION=\d+x(\d+)/g) || []).map(function (x) { return parseInt(x.split("x")[1], 10); });
+            if (heights.length) label = "Diretta · fino a " + Math.max.apply(null, heights) + "p";
+        } catch (e) {}
         return [{
             url: src,
             originalUrl: src,
-            quality: "Diretta (HLS)",
+            quality: label,
             // Il player senza User-Agent si presenta come «libmpv»: meglio come la pagina.
             headers: { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA },
         }];

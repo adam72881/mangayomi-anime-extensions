@@ -122,7 +122,7 @@
         "hasCloudflare": false,
         "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/chaturbate.js",
         "apiUrl": "",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "isManga": false,
         "itemType": 1,
         "isFullData": false,

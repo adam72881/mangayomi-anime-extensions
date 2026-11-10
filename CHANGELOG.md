@@ -1,5 +1,9 @@
 # Novità
 
+## Chaturbate 1.2.1
+
+- Il nome del video dice la qualità più alta della diretta (es. «Diretta · fino a 1080p»). Il player la sceglie già da solo.
+
 ## Stripchat 1.1.0
 
 - **Filtro Paese**: Italiane, Spagnole, Francesi, Tedesche, Rumene, Russe, Ucraine, Colombiane, Brasiliane, Americane, Giapponesi, Cinesi, Indiane, Arabe (provati uno per uno). Non si combina con la Categoria: se scegli un Paese vale quello.
