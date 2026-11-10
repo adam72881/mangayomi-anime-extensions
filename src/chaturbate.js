@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.3.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -92,6 +92,13 @@ class DefaultExtension extends MProvider {
             throw new Error("Chaturbate non risponde (problema di connessione). Controlla la rete e tocca Riprova.");
         }
         var body = String(res.body || "");
+        // Verifica dell'età obbligatoria per legge (in Italia: Yoti, Face Scan,
+        // AgeKey). Non si aggira: la fa la persona nella Webview, poi l'app usa
+        // lo stesso accesso. Il sito la chiede di nuovo dopo un po' di inattività.
+        if ((res.statusCode === 401 || res.statusCode === 403 || res.statusCode === 451 || !/^\s*[\[{]/.test(body)) && /verify your age|age[ _-]?verif|ageverif|visitors in italy|yoti|agekey|face ?scan|age_gate|agegate/i.test(body.slice(0, 200000)) ||
+            /^\s*\{/.test(body) && /"(?:code|error|detail|status)"\s*:\s*"[^"]*age[ _-]?verif/i.test(body.slice(0, 2000))) {
+            throw new Error("Chaturbate chiede la verifica dell'età (obbligatoria in Italia). Tocca Webview, scegli un metodo (Yoti, Face Scan o AgeKey) e completala, poi torna qui e tocca Riprova. Dopo un po' di inattività il sito la chiede di nuovo.");
+        }
         if (res.statusCode === 403 || res.statusCode === 429 || /<title>\s*(just a moment|attention required)/i.test(body)) {
             throw new Error("Chaturbate chiede una verifica. Tocca Webview, superala e poi tocca Riprova.");
         }
@@ -100,7 +107,7 @@ class DefaultExtension extends MProvider {
         try {
             return JSON.parse(body);
         } catch (e) {
-            throw new Error("Chaturbate ha risposto in modo inatteso. Tocca Riprova.");
+            throw new Error("Chaturbate ha risposto con una pagina invece che con l'elenco: probabilmente chiede una verifica (età o sicurezza). Tocca Webview, completala e poi tocca Riprova.");
         }
     }
 

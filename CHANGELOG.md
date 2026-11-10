@@ -1,5 +1,9 @@
 # Novità
 
+## Chaturbate 1.3.1 / Stripchat 1.2.1
+
+- Dall'Italia i siti chiedono la **verifica dell'età** (obbligatoria per legge: Yoti, Face Scan, AgeKey). Prima l'estensione diceva solo «ha risposto in modo inatteso»; ora spiega cosa fare: tocca **Webview**, completa la verifica, torna indietro e tocca **Riprova**. La verifica non si aggira; il sito la chiede di nuovo dopo un po' di inattività.
+
 ## Stripchat 1.2.0
 
 - Nuova impostazione **«Ho fatto il login: cerca l'HD»**. Dopo il login nella Webview, per ogni diretta chiede al sito i dati della stanza con il tuo account (come la pagina della stanza) e, se il sito ti dà qualità più alte (720p, 1080p…), le mette in cima nel player con «· account». Se non te le dà, restano 480p e 240p.

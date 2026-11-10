@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.2.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -111,11 +111,17 @@ class DefaultExtension extends MProvider {
                 throw new Error("Stripchat non risponde (problema di connessione). Controlla la rete e tocca Riprova.");
             }
         }
+        var body = String(res.body || "");
+        // Verifica dell'età obbligatoria per legge (in Italia): la fa la persona
+        // nella Webview, non si aggira.
+        if ((res.statusCode === 401 || res.statusCode === 403 || res.statusCode === 451 || !/^\s*[\[{]/.test(body)) && /verify your age|age[ _-]?verif|ageverif|visitors in italy|yoti|agekey|face ?scan|age_gate|agegate/i.test(body.slice(0, 200000))) {
+            throw new Error("Stripchat chiede la verifica dell'età (obbligatoria in Italia). Tocca Webview, completala, poi torna qui e tocca Riprova.");
+        }
         if (res.statusCode >= 400) throw new Error("Stripchat ha risposto con errore " + res.statusCode + ". Tocca Riprova.");
         try {
-            return JSON.parse(String(res.body || ""));
+            return JSON.parse(body);
         } catch (e) {
-            throw new Error("Stripchat ha risposto in modo inatteso. Tocca Riprova.");
+            throw new Error("Stripchat ha risposto con una pagina invece che con l'elenco: probabilmente chiede una verifica (età o sicurezza). Tocca Webview, completala e poi tocca Riprova.");
         }
     }
 
