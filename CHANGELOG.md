@@ -1,5 +1,12 @@
 # Novità
 
+## Link universale 1.4.9
+
+- **Salva un sito.** Confermare il link non aggiornava l'elenco: il testo restava nel campo e «Sito principale» / «I tuoi siti attivi» / il filtro Sito continuavano a leggere la lista vecchia, finché la sorgente non veniva riletta. Ora il link entra nell'elenco quando si riaprono le impostazioni. Rientra nel filtro Sito quando si esce e si rientra nella sorgente (o con Reset). Un indirizzo senza https, con uno slash finale, o ripetuto, conta una volta sola. I siti già salvati non si cancellano. Se il sito c'è ma è nascosto, il riassunto lo dice invece di sembrare non salvato.
+- **WebView.** L'app apre sempre l'indirizzo fisso della sorgente: non si può far partire il globo direttamente su xHamster senza rompere la scheda degli altri siti. Quando il sito principale è già stato visto da una scheda, il ponte non mostra più l'elenco e apre quel sito. La scheda di un video resta la pagina di quel video.
+- **Immagini.** Tolta l'impostazione «Immagini: presentati come il sito principale». Lo User-Agent c'è sempre; un Referer diverso per ogni sito l'app non lo manda. Le copertine di JavGuru restano quelle del sito, non del CDN.
+- **Categorie.** Nel filtro Categoria, dopo aver aperto il sito, compaiono le categorie trovate nella pagina (non un elenco inventato e non quelle di un altro sito). Se la pagina non le ha, il filtro non c'è. Vale per la ricerca: Popolari e Recenti non ricevono filtri. Cambiare «Sito» nel foglio non ricarica le categorie finché non si preme Reset o si rientra.
+
 ## Link universale 1.4.8
 
 - **JavGuru: le miniature e la copertina non restano più grigie.** Il sito indica un indirizzo su un altro server che all'app risponde con una pagina HTML, non con una foto. Ora si usa la stessa immagine sul sito stesso, e la richiesta della copertina porta uno User-Agent: senza, Mangayomi riceve di nuovo HTML e la miniatura resta grigia.

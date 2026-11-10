@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.8 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.9 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,16 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.9
+
+Salva un sito: il testo confermato finiva solo nella preferenza `linkuni_add_site` (`EditTextPreference.value`, letto da `getPreferenceValue`). L'elenco `linkuni_saved_sites` si aggiornava dentro `sites()`, chiamato da `getFilterList` / liste. Tornando dalle impostazioni della sorgente già aperta, `manga_home_screen.dart` non richiama `getFilterList` né invalida Popolari: il sito non entrava nell'elenco e riaprendo le impostazioni `getSourcePreferences` leggeva ancora l'elenco vecchio. Ora `getSourcePreferences` copia il testo nell'elenco prima di costruire Sito principale e I tuoi siti attivi, con `_readingPrefs` così un `get()` sulla chiave non ancora salvata non richiama `sites()` né `applyRename`. Un indirizzo tolto non rientra da solo finché non si riscrive. Se è salvato ma senza spunta, il riassunto lo dice. Normalizzazione: schema facoltativo, slash finale, più indirizzi separati da spazio o virgola, stesso host una volta (https se c'è anche http). Gli altri siti già salvati restano.
+
+WebView: `JsExtensionService.sourceBaseUrl` è `source.baseUrl` (v0.9.95 e main), la lista apre solo quello, la scheda apre `baseUrl + link.getUrlWithoutDomain` (percorso, query e frammento). `baseUrl` resta il ponte: cambiarlo in xHamster manderebbe la scheda di un altro sito su xHamster e varrebbe per tutti. `tagLink` aggiunge `&m=<host del sito principale>`. `404.html` porta ancora al contenuto (`#lu=`) e ricorda `m` in `localStorage.lu_main`. `index.html`, se `lu_main` c'è, fa `location.replace` verso quel sito prima dell'elenco. La prima WebView della lista, se `lu_main` non c'è ancora, resta l'elenco: l'app non passa la preferenza e i cookie di `MClient` non sono sulla prima richiesta della WebView.
+
+Immagini: tolta la preferenza `linkuni_image_referer`. `getHeaders` manda solo lo User-Agent. Mangayomi lo chiede una volta con il baseUrl (`getHeaders` in `service.dart`) e lo tiene in `_sourceHeadersCache`: un Referer per sito non esiste. `coverUrl` per `/wp-content/uploads/` resta. Il 10 novembre 2026 `https://jav.guru/wp-content/uploads/2026/11/1start663pl-550x374.jpg` con quello UA è `200 image/jpeg` (51579 byte, `ffd8`).
+
+Categorie: `getFilterList` è sincrono e l'app lo richiama all'ingresso e con Reset, non quando si cambia «Sito». Niente richiesta in più: si leggono i link `<a>` e le coppie JSON `label`/`href` della pagina già scaricata. Vale il gruppo più numeroso con percorso `/categories|category|genre(s)|categorie|generi|c/<nome>` (almeno 3), stesso sito, senza tag, modelle, canali, pubblicità, link esterni. Cache `linkuni_nav` per origine; una home-elenco senza categorie svuota solo quella origine. Il filtro mostra la cache del sito principale. In ricerca, se «Sito» è un altro, l'URL di categoria non si usa. Paginazione: `nextPageOf` più `pageLinkTemplate` con `{#}`. Provato il 10 novembre 2026: xHamster home → 40 categorie (`/categories/…`), la pagina amateur ha la pagina 2; jav.guru home → 7 (`/category/…`), amateur ha `/page/2/`. La home mobile di HellPorno non ha categorie: il filtro non compare. Non è un elenco universale.
 
 ## Link universale — 1.4.8
 

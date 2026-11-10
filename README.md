@@ -27,14 +27,14 @@ Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 
 **Impostazioni della sorgente:**
 - **Siti già pronti**: 56 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AlphaPorno, HellPorno, YesPorn, FetishShrine, Bdsmstreak, AnalVids, JavGuru, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
-- **➕ Salva un sito**: scrivi il link della pagina principale (es. `https://xhamster.com`) e apri la sorgente: il sito entra nell'elenco. Puoi salvarne quanti vuoi, uno alla volta o più insieme separati da spazio.
+- **➕ Salva un sito**: scrivi il link della pagina principale (anche senza `https`, con o senza slash finale) e riapri le impostazioni: il sito entra in Sito principale e in I tuoi siti attivi. Nel filtro Sito della ricerca compare uscendo e rientrando nella sorgente. Più link: spazio o virgola. Un sito nascosto (spunta tolta) resta salvato.
 - **Sito principale**: quello di Popolari e Recenti (anche uno di quelli pronti).
 - **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi.
 - **Togli i tuoi siti**: spunta quelli salvati da te da eliminare.
 
 **Nella sorgente:**
 - **Popolari** e **Recenti**: le liste «Più visti» e «Più recenti» del sito principale (se il sito non le ha, la home).
-- **Ricerca**: scrivi una parola e scegli il sito nel filtro **Sito**; l'estensione trova da sola come cerca quel sito.
+- **Ricerca**: scrivi una parola e scegli il sito nel filtro **Sito**; l'estensione trova da sola come cerca quel sito. Se la pagina del sito principale ha delle categorie, il filtro **Categoria** le elenca; se non le ha, il filtro non c'è.
 - Puoi anche incollare nella ricerca il **link di un video, di una serie o di una pagina**.
 
 Provata con Pornhub, xHamster, xVideos, xnxx, Eporner, YouPorn, RedTube (questi due solo 360p), Porntrex, AnimeSaturn, AnimeWorld e HentaiWorld.
@@ -53,6 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **Link universale 1.4.9** — «Salva un sito» entra nell'elenco; niente interruttore per le immagini; categorie del sito principale quando la pagina le ha; la WebView della scheda resta sul video.
 - **Link universale 1.4.8** — miniature e copertina di JavGuru; dopo la WebView una verifica rimasta non sembra più «nessun risultato».
 - **Link universale 1.4.7** — i video di JavGuru partono nell'app (il player era nascosto nella pagina).
 - **Link universale 1.4.6** — Bdsmstreak (BDSM) e AnalVids (hardcore) tra i siti pronti.

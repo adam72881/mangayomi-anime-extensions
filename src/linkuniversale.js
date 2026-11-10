@@ -8,16 +8,21 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.8",
+        "version": "1.4.9",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
     },
 ];
 
-// Pagina ponte (GitHub Pages, ramo gh-pages): il pulsante Webview dell'app apre
-// sempre baseUrl + percorso del link. La pagina legge «#lu=<sito>» in fondo al
-// link e porta al sito vero; aperta da sola mostra l'elenco dei siti.
+// Pagina ponte (GitHub Pages, ramo gh-pages). Mangayomi, per le estensioni JS,
+// apre sempre source.baseUrl (pulsante della lista) oppure baseUrl + percorso
+// del link (scheda): non chiama un metodo dell'estensione. baseUrl resta il
+// ponte, così l'identità della sorgente e gli aggiornamenti non cambiano e la
+// scheda di un altro sito arriva comunque al sito vero. Il frammento è
+// #lu=<host del contenuto>&m=<host del sito principale>. 404.html porta al
+// contenuto e ricorda m; index.html, se m è già noto, sostituisce subito la
+// pagina con il sito principale senza mostrare l'elenco.
 const BRIDGE = "https://adam72881.github.io/mangayomi-anime-extensions";
 const PREF_HISTORY = "linkuni_history";
 const PREF_NEXT = "linkuni_next_pages";
@@ -27,7 +32,6 @@ const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
 const STORE_READY_OFF = "linkuni_ready_off";
 const PREF_RANDOM = "linkuni_random_site";
-const PREF_IMG_REFERER = "linkuni_image_referer";
 const PREF_QUALITY = "linkuni_quality";
 const PREF_DEBUG = "linkuni_debug";
 const PREF_RENAME = "linkuni_rename";
@@ -35,6 +39,8 @@ const PREF_NAV = "linkuni_nav";
 const STORE_NAMES = "linkuni_names";
 const STORE_LAST_RENAME = "linkuni_last_rename";
 const STORE_SAVED_OFF = "linkuni_saved_off";
+const STORE_ADD_NOTE = "linkuni_add_note";
+const STORE_DISMISS = "linkuni_add_dismissed";
 const STORE_RANDOM = "linkuni_random_pick_";
 
 // Siti provati: lista, ricerca e video funzionano senza fare niente.
@@ -379,15 +385,139 @@ function resolveUrl(href, base) {
     return dir + href;
 }
 
-function tagLink(url) {
+function tagLink(url, mainHost) {
     var clean = String(url || "").split("#")[0];
     var host = hostOf(clean);
-    return host ? clean + "#lu=" + host : clean;
+    if (!host) return clean;
+    var frag = "#lu=" + host;
+    var main = hostOf(mainHost || "");
+    if (main) frag += "&m=" + main;
+    return clean + frag;
 }
 
-function tagList(res) {
-    res.list.forEach(function (c) { c.link = tagLink(c.link); });
+function tagList(res, mainHost) {
+    res.list.forEach(function (c) { c.link = tagLink(c.link, mainHost); });
     return res;
+}
+
+// Indirizzo di un sito, da un testo libero: con o senza schema, con slash,
+// virgole o più link. Stesso host una volta sola (https al posto di http).
+function normalizeSiteInput(text) {
+    var parts = String(text || "").split(/[\s,;]+/);
+    var out = [];
+    var at = {};
+    for (var i = 0; i < parts.length; i++) {
+        var x = parts[i].trim().replace(/^[<"'\u00ab\u00bb]+|[>"'\u00ab\u00bb),.;]+$/g, "").replace(/\/+$/, "");
+        if (!x || /^(javascript|mailto|tel|data):/i.test(x)) continue;
+        if (x.indexOf("//") === 0) x = "https:" + x;
+        else if (!/^https?:\/\//i.test(x)) x = "https://" + x;
+        var origin = originOf(x);
+        var auth = (origin.match(/^https?:\/\/([^\/?#]+)/i) || ["", ""])[1].toLowerCase();
+        var name = auth.split(":")[0];
+        if (!name || name.indexOf(".") < 1 || auth.length > 253 || !/^[a-z0-9.-]+(?::\d{2,5})?$/.test(auth)) continue;
+        var key = auth;
+        var proto = /^http:/i.test(origin) ? "http://" : "https://";
+        var norm = proto + key;
+        if (at[key]) {
+            if (proto === "https://" && out[at[key] - 1].indexOf("http://") === 0) out[at[key] - 1] = norm;
+            continue;
+        }
+        at[key] = out.length + 1;
+        out.push(norm);
+    }
+    return out;
+}
+
+function normCatUrl(abs) {
+    var origin = originOf(abs);
+    if (!origin) return "";
+    var host = hostOf(origin);
+    if (!host) return "";
+    var proto = /^http:/i.test(origin) ? "http://" : "https://";
+    var rest = String(abs).slice(origin.length).split("#")[0];
+    var path = (rest.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+    var q = "";
+    var qm = rest.match(/\?([^#]*)/);
+    if (qm && qm[1]) {
+        var keep = [];
+        qm[1].split("&").forEach(function (p) {
+            var k = p.split("=")[0] || "";
+            try { k = decodeURIComponent(k.replace(/\+/g, " ")); } catch (e) {}
+            if (!k || /^(utm_|fbclid$|gclid$|ref$|order|orderby|order_by|sort|sortby|sort_by|direction)$/i.test(k)) return;
+            keep.push(p);
+        });
+        if (keep.length) q = "?" + keep.join("&");
+    }
+    return proto + host + path + q;
+}
+
+// Percorso di una categoria: /categories/nome, /category/nome, /genre/nome, /c/Nome.
+// Non tag, modelle, canali, pagine, numeri.
+function isCategoryPath(path) {
+    var parts = String(path || "").split("?")[0].split("/").filter(Boolean);
+    if (parts.length !== 2) return false;
+    if (/^(page|\d+)$/i.test(parts[0]) || /^(page|\d+)$/i.test(parts[1])) return false;
+    if (/^(tags?|pornstars?|models?|channels?|studios?|users?|members?|search|photos?|pics|gifs?|albums?|playlists?|live|cams?)$/i.test(parts[0])) return false;
+    if (/^(categories|category|cats|cat|genres|genre|generi|genere|categorie|categoria)$/i.test(parts[0])) return parts[1].length > 1 && /[a-zà-ù]/i.test(parts[1]);
+    if (/^c$/i.test(parts[0])) return parts[1].length > 1 && parts[1].length <= 48 && /[a-zà-ù]/i.test(parts[1]);
+    return false;
+}
+
+var CAT_LABEL_SKIP = /^(home|login|log ?in|sign ?in|sign ?up|register|signup|premium|upload|live|cams?|photos?|pics|gifs?|blog|forum|categories|category|categorie|categoria|generi|genres?|tags?|pornstars?|models?|channels?|studios?|more|menu|search|cerca|all|tutte|tutti|18\+|advertise|ads?|dmca|privacy|terms|contact|language|lingua|english|italiano|español|deutsch|français|português)$/i;
+
+// Categorie dal HTML già scaricato. Servono almeno tre link con la stessa
+// forma di percorso: un link solo non basta e non si inventa un elenco.
+function jsonUnescape(s) {
+    return String(s || "").replace(/\\\//g, "/").replace(/\\u([0-9a-f]{4})/gi, function (_, h) {
+        return String.fromCharCode(parseInt(h, 16));
+    }).replace(/\\"/g, '"');
+}
+
+function collectCategories(html, site) {
+    var text = String(html || "");
+    var origin = originOf(site) || String(site || "");
+    var groups = {};
+    var push = function (label, href) {
+        label = decodeEntities(jsonUnescape(label).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+        label = label.replace(/\s*[\(\[]\d{1,7}[\)\]]\s*$/, "").replace(/\s+\d{1,7}$/, "").trim();
+        if (label.length < 2 || label.length > 32 || !/[a-zà-ù]/i.test(label) || CAT_LABEL_SKIP.test(label)) return;
+        var link = resolveUrl(jsonUnescape(href), origin + "/");
+        if (!link || AD_HOSTS.test(link) || siteOf(link) !== siteOf(origin)) return;
+        var path = link.replace(/^https?:\/\/[^\/?#]+/i, "");
+        if (!isCategoryPath(path)) return;
+        var url = normCatUrl(link);
+        if (!url) return;
+        var seg = path.split("?")[0].split("/").filter(Boolean)[0].toLowerCase();
+        if (!groups[seg]) groups[seg] = [];
+        groups[seg].push({ name: label, url: url });
+    };
+    var re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+    var m, seen = 0;
+    while ((m = re.exec(text)) !== null && seen < 5000) {
+        seen++;
+        var href = (m[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i) || ["", ""])[1];
+        if (!href || /^(javascript|mailto|tel|data):/i.test(href)) continue;
+        push(m[2], href);
+    }
+    var pair = /"(?:label|name|title)"\s*:\s*"((?:\\.|[^"\\]){2,40})"\s*,\s*"(?:href|url|link)"\s*:\s*"((?:\\.|[^"\\])+)"/g;
+    var rev = /"(?:href|url|link)"\s*:\s*"((?:\\.|[^"\\])+)"\s*,\s*"(?:label|name|title)"\s*:\s*"((?:\\.|[^"\\]){2,40})"/g;
+    var jm;
+    while ((jm = pair.exec(text)) !== null && seen < 8000) { seen++; push(jm[1], jm[2]); }
+    while ((jm = rev.exec(text)) !== null && seen < 8000) { seen++; push(jm[2], jm[1]); }
+    var best = [];
+    Object.keys(groups).forEach(function (k) {
+        var uniq = [];
+        var byUrl = {}, byName = {};
+        groups[k].forEach(function (c) {
+            var nk = c.name.toLowerCase();
+            if (byUrl[c.url] || byName[nk]) return;
+            byUrl[c.url] = true;
+            byName[nk] = true;
+            uniq.push(c);
+        });
+        if (uniq.length > best.length) best = uniq;
+    });
+    return best.length >= 3 ? best.slice(0, 40) : [];
 }
 
 function cleanLink(url) {
@@ -546,17 +676,12 @@ class DefaultExtension extends MProvider {
         this.prefs = new SharedPreferences();
     }
 
-    // Intestazioni che l'app usa per caricare le immagini: sono le stesse per
-    // tutta la sorgente (Mangayomi le calcola una volta sola, all'avvio).
+    // Intestazioni delle copertine. Mangayomi le chiede una volta, con il
+    // baseUrl della sorgente, e le riusa per ogni immagine (headers.dart):
+    // non esiste un Referer diverso per ogni sito. Lo User-Agent serve perché
+    // senza, alcuni siti rispondono con HTML e la miniatura resta grigia.
     getHeaders(url) {
-        var h = { "User-Agent": UA };
-        try {
-            if (this.setting(PREF_IMG_REFERER) === true) {
-                var main = this.sites()[0];
-                if (main) h["Referer"] = main + "/";
-            }
-        } catch (e) {}
-        return h;
+        return { "User-Agent": UA };
     }
 
     headers(referer) {
@@ -735,28 +860,75 @@ class DefaultExtension extends MProvider {
         }
     }
 
+    // Copia «Salva un sito» nell'elenco. Il testo sta nella preferenza; l'elenco
+    // è un altro archivio. Va fatto anche aprendo le impostazioni, non solo
+    // aprendo la sorgente: se no il sito resta nel campo e non compare da nessuna parte.
+    // Non chiama sites() né applyRename(). get() del campo, se la chiave non è
+    // ancora salvata, richiama getSourcePreferences: lì _readingPrefs è già vero.
+    takeAddedSites() {
+        var saved = this.savedSites().slice();
+        var added = "";
+        try { added = String(this.setting(PREF_ADD) || "").trim(); } catch (e) { return saved; }
+        if (!added) return saved;
+        var last = String(this.prefs.getString(STORE_LAST_ADDED, "") || "");
+        var parsed = normalizeSiteInput(added);
+        var fresh = added !== last;
+        if (!parsed.length) {
+            if (fresh) {
+                this.prefs.setString(STORE_ADD_NOTE, "Non ho riconosciuto un indirizzo in «" + added.slice(0, 60) + "».");
+                this.prefs.setString(STORE_LAST_ADDED, added);
+            }
+            return saved;
+        }
+        var dismissed = this.readJson(STORE_DISMISS, []);
+        if (!dismissed || typeof dismissed.length !== "number") dismissed = [];
+        if (fresh) dismissed = dismissed.filter(function (u) { return parsed.indexOf(u) === -1; });
+        var off = this.readJson(STORE_SAVED_OFF, []);
+        if (!off || typeof off.length !== "number") off = [];
+        var changed = false;
+        var hiddenHit = false;
+        var byHost = {};
+        for (var s = 0; s < saved.length; s++) byHost[hostOf(saved[s])] = s;
+        for (var i = 0; i < parsed.length; i++) {
+            var origin = parsed[i];
+            var host = hostOf(origin);
+            if (!fresh && dismissed.indexOf(origin) !== -1) continue;
+            if (byHost[host] === undefined) {
+                byHost[host] = saved.length;
+                saved.push(origin);
+                changed = true;
+            } else if (saved[byHost[host]] !== origin && origin.indexOf("https://") === 0) {
+                saved[byHost[host]] = origin;
+                changed = true;
+            } else if (off.indexOf(saved[byHost[host]]) !== -1 || off.indexOf(origin) !== -1) {
+                hiddenHit = true;
+            }
+        }
+        if (changed) this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
+        if (fresh) {
+            this.prefs.setString(STORE_LAST_ADDED, added);
+            this.prefs.setString(STORE_DISMISS, JSON.stringify(dismissed));
+            this.prefs.setString(STORE_ADD_NOTE, !changed && hiddenHit ? "Già salvato, ma nascosto: in «I tuoi siti attivi» rimetti la spunta." : "");
+        }
+        return saved;
+    }
+
     sites() {
         this.applyRename();
-        var saved = this.savedSites();
-        var added = String(this.setting(PREF_ADD) || "").trim();
-        if (added && added !== this.prefs.getString(STORE_LAST_ADDED, "")) {
-            added.split(/[\s,;]+/).forEach(function (x) {
-                x = x.trim().replace(/\/+$/, "");
-                if (!x) return;
-                if (!/^https?:\/\//i.test(x)) x = "https://" + x;
-                x = originOf(x) || x;
-                if (saved.indexOf(x) === -1) saved.push(x);
-            });
-            this.prefs.setString(STORE_LAST_ADDED, added);
-            this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
-        }
+        var saved = this.takeAddedSites();
         if (saved.length) {
             var remove = this.setting(this.listKey("linkuni_remove_", saved));
             if (remove && remove.length) {
+                var dismissed = this.readJson(STORE_DISMISS, []);
+                if (!dismissed || typeof dismissed.length !== "number") dismissed = [];
+                remove.forEach(function (u) { if (dismissed.indexOf(u) === -1) dismissed.push(u); });
+                var before = saved.length;
                 saved = saved.filter(function (x) { return remove.indexOf(x) === -1; });
-                this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
-                if (remove.indexOf(originOf(this.prefs.getString(STORE_LAST_ADDED, "")) || "-") !== -1) {
-                    this.prefs.setString(STORE_LAST_ADDED, "");
+                if (saved.length !== before) {
+                    this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
+                    this.prefs.setString(STORE_DISMISS, JSON.stringify(dismissed));
+                    var offLeft = this.readJson(STORE_SAVED_OFF, []).filter(function (u) { return remove.indexOf(u) === -1; });
+                    this.prefs.setString(STORE_SAVED_OFF, JSON.stringify(offLeft));
                 }
             }
         }
@@ -864,43 +1036,69 @@ class DefaultExtension extends MProvider {
         return ["/best", "/most-viewed", "/most-popular", "/popular", "/trending", "/top-rated", "/videos"];
     }
 
-    // Categorie linkate dalla home, per aprire il genere quando la ricerca è il suo nome.
-    rememberNav(site, html) {
-        var cats = [], seen = {};
-        var re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi, m;
-        while ((m = re.exec(html)) !== null && cats.length < 40) {
-            var label = decodeEntities(m[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
-            if (label.length < 3 || label.length > 28 || !/[a-zà-ù]/i.test(label)) continue;
-            var href = (m[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i) || ["", ""])[1];
-            if (!href) continue;
-            var link = resolveUrl(href, site + "/");
-            if (!link || siteOf(link) !== siteOf(site)) continue;
-            var path = link.replace(/^https?:\/\/[^\/]+/, "");
-            if (!/\/(categor|cats?|tags?|channels?|pornstars?|models?|genres?|generi)\//i.test(path)) continue;
-            var key = label.toLowerCase();
-            if (seen[key]) continue;
-            seen[key] = true;
-            cats.push({ name: label, url: link });
+    // Cache per origine. Il formato vecchio era un array: si rilegge, ma si
+    // tengono solo URL che sono ancora categorie di QUESTO sito.
+    catsOf(entry, site) {
+        var list = [];
+        if (entry && entry.cats && entry.cats.length) list = entry.cats;
+        else if (entry && entry.length && entry[0] && entry[0].url) list = entry;
+        var out = [], seen = {};
+        for (var i = 0; i < list.length; i++) {
+            var c = list[i];
+            if (!c || !c.url || !c.name) continue;
+            if (siteOf(c.url) !== siteOf(site)) continue;
+            var path = String(c.url).replace(/^https?:\/\/[^\/?#]+/i, "");
+            if (!isCategoryPath(path)) continue;
+            var url = normCatUrl(c.url);
+            var nk = String(c.name).toLowerCase();
+            if (!url || seen[url] || seen[nk]) continue;
+            seen[url] = true;
+            seen[nk] = true;
+            out.push({ name: String(c.name).slice(0, 32), url: url });
+            if (out.length >= 40) break;
         }
-        if (!cats.length) return;
+        return out;
+    }
+
+    // Aggiorna la cache solo con categorie vere trovate nella pagina già
+    // scaricata. Una home che è un elenco e non ha categorie cancella la
+    // cache di quel sito: non si lasciano quelle di prima, né di un altro sito.
+    noteCategories(site, html, pageUrl) {
+        var key = originOf(site);
+        if (!key) return;
+        var found = collectCategories(html, key);
         var cache = this.readJson(PREF_NAV, {});
-        cache[site] = cats;
-        this.prefs.setString(PREF_NAV, JSON.stringify(cache));
+        if (found.length) {
+            cache[key] = { site: key, at: Date.now(), cats: found };
+            this.prefs.setString(PREF_NAV, JSON.stringify(cache));
+            return;
+        }
+        var path = String(pageUrl || "").replace(/^https?:\/\/[^\/?#]+/i, "").split("?")[0];
+        var home = !path || path === "/";
+        var prev = this.catsOf(cache[key], key);
+        var catalog = /thumbURL|pageURL|wp-content\/uploads|<img\b[^>]+src=/i.test(String(html).slice(0, 100000));
+        if (home && catalog && prev.length) {
+            cache[key] = { site: key, at: Date.now(), cats: [] };
+            this.prefs.setString(PREF_NAV, JSON.stringify(cache));
+        }
     }
 
     categoryPick(filters, site) {
-        var idx = 0;
+        var picked = "";
         (filters || []).forEach(function (f) {
-            if (f && f.type_name === "SelectFilter" && f.name === "Categoria") idx = f.state || 0;
+            if (!f || f.type_name !== "SelectFilter" || f.name !== "Categoria") return;
+            var idx = f.state || 0;
+            if (!idx) return;
+            var opt = (f.values || [])[idx];
+            if (opt && opt.value) picked = String(opt.value);
         });
-        if (!idx) return "";
-        var cats = (this.readJson(PREF_NAV, {})[site] || []);
-        var c = cats[idx - 1];
-        return c && c.url ? c.url : "";
+        if (!picked || siteOf(picked) !== siteOf(site)) return "";
+        if (!isCategoryPath(picked.replace(/^https?:\/\/[^\/?#]+/i, ""))) return "";
+        return picked;
     }
 
     categoryMatch(site, text) {
-        var cats = (this.readJson(PREF_NAV, {})[site] || []);
+        var cats = this.catsOf(this.readJson(PREF_NAV, {})[originOf(site)], site);
         var want = String(text || "").trim().toLowerCase();
         for (var i = 0; i < cats.length; i++) {
             if (String(cats[i].name).toLowerCase() === want) return cats[i].url;
@@ -963,7 +1161,7 @@ class DefaultExtension extends MProvider {
         var html = await this.fetchHtml(site + "/", site + "/");
         // In ordine di preferenza: «Più visti» batte «Di tendenza», ecc.
         var words = this.kindWords(kind);
-        this.rememberNav(site, html);
+        this.noteCategories(site, html, site + "/");
         var found = "", best = words.length;
         var re = /<a\b([^>]*)>([\s\S]{0,300}?)<\/a>/gi, m;
         while ((m = re.exec(html)) !== null) {
@@ -990,11 +1188,11 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        return tagList(await this.sectionListing("popular", page));
+        return tagList(await this.sectionListing("popular", page), this.sites()[0] || "");
     }
 
     async getLatestUpdates(page) {
-        return tagList(await this.sectionListing("latest", page));
+        return tagList(await this.sectionListing("latest", page), this.sites()[0] || "");
     }
 
     async sectionListing(kind, page) {
@@ -1049,7 +1247,7 @@ class DefaultExtension extends MProvider {
     // ---------- Ricerca: link incollato, ricerca nel sito o nella cronologia ----------
 
     async search(query, page, filters) {
-        return tagList(await this.searchPlain(query, page, filters));
+        return tagList(await this.searchPlain(query, page, filters), this.sites()[0] || "");
     }
 
     async searchPlain(query, page, filters) {
@@ -1226,6 +1424,7 @@ class DefaultExtension extends MProvider {
         if (!url) return { list: [], hasNextPage: false };
 
         var html = await this.fetchHtml(url, originOf(url) + "/");
+        try { this.noteCategories(originOf(url) || url, html, url); } catch (e) {}
         var list = [];
         if (withSelf && page === 1 && this.looksLikeVideoPage(url, html)) {
             var self = {
@@ -1481,6 +1680,12 @@ class DefaultExtension extends MProvider {
         if (!m && new RegExp('"(?:next|nextPage|next_page)"\\s*:\\s*"?' + ((page || 1) + 1) + '\\b').test(html)) {
             var bare = pageUrl.replace(/([?&])page=\d+&?/, "$1").replace(/[?&]$/, "");
             m = [null, bare + (bare.indexOf("?") === -1 ? "?" : "&") + "page=" + ((page || 1) + 1)];
+        }
+        if (!m) {
+            var tpl = html.match(/"pageLinkTemplate"\s*:\s*"((?:\\.|[^"\\])+)"/);
+            if (tpl && /\{#\}|\{page\}|%page%/i.test(tpl[1])) {
+                m = [null, tpl[1].replace(/\\\//g, "/").replace(/\{#\}|\{page\}|%page%/gi, String((page || 1) + 1))];
+            }
         }
         if (!m) return "";
         var next = resolveUrl(m[1], pageUrl);
@@ -1832,7 +2037,8 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Più lunghi", value: "longest" },
                 ],
             });
-            var cats = (self.readJson(PREF_NAV, {})[sites[0]] || []).slice(0, 40);
+            var mainOrigin = originOf(sites[0]) || sites[0];
+            var cats = self.catsOf(self.readJson(PREF_NAV, {})[mainOrigin], mainOrigin);
             if (cats.length) {
                 filters.push({
                     type_name: "SelectFilter",
@@ -1849,9 +2055,16 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         var self = this;
-        // Non chiamare get() / sites() / applyRename qui: Mangayomi, per leggere
-        // una preferenza, richiama questo metodo. Un get() interno è un ciclo.
-        var saved = this.savedSites();
+        // Mangayomi, per leggere una preferenza non ancora salvata, richiama
+        // questo metodo. sites() e applyRename non si chiamano. Il testo di
+        // «Salva un sito» si legge solo fuori da quel richiamo: se no è un ciclo.
+        var saved;
+        if (this._readingPrefs) saved = this.savedSites();
+        else {
+            this._readingPrefs = true;
+            try { saved = this.takeAddedSites(); }
+            finally { this._readingPrefs = false; }
+        }
         var all = this.allSites(saved);
         var urls = READY.map(function (r) { return r[0]; });
         var off = this.readJson(STORE_READY_OFF, []);
@@ -1888,14 +2101,6 @@ class DefaultExtension extends MProvider {
             },
         });
         prefs.push({
-            key: PREF_IMG_REFERER,
-            switchPreferenceCompat: {
-                title: "Immagini: presentati come il sito principale",
-                summary: "Accendilo se le miniature del sito principale restano grigie: alcuni siti danno le immagini solo alle proprie pagine. Vale per un sito alla volta: dopo averlo acceso, o dopo aver cambiato sito principale, chiudi e riapri Mangayomi. Può far sparire le miniature degli altri siti.",
-                value: false,
-            },
-        });
-        prefs.push({
             key: PREF_QUALITY,
             listPreference: {
                 title: "Qualità preferita",
@@ -1923,20 +2128,26 @@ class DefaultExtension extends MProvider {
                 dialogMessage: "Indirizzo del sito, una barra verticale, il nome da mostrare.",
             },
         });
+        var savedOff = this.readJson(STORE_SAVED_OFF, []);
+        var hidden = saved.filter(function (u) { return savedOff.indexOf(u) !== -1; });
+        var addNote = String(this.prefs.getString(STORE_ADD_NOTE, "") || "");
+        var addSummary = saved.length
+            ? "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + "."
+            : "Scrivi il link della pagina principale, anche senza https. Più siti: separali con uno spazio o una virgola.";
+        if (hidden.length) addSummary += " Nascosti, non cancellati (spunta in «I tuoi siti attivi»): " + hidden.map(function (x) { return self.siteName(x); }).join(", ") + ".";
+        if (addNote) addSummary += " " + addNote;
+        addSummary += " Riapri queste impostazioni per vedere l'elenco aggiornato; nel filtro Sito entra rientrando nella sorgente.";
         prefs.push({
             key: PREF_ADD,
             editTextPreference: {
                 title: "➕ Salva un sito",
-                summary: saved.length ?
-                    "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + ". Scrivi il link della pagina principale di un altro sito per aggiungerlo." :
-                    "Un sito che non è tra quelli pronti: scrivi il link della pagina principale, poi apri la sorgente.",
+                summary: addSummary,
                 value: "",
                 dialogTitle: "Salva un sito",
-                dialogMessage: "Link della pagina principale. Puoi metterne più di uno separati da spazio.",
+                dialogMessage: "Link della pagina principale. Con o senza https. Più di uno: spazio o virgola.",
             },
         });
         if (saved.length) {
-            var savedOff = this.readJson(STORE_SAVED_OFF, []);
             prefs.push({
                 key: this.listKey("linkuni_saved_on_", saved),
                 multiSelectListPreference: {
