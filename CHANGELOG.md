@@ -1,5 +1,12 @@
 # Novità
 
+## Chaturbate 1.3.0
+
+- **Impostazione Qualità**: Auto (consigliata), 1080p, 720p, 480p, 360p, 240p.
+  - **Auto**: il player prende la più alta (di solito 1080p), come prima.
+  - **Una qualità**: parte quella (o la più vicina sotto), e nel player trovi anche tutte le altre, ognuna con l'audio collegato (su Chaturbate l'audio è un flusso a parte).
+  - Se una diretta resta muta o si blocca, torna su Auto.
+
 ## Chaturbate 1.2.1
 
 - Il nome del video dice la qualità più alta della diretta (es. «Diretta · fino a 1080p»). Il player la sceglie già da solo.

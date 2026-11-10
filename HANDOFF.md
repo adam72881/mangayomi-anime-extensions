@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/chaturbate.js` | Chaturbate (dirette) | 1.2.1 |
+| `src/chaturbate.js` | Chaturbate (dirette) | 1.3.0 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.1.0 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
@@ -264,3 +264,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Stripchat 1.1.0:** `tag=girls/<paese>` provati (italian 17/20 dall'Italia; british, korean, thai ignorati). Due tag insieme (`girls/italian/milfs`, ecc.) = ignorati → Paese ha la precedenza. `watchable()`: status public + stream; sotto girls tolte `maleFemale` se restano ≥ 10; senza Paese/Categoria due pagine API per pagina dell'app. Preferite: GET `/favorites` con i cookie della Webview → `window.__PRELOADED_STATE__`, utente da `data.user`, elenco = array più lungo di oggetti con username+id (non provato, Cloudflare). `streamById(id)`: `edge-hls.saawsedge.com/hls/<id>/master/<id>_auto.m3u8` (provato 200), poi `_480p`, poi doppiocdn.
 
 - **Qualità (10/11/2026):** Chaturbate, 14 stanze: 12 con 1080p nel master pubblico, 2 con 720p; mpv apre la variante più alta. Etichetta «fino a Np» dal master (1.2.1). Stripchat: le modelle trasmettono spesso 1080p/1440p, ma il master pubblico `_auto`/`_480p` ha solo 480p e 240p. Un suffisso non documentato (`_160p`) restituisce la sorgente a 1440p: **non usato**, perché non è offerto dal sito al pubblico (probabilmente qualità per utenti registrati/abbonati).
+
+- **Chaturbate 1.3.0 — qualità:** preferenza `cb_quality` (auto default). Non auto: `variants()` legge il master (STREAM-INF + AUDIO di gruppo da `#EXT-X-MEDIA TYPE=AUDIO`), video ordinati con prima la qualità ≤ scelta, ognuno con `audios: [{file: audio del primo, label}]` (l'app usa le tracce audio del primo video per tutti), niente master nella lista (audio doppio). Provato con ffmpeg: variante 1080p/720p + chunklist audio → mp4 con video e audio. Non provato nel player dell'app.

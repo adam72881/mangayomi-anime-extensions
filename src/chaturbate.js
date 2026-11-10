@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.2.1",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -227,22 +227,75 @@ class DefaultExtension extends MProvider {
             throw new Error(user + " non è in diretta pubblica adesso (" + st.toLowerCase() + "). Riprova più tardi o scegli un'altra stanza.");
         }
         var src = String(ctx.hls_source);
-        // La qualità più alta della diretta (spesso 1080p): il player con questo
-        // file sceglie già la più alta da solo. Le qualità una per una no: l'audio
-        // è un flusso a parte e resterebbero mute.
-        var label = "Diretta (HLS)";
+        var headers = { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA };
+        var master = "";
         try {
-            var master = await this.client.get(src, { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA });
-            var heights = (String(master.body || "").match(/RESOLUTION=\d+x(\d+)/g) || []).map(function (x) { return parseInt(x.split("x")[1], 10); });
-            if (heights.length) label = "Diretta · fino a " + Math.max.apply(null, heights) + "p";
+            master = String((await this.client.get(src, headers)).body || "");
         } catch (e) {}
-        return [{
+        var variants = this.variants(master, src);
+        var top = variants.length ? variants[0].height : 0;
+        var auto = {
             url: src,
             originalUrl: src,
-            quality: label,
+            quality: top ? "Auto · fino a " + top + "p" : "Diretta (HLS)",
             // Il player senza User-Agent si presenta come «libmpv»: meglio come la pagina.
-            headers: { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA },
-        }];
+            headers: headers,
+        };
+        var wanted = String(this.setting("cb_quality") || "auto");
+        if (wanted === "auto" || !variants.length) return [auto];
+
+        // Qualità scelta: il video di quella qualità e l'audio, che su Chaturbate
+        // è un flusso a parte. L'app collega l'audio del PRIMO video a tutti:
+        // stesso audio per ogni qualità, e niente «Auto» nella lista (avrebbe
+        // l'audio doppio).
+        var target = parseInt(wanted, 10) || 1080;
+        var first = variants.filter(function (v) { return v.height <= target; })[0] || variants[variants.length - 1];
+        var ordered = [first].concat(variants.filter(function (v) { return v !== first; }));
+        var audio = first.audio;
+        var out = [];
+        ordered.forEach(function (v) {
+            if (!audio) return;
+            out.push({
+                url: v.url,
+                originalUrl: v.url,
+                quality: v.height + "p" + (v.fps >= 50 ? "60" : ""),
+                headers: headers,
+                audios: [{ file: audio, label: "Audio" }],
+            });
+        });
+        return out.length ? out : [auto];
+    }
+
+    // Le qualità del file principale della diretta, dalla più alta: indirizzo del
+    // video e dell'audio (#EXT-X-MEDIA TYPE=AUDIO dello stesso gruppo).
+    variants(master, src) {
+        var origin = (src.match(/^https?:\/\/[^\/]+/) || [""])[0];
+        var abs = function (u) { return /^https?:\/\//i.test(u) ? u : origin + (u.charAt(0) === "/" ? "" : "/") + u; };
+        var audios = {};
+        var am = /#EXT-X-MEDIA:([^\n]*TYPE=AUDIO[^\n]*)/g, a;
+        while ((a = am.exec(master)) !== null) {
+            var g = (a[1].match(/GROUP-ID="([^"]+)"/) || ["", ""])[1];
+            var u = (a[1].match(/URI="([^"]+)"/) || ["", ""])[1];
+            if (g && u && !audios[g]) audios[g] = abs(u);
+        }
+        var lines = master.split(/\r?\n/);
+        var out = [];
+        for (var i = 0; i < lines.length; i++) {
+            if (lines[i].indexOf("#EXT-X-STREAM-INF:") !== 0) continue;
+            var info = lines[i];
+            var next = (lines[i + 1] || "").trim();
+            if (!next || next.charAt(0) === "#") continue;
+            var res = info.match(/RESOLUTION=\d+x(\d+)/);
+            out.push({
+                height: res ? parseInt(res[1], 10) : 0,
+                fps: parseFloat((info.match(/FRAME-RATE=([\d.]+)/) || ["", "0"])[1]) || 0,
+                bandwidth: parseInt((info.match(/BANDWIDTH=(\d+)/) || ["", "0"])[1], 10) || 0,
+                url: abs(next),
+                audio: audios[(info.match(/AUDIO="([^"]+)"/) || ["", ""])[1]] || "",
+            });
+        }
+        out.sort(function (x, y) { return y.height - x.height || y.fps - x.fps || y.bandwidth - x.bandwidth; });
+        return out;
     }
 
     getFilterList() {
@@ -272,6 +325,16 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         return [
+            {
+                key: "cb_quality",
+                listPreference: {
+                    title: "Qualità",
+                    summary: "Auto: il player prende la più alta (spesso 1080p). Se scegli una qualità, nel player trovi anche le altre. Se una diretta resta muta o si blocca, torna su Auto.",
+                    valueIndex: 0,
+                    entries: ["Auto (consigliata)", "1080p", "720p", "480p", "360p", "240p"],
+                    entryValues: ["auto", "1080", "720", "480", "360", "240"],
+                },
+            },
             {
                 key: "cb_popular_follow",
                 switchPreferenceCompat: {
