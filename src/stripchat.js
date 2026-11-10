@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.4",
+        "version": "1.3.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -331,7 +331,7 @@ class DefaultExtension extends MProvider {
                 try { return JSON.parse(raw); } catch (e) {}
                 // Oggetto JavaScript, non JSON puro: i valori tipici del codice minimizzato.
                 try {
-                    return JSON.parse(raw.replace(/:\s*undefined\b/g, ":null").replace(/:\s*!0\b/g, ":true").replace(/:\s*!1\b/g, ":false"));
+                    return JSON.parse(this.jsToJson(raw));
                 } catch (e2) {
                     this._stateError = "stato non leggibile (" + String(e2.message || e2).slice(0, 40) + ")";
                     return null;
@@ -339,6 +339,45 @@ class DefaultExtension extends MProvider {
             }
         }
         return null;
+    }
+
+    // Oggetto JavaScript del codice minimizzato → JSON: nomi senza virgolette,
+    // stringhe con apici singoli, !0/!1, undefined e void 0.
+    jsToJson(raw) {
+        var out = "", i = 0, n = raw.length;
+        while (i < n) {
+            var ch = raw.charAt(i);
+            if (ch === '"' || ch === "'") {
+                var q = ch, j = i + 1, str = "";
+                while (j < n && raw.charAt(j) !== q) {
+                    if (raw.charAt(j) === "\\") { str += raw.substr(j, 2); j += 2; continue; }
+                    str += raw.charAt(j) === '"' ? '\\"' : raw.charAt(j);
+                    j++;
+                }
+                if (q === "'") str = str.replace(/\\'/g, "'");
+                out += '"' + str + '"';
+                i = j + 1;
+                continue;
+            }
+            var word = raw.slice(i).match(/^[A-Za-z_$][\w$]*/);
+            if (word) {
+                var w = word[0], rest = raw.slice(i + w.length).match(/^\s*:/);
+                if (rest && /[{,]\s*$/.test(out)) out += '"' + w + '"';
+                else if (w === "undefined") out += "null";
+                else if (w === "void" && /^\s+0/.test(raw.slice(i + 4))) { out += "null"; i = i + 4 + raw.slice(i + 4).match(/^\s+0/)[0].length; continue; }
+                else out += w;
+                i += w.length;
+                continue;
+            }
+            if (ch === "!" && (raw.charAt(i + 1) === "0" || raw.charAt(i + 1) === "1")) {
+                out += raw.charAt(i + 1) === "0" ? "true" : "false";
+                i += 2;
+                continue;
+            }
+            out += ch;
+            i++;
+        }
+        return out;
     }
 
     loggedUser(data) {
@@ -370,15 +409,15 @@ class DefaultExtension extends MProvider {
         var out = [], seen = {};
         // Le schede hanno oggetti dentro oggetti: per ogni «"username":"…"» si
         // prende l'«"id":…» più vicino prima, nello stesso oggetto.
-        var re = /"username":"([A-Za-z0-9_-]+)"/g, m;
+        var re = /["']?\busername["']?\s*:\s*["']([A-Za-z0-9_-]+)["']/g, m;
         while ((m = re.exec(text)) !== null) {
             var before = text.slice(Math.max(0, m.index - 1500), m.index);
-            var ids = before.match(/"id":(\d+)/g);
+            var ids = before.match(/["']?\bid["']?\s*:\s*\d+/g);
             var after = text.slice(m.index, m.index + 1500);
-            var id = ids ? ids[ids.length - 1].slice(5) : (after.match(/"id":(\d+)/) || [])[1];
+            var id = ids ? ids[ids.length - 1].match(/(\d+)$/)[1] : (after.match(/["']?\bid["']?\s*:\s*(\d+)/) || [])[1];
             if (!id || seen[m[1].toLowerCase()]) continue;
             seen[m[1].toLowerCase()] = true;
-            out.push({ id: id, username: m[1], status: (after.match(/"status":"(\w+)"/) || [])[1] });
+            out.push({ id: id, username: m[1], status: (after.match(/["']?\bstatus["']?\s*:\s*["'](\w+)["']/) || [])[1] });
         }
         if (out.length) return out;
         var cards = /<a\b[^>]*>/g, a;

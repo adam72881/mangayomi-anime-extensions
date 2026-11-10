@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.5
+
+- **Preferiti:** i dati della pagina sono scritti come codice JavaScript compatto, con i nomi dei campi senza virgolette. Ora l'estensione li converte prima di leggerli.
+
 ## Stripchat 1.3.4
 
 - **Preferiti:** la pagina dei preferiti ha i dati, ma scritti come codice JavaScript e non come dati puri, e le schede hanno oggetti uno dentro l'altro. Ora l'estensione li legge tutti e due.
