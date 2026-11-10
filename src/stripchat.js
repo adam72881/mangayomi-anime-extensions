@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.15",
+        "version": "1.3.16",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.15";
+const VERSION = "1.3.16";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://ita.stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -149,7 +149,7 @@ class DefaultExtension extends MProvider {
     }
 
     getHeaders(url) {
-        return { "User-Agent": UA };
+        return { "User-Agent": UA, "Referer": BASE + "/" };
     }
 
     playerHeaders(user) {
@@ -192,8 +192,17 @@ class DefaultExtension extends MProvider {
     }
 
     thumb(m) {
-        // Prima l'istantanea della diretta, poi la foto del profilo.
-        return m.snapshotUrl || m.popularSnapshotUrl || m.previewUrlThumbBig || m.previewUrl || m.previewUrlThumbSmall || m.avatarUrl || "";
+        // Anteprima della diretta, non l'avatar. Sul JSON della home c'è
+        // snapshotTimestamp + id → https://img.doppiocdn.com/thumbs/<ts>/<id>
+        // (200 image/webp, provato). I path relativi /previews/ e /avatars/ restano vuoti nell'app.
+        if (m && m.id && (m.snapshotTimestamp || m.popularSnapshotTimestamp)) {
+            return "https://img.doppiocdn.com/thumbs/" + (m.snapshotTimestamp || m.popularSnapshotTimestamp) + "/" + m.id;
+        }
+        var list = m ? [m.snapshotUrl, m.popularSnapshotUrl, m.previewUrlThumbBig, m.previewUrl, m.previewUrlThumbSmall] : [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i] && /^https?:/i.test(String(list[i]))) return list[i];
+        }
+        return "";
     }
 
     card(m) {
@@ -582,8 +591,12 @@ class DefaultExtension extends MProvider {
     // login: Mangayomi tiene i cookie dell'ultimo indirizzo visitato e toglie
     // quelli dell'altro, quindi login (e Cloudflare) valgono su uno solo dei due.
     // Si provano tutti e due e si ricorda quello che funziona.
+    // Webview: baseUrl è stripchat.com (come l'API dei preferiti che funziona nel
+    // browser). Poi ita, dove la Webview spesso finisce. Stesso schema di host di
+    // Chaturbate, senza riusarne il codice: si prova il host di base e quello
+    // italiano, e si ricorda quello che restituisce l'elenco.
     siteHosts() {
-        var all = ["https://ita.stripchat.com", "https://www.stripchat.com", BASE];
+        var all = [BASE, "https://ita.stripchat.com", "https://www.stripchat.com"];
         var first = this._site;
         if (first && all.indexOf(first) !== -1) {
             return [first].concat(all.filter(function (h) { return h !== first; }));
@@ -821,9 +834,7 @@ class DefaultExtension extends MProvider {
             var off = await this.apiJson(origin + "/api/front/models/favorites/offline?" + q, headers);
             offline = (off.data && off.data.models) || [];
         }
-        var cfg = await this.apiJson(origin + "/api/front/v3/config/initial?requestPath=%2Ffavorites", headers);
-        var apiUser = cfg.data && cfg.data.initial && cfg.data.initial.client && cfg.data.initial.client.user;
-        var auth = !!(viewer && viewer.id) || !!(apiUser && (apiUser.id || apiUser.username));
+        var auth = !!(viewer && viewer.id) || !!token;
         if (!models.length && viewer && viewer.id) {
             var idsRes = await this.apiJson(origin + "/api/front/users/" + encodeURIComponent(viewer.id) + "/favorites", headers);
             if (idsRes.status === 401 || idsRes.status === 403) return { auth: false, models: [], more: false };
@@ -874,17 +885,23 @@ class DefaultExtension extends MProvider {
 
     cookieSummary(names) {
         var other = names.filter(function (n) { return n.indexOf("ABTest_") !== 0; });
+        var session = this.sessionCookie(names);
         var ab = names.length - other.length;
-        var shown = other.slice(0, 12);
+        var rest = other.filter(function (n) { return session.indexOf(n) === -1; });
+        var shown = session.slice(0, 6).concat(rest.slice(0, 8));
         if (ab) shown.push("ABTest×" + ab);
-        if (other.length > 12) shown.push("+" + (other.length - 12));
-        return names.length + (shown.length ? " (" + shown.join(", ") + ")" : "");
+        if (rest.length > 8) shown.push("+" + (rest.length - 8));
+        var sess = session.length ? "sessione=" + session.join("+") : "sessione=NO";
+        return names.length + " (" + sess + (shown.length ? ", " + shown.join(", ") : "") + ")";
     }
 
     sessionCookie(names) {
-        return names.some(function (n) {
-            return n.indexOf("ABTest_") !== 0 && /session|auth|jwt|token/i.test(n);
+        var hits = [];
+        (names || []).forEach(function (n) {
+            if (n.indexOf("ABTest_") === 0) return;
+            if (/session|sid$|auth|jwt/i.test(n) && hits.indexOf(n) === -1) hits.push(n);
         });
+        return hits;
     }
 
     // Preferite con l'account. Il login della Webview è un cookie di sessione:
@@ -941,14 +958,13 @@ class DefaultExtension extends MProvider {
             var lines = notes.map(function (n) {
                 return n.host + " HTTP " + n.status + ", " + Math.round(n.bytes / 1024) + "KB, user=" + n.user + ", jwt=" + n.jwt + ", cookie " + this.cookieSummary(n.cookies) + (n.api ? ", " + n.api : "");
             }, this);
-            var anySession = notes.some(function (n) { return this.sessionCookie(n.cookies); }, this);
-            var anyUser = notes.some(function (n) { return n.user === "sì"; });
+            var anySession = notes.some(function (n) { return this.sessionCookie(n.cookies).length; }, this);
             var cf = notes.length && notes.every(function (n) { return n.api === "Cloudflare" || n.status === "nessuna risposta"; });
-            if (authed) throw new Error("Preferiti Stripchat " + VERSION + ": accesso visto ma elenco vuoto. " + lines.join(" | "));
+            if (authed) throw new Error("Preferiti Stripchat " + VERSION + ": il sito ti riconosce ma l'elenco è vuoto. " + lines.join(" | "));
             if (cf) throw new Error("Stripchat " + VERSION + " chiede una verifica (Cloudflare). Tocca Webview, aspetta la pagina, poi Riprova. " + lines.join(" | "));
-            var limit = (!anyUser && !anySession)
-                ? " Mangayomi 0.9.95 copia i cookie della Webview solo quando cambia l'indirizzo, e solo come nome=valore: il cookie di accesso non è tra quelli inviati. Dopo il login apri un'altra pagina di Stripchat nella Webview e tocca Riprova. È un limite dell'app."
-                : " Il sito non ha riconosciuto l'accesso in questa richiesta.";
+            var limit = !anySession
+                ? " Manca il cookie di sessione (stripchat_com_sessionId o sessionId): tra i cookie copiati non c'è. Chaturbate funziona perché il suo cookie di login arriva all'estensione; quello di Stripchat è HttpOnly e Mangayomi 0.9.95 sull'iPhone spesso non lo copia (solo al cambio di indirizzo, solo nome=valore). Dopo il login apri un'altra pagina di Stripchat nella Webview e tocca Riprova. È un limite dell'app."
+                : " Il cookie di sessione c'è ma questo host non ha restituito i preferiti.";
             throw new Error("Preferiti Stripchat " + VERSION + ". " + lines.join(" | ") + "." + limit);
         }
         this._site = found.origin;

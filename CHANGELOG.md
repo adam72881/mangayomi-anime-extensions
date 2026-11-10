@@ -1,5 +1,11 @@
 # Novità
 
+## Stripchat 1.3.16
+
+- Le copertine sono l'anteprima della diretta, non la foto profilo.
+- Popolare resta il blocco Featured della home. Più recente resta l'elenco consigli.
+- Se i preferiti sono vuoti, il messaggio dice se manca il cookie di sessione. Si prova prima stripchat.com, poi il sito italiano.
+
 ## Stripchat 1.3.15
 
 - Popolare è la sezione Featured della home (blocco `topStreamsModels`). Più recente è «Today's Recommendations», l'elenco di `/girls/recommended`.
