@@ -1,5 +1,9 @@
 # Novità
 
+## Chaturbate 1.3.3
+
+- **La diretta resta a caricare all'infinito:** il link della diretta ora vale per una sola apertura. L'estensione lo apriva per leggere le qualità e al player arrivava già scaduto (errore 403). In **Auto** il link passa intatto al player; con una qualità scelta l'estensione usa i link delle singole qualità, che restano validi.
+
 ## Stripchat 1.3.0
 
 - **Molte più categorie** (provate una per una): All'aperto, Da telefono, VR, Giocattoli interattivi, Cam2cam, Privati economici, Over 60, Bionde, More, Rosse, Sedere grande, Atletiche, Tatuate, Piercing, Con gli occhiali, Lingerie, Cosplay, Ufficio, Doccia, Show con l'olio, Balli, Striptease, Fumo, Piedi, Masturbazione, Ditalino, Dildo e vibratori, Pompini, Deepthroat, Doppia penetrazione, Fisting, Ahegao, Sculacciate, Giochi di ruolo, Lesbiche, Sesso di gruppo (oltre a quelle di prima).

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.2",
+        "version": "1.3.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -271,21 +271,25 @@ class DefaultExtension extends MProvider {
         }
         var src = String(ctx.hls_source);
         var headers = { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA };
+        var wanted = String(this.setting("cb_quality") || "auto");
+        // Il link principale (llhls.m3u8?token=…) vale UNA sola apertura: se lo
+        // apre l'estensione, al player arriva un 403 e la diretta gira a vuoto.
+        // In Auto va passato al player intatto; i link delle singole qualità
+        // invece restano validi.
+        var auto = {
+            url: src,
+            originalUrl: src,
+            quality: "Auto",
+            // Il player senza User-Agent si presenta come «libmpv»: meglio come la pagina.
+            headers: headers,
+        };
+        if (wanted === "auto") return [auto];
         var master = "";
         try {
             master = String((await this.client.get(src, headers)).body || "");
         } catch (e) {}
         var variants = this.variants(master, src);
-        var top = variants.length ? variants[0].height : 0;
-        var auto = {
-            url: src,
-            originalUrl: src,
-            quality: top ? "Auto · fino a " + top + "p" : "Diretta (HLS)",
-            // Il player senza User-Agent si presenta come «libmpv»: meglio come la pagina.
-            headers: headers,
-        };
-        var wanted = String(this.setting("cb_quality") || "auto");
-        if (wanted === "auto" || !variants.length) return [auto];
+        if (!variants.length || !variants[0].audio) return [await this.freshAuto(user, auto)];
 
         // Qualità scelta: il video di quella qualità e l'audio, che su Chaturbate
         // è un flusso a parte. L'app collega l'audio del PRIMO video a tutti:
@@ -295,18 +299,23 @@ class DefaultExtension extends MProvider {
         var first = variants.filter(function (v) { return v.height <= target; })[0] || variants[variants.length - 1];
         var ordered = [first].concat(variants.filter(function (v) { return v !== first; }));
         var audio = first.audio;
-        var out = [];
-        ordered.forEach(function (v) {
-            if (!audio) return;
-            out.push({
+        return ordered.map(function (v) {
+            return {
                 url: v.url,
                 originalUrl: v.url,
                 quality: v.height + "p" + (v.fps >= 50 ? "60" : ""),
                 headers: headers,
                 audios: [{ file: audio, label: "Audio" }],
-            });
+            };
         });
-        return out.length ? out : [auto];
+    }
+
+    // Il link letto per le qualità è ormai usato: per il player ne serve uno nuovo.
+    async freshAuto(user, auto) {
+        var ctx = await this.context(user);
+        if (!ctx.hls_source) throw new Error(user + " ha appena chiuso la diretta.");
+        auto.url = auto.originalUrl = String(ctx.hls_source);
+        return auto;
     }
 
     // Le qualità del file principale della diretta, dalla più alta: indirizzo del
