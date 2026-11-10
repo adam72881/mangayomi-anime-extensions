@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.15
+
+- Popolare è la sezione Featured della home (blocco `topStreamsModels`). Più recente è «Today's Recommendations», l'elenco di `/girls/recommended`.
+- I preferiti in diretta usano l'API che il sito apre su `/favorites`, con l'ordine del sito. Non si scartano più se manca il link del video.
+
 ## Stripchat 1.3.14
 
 - Popolare, Più recente, ricerca e filtri mostrano solo chi è in diretta pubblica. Le stanze spente o in show privato non compaiono. Resta il filtro da 720p in su.

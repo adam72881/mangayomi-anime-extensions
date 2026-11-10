@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.14",
+        "version": "1.3.15",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.14";
+const VERSION = "1.3.15";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://ita.stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -351,23 +351,137 @@ class DefaultExtension extends MProvider {
     }
 
     async getPopular(page) {
-        // Griglia «in evidenza»: stesso ordinamento camsLive (recScoreStripRanking).
-        // Con i cookie del login il sito può personalizzarla; senza, è l'elenco generico.
+        // «Featured Free Sex Cam Shows» = blocco topStreamsModels della home v2.
+        // Da ospite i nomi non sono quelli dell'account; con i cookie della Webview
+        // la stessa risposta è quella di Adam. Poi solo diretta pubblica e preset ≥720.
         try {
-            var ranked = await this.fillFront(page, { gender: "" }, "recScoreStripRanking");
-            if (ranked && (ranked.list.length || page > 1)) return ranked;
+            var featured = await this.fillFeatured(page);
+            if (featured && (featured.list.length || page > 1)) return featured;
         } catch (e) {}
         return this.page(page, { gender: "girls" });
     }
 
     async getLatestUpdates(page) {
-        // «I consigli di oggi per te»: sortBy=recommendedScore, elenco diverso dalla
-        // griglia. Se l'API non dà nulla, si torna alle nuove senza errore.
+        // «See all» di Today's Recommendations: /girls/recommended,
+        // filterGroupTags [["recommended"]] e sortBy=recommendedScore.
         try {
-            var tips = await this.fillFront(page, { gender: "" }, "recommendedScore");
+            var tips = await this.fillRecommended(page);
             if (tips && (tips.list.length || page > 1)) return tips;
         } catch (e) {}
         return this.page(page, { gender: "girls", isNew: true });
+    }
+
+    v2HomeUrl(origin, topLimit) {
+        return origin + "/api/front/v2/models?primaryTag=girls&limit=24&topLimit=" + topLimit
+            + "&favoritesLimit=24&msBlock=true&byw=false&flags=0&rcmGrp=A&rbCnGr=true&iem=true"
+            + "&decMb=true&dmv=false&ctryTop=true&mlfv=false&rectf=false&iig=true&sac=true&nic=true&shFv=true";
+    }
+
+    async featuredModels(topLimit) {
+        var origins = ["https://stripchat.com", "https://ita.stripchat.com"];
+        for (var i = 0; i < origins.length; i++) {
+            var res = await this.apiJson(this.v2HomeUrl(origins[i], topLimit), {
+                "Referer": origins[i] + "/",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+            });
+            var blocks = (res.data && res.data.blocks) || [];
+            for (var j = 0; j < blocks.length; j++) {
+                if (blocks[j] && blocks[j].id === "topStreamsModels" && (blocks[j].models || []).length) return blocks[j].models;
+            }
+        }
+        return [];
+    }
+
+    keepListed(m) {
+        if (!this.isPublicLive(m) || !this.offersHd(m)) return false;
+        this.withStream(m);
+        return true;
+    }
+
+    async fillFeatured(page) {
+        if (!this._feat) this._feat = { items: [], got: 0, more: true };
+        var need = page * PER_PAGE;
+        var guard = 0;
+        while (this._feat.items.length < need && this._feat.more && guard < 8) {
+            guard++;
+            var top = 61 + (guard - 1) * 60;
+            var models = await this.featuredModels(top);
+            if (guard > 1 && models.length <= this._feat.got) {
+                this._feat.more = false;
+                break;
+            }
+            this._feat.got = models.length;
+            var items = [];
+            var seen = {};
+            var self = this;
+            models.forEach(function (m) {
+                var id = m && (m.id || m.username);
+                if (!id || seen[id] || !self.keepListed(m)) return;
+                seen[id] = 1;
+                items.push(m);
+            });
+            this._feat.items = items;
+            if (models.length < top) this._feat.more = false;
+        }
+        var slice = this._feat.items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+        return {
+            list: slice.map(function (m) { return this.card(m); }, this),
+            hasNextPage: this._feat.items.length > page * PER_PAGE || this._feat.more,
+        };
+    }
+
+    async fillRecommended(page) {
+        var key = "recommended";
+        if (!this._buckets) this._buckets = {};
+        if (!this._buckets[key]) this._buckets[key] = { items: [], api: 0, more: true, miss: false };
+        var bucket = this._buckets[key];
+        var need = page * PER_PAGE;
+        var flags = "&userRole=user&nic=true&rcmGrp=A&rbCnGr=true&iem=true&decMb=true&dmv=false&ctryTop=true&mlfv=false&rectf=false&iig=true&sac=true";
+        var guard = 0;
+        while (bucket.items.length < need && bucket.more && bucket.api < 8 && guard < 8) {
+            guard++;
+            bucket.api++;
+            var offset = (bucket.api - 1) * PER_PAGE;
+            var path = "/api/front/models?limit=60&offset=" + offset + "&primaryTag=girls&filterGroupTags="
+                + encodeURIComponent("[[\"recommended\"]]") + "&sortBy=recommendedScore" + flags;
+            var res = null;
+            var origins = ["https://stripchat.com", "https://ita.stripchat.com"];
+            for (var i = 0; i < origins.length; i++) {
+                try {
+                    res = await this.apiJson(origins[i] + path, {
+                        "Referer": origins[i] + "/girls/recommended",
+                        "Accept": "application/json, text/plain, */*",
+                    });
+                } catch (e) {
+                    res = null;
+                }
+                if (res && res.data && res.data.models) break;
+            }
+            var models = (res && res.data && res.data.models) || [];
+            if (!models.length) {
+                bucket.more = false;
+                if (!bucket.items.length) bucket.miss = true;
+                break;
+            }
+            var seen = {};
+            bucket.items.forEach(function (m) { seen[m.id || m.username] = 1; });
+            var self = this;
+            models.forEach(function (m) {
+                var id = m && (m.id || m.username);
+                if (!id || seen[id] || !self.keepListed(m)) return;
+                seen[id] = 1;
+                bucket.items.push(m);
+            });
+            var total = (res.data.filteredCount || res.data.totalCount || 0);
+            bucket.more = offset + models.length < total && models.length >= 60;
+        }
+        if (bucket.miss && !bucket.items.length) return null;
+        var slice = bucket.items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+        return {
+            list: slice.map(function (m) { return this.card(m); }, this),
+            hasNextPage: bucket.items.length > page * PER_PAGE || bucket.more,
+        };
     }
 
     async search(query, page, filters) {
@@ -694,18 +808,18 @@ class DefaultExtension extends MProvider {
     // Schede dei preferiti. Senza il cookie di accesso l'API risponde 200 con
     // models vuoto (provato). Con l'accesso, le schede stanno in
     // /models/favorites; l'id utente, se c'è, si legge da config o dalla pagina.
-    async favoriteModels(origin, viewer, token, page) {
+    async favoriteModels(origin, viewer, token, page, includeOffline) {
         var headers = this.apiHeaders(origin, token);
         var offset = (page - 1) * PER_PAGE;
-        var listed = await this.apiJson(origin + "/api/front/models/favorites?limit=" + PER_PAGE + "&offset=" + offset, headers);
-        if (listed.status === 401 || listed.status === 403) return { auth: false, models: [], more: false };
+        var q = "offset=" + offset + "&sortBy=bestMatch&limit=60&mlfv=false";
+        var listed = await this.apiJson(origin + "/api/front/models/favorites?" + q, headers);
+        if (listed.status === 401 || listed.status === 403) return { auth: false, models: [], offline: [], more: false };
         var models = (listed.data && listed.data.models) || [];
-        var total = (listed.data && listed.data.totalCount) || models.length;
-        if (page === 1) {
-            var off = await this.apiJson(origin + "/api/front/models/favorites/offline?limit=" + PER_PAGE + "&offset=0", headers);
-            ((off.data && off.data.models) || []).forEach(function (m) {
-                if (m && m.username) models.push(m);
-            });
+        var total = (listed.data && (listed.data.totalCount || listed.data.filteredCount)) || models.length;
+        var offline = [];
+        if (includeOffline) {
+            var off = await this.apiJson(origin + "/api/front/models/favorites/offline?" + q, headers);
+            offline = (off.data && off.data.models) || [];
         }
         var cfg = await this.apiJson(origin + "/api/front/v3/config/initial?requestPath=%2Ffavorites", headers);
         var apiUser = cfg.data && cfg.data.initial && cfg.data.initial.client && cfg.data.initial.client.user;
@@ -739,7 +853,7 @@ class DefaultExtension extends MProvider {
                 total = ids.length;
             }
         }
-        return { auth: auth, models: models, more: total > offset + PER_PAGE };
+        return { auth: auth, models: models, offline: offline, more: total > offset + 60 };
     }
 
     // Nomi dei cookie che Mangayomi ha messo sulla richiesta. I valori non si
@@ -812,7 +926,7 @@ class DefaultExtension extends MProvider {
             note.jwt = token ? "sì" : "no";
             var got;
             try {
-                got = await this.favoriteModels(origin, viewer, token, page);
+                got = await this.favoriteModels(origin, viewer, token, page, includeOffline);
             } catch (e) {
                 note.api = "API muta";
                 notes.push(note);
@@ -820,7 +934,7 @@ class DefaultExtension extends MProvider {
             }
             note.api = got.auth ? "accesso" : "ospite";
             notes.push(note);
-            if (got.models.length) found = { origin: origin, models: got.models, more: got.more };
+            if (got.models.length || (includeOffline && got.offline && got.offline.length)) found = { origin: origin, models: got.models, offline: got.offline || [], more: got.more };
             else if (got.auth) authed = true;
         }
         if (!found) {
@@ -838,50 +952,38 @@ class DefaultExtension extends MProvider {
             throw new Error("Preferiti Stripchat " + VERSION + ". " + lines.join(" | ") + "." + limit);
         }
         this._site = found.origin;
-        var gotModels = found.models;
+        var gotModels = found.models || [];
+        var offlineModels = includeOffline ? (found.offline || []) : [];
         var more = found.more;
-        await this.enrichFavoriteStatus(gotModels);
-        var online = [];
-        var rest = [];
-        var seenIds = {};
-        var counts = {};
-        gotModels.forEach(function (o) {
-            if (!o || !o.username) return;
-            var key = String(o.username).toLowerCase();
-            if (seenIds[key]) return;
-            seenIds[key] = true;
-            var st = o.status ? String(o.status) : "";
-            counts[st || "senzastatus"] = (counts[st || "senzastatus"] || 0) + 1;
-            // In diretta pubblica: status public. Senza status, solo se isLive
-            // e non risulta un altro stato. Niente requisito stream: la risposta
-            // dei preferiti spesso non ha stream né hlsPlaylist.
-            var pub = st === "public" || (!st && o.isLive === true);
-            if (pub) online.push(o);
-            else rest.push(o);
-        });
-        if (online.some(function (o) { return o.viewersCount; })) {
-            online.sort(function (a, b) { return (b.viewersCount || 0) - (a.viewersCount || 0); });
-        }
-        if (!includeOffline && !online.length) {
-            if (page > 1) return { list: [], hasNextPage: false };
-            var bits = Object.keys(counts).map(function (k) { return k + "×" + counts[k]; });
-            throw new Error("Nessuna delle tue preferite è in diretta adesso (" + (online.length + rest.length) + ": " + bits.join(", ") + "). Prova «Le mie preferite (anche offline)».");
-        }
         var self = this;
-        var show = includeOffline ? online.concat(rest) : online;
-        var list = show.map(function (o) {
-            var key = String(o.username).toLowerCase();
-            var pub = o.status === "public" || (!o.status && o.isLive === true);
-            var known = self.seen[key];
+        var seenIds = {};
+        var list = [];
+        gotModels.forEach(function (o) {
+            if (!o || !o.username || seenIds[String(o.username).toLowerCase()]) return;
+            seenIds[String(o.username).toLowerCase()] = true;
+            var known = self.seen[String(o.username).toLowerCase()];
             var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
-            if (!known) self.seen[key] = Object.assign({ _at: 0 }, o);
-            c.name = (pub ? "● " : "") + String(c.name).replace(/^● /, "");
-            if (!pub) {
+            if (!known) self.seen[String(o.username).toLowerCase()] = Object.assign({ _at: 0 }, o);
+            c.name = "● " + String(c.name).replace(/^● /, "");
+            list.push(c);
+        });
+        if (includeOffline) {
+            offlineModels.forEach(function (o) {
+                if (!o || !o.username || seenIds[String(o.username).toLowerCase()]) return;
+                seenIds[String(o.username).toLowerCase()] = true;
+                var known = self.seen[String(o.username).toLowerCase()];
+                var c = known ? self.card(known) : { name: o.username, imageUrl: self.thumb(o), link: "/" + o.username + (o.id ? "#id=" + o.id : "") };
+                if (!known) self.seen[String(o.username).toLowerCase()] = Object.assign({ _at: 0 }, o);
+                c.name = String(c.name).replace(/^● /, "");
                 var label = STATUS_TEXT[o.status] || "";
                 if (label) c.name = c.name + " · " + label;
-            }
-            return c;
-        });
+                list.push(c);
+            });
+        }
+        if (!list.length) {
+            if (page > 1) return { list: [], hasNextPage: false };
+            throw new Error("Nessuna delle tue preferite è in diretta adesso. Prova «Le mie preferite (anche offline)».");
+        }
         return { list: list, hasNextPage: !!more };
     }
 
