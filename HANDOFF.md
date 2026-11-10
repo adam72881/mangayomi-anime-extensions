@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/chaturbate.js` | Chaturbate (dirette) | 1.3.1 |
+| `src/chaturbate.js` | Chaturbate (dirette) | 1.3.2 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.2.1 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
@@ -270,3 +270,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Stripchat 1.2.0 — HD con l'account:** preferenza `sc_account_hd` (default spenta). `accountStreams(user)`: GET `/api/front/v2/models/username/<nome>/cam`, poi la pagina `/<nome>`, con i cookie della Webview; prende gli URL `.m3u8` presenti nella risposta (solo quelli dati dal sito), ne legge le varianti (NAME/RESOLUTION) e le mette prima solo se ce n'è una > 480p. Provato solo con risposte finte (Cloudflare da qui). Il suffisso `_160p` (sorgente senza account) resta non usato.
 
 - **11/11/2026 — Italia:** dall'Italia Chaturbate risponde alle API con la pagina «Verify your age — Visitors in Italy must verify their age» (Yoti / Face Scan / AgeKey; scade con l'inattività). Obbligo di legge: **non si aggira**. Le estensioni riconoscono la pagina (HTML al posto del JSON, o 401/403/451 con testo di verifica età) e dicono di completarla nella Webview. Da qui (USA) le API rispondono normalmente, quindi i test cloud non vedono questo caso.
+
+- **Chaturbate 1.3.2 — it.chaturbate.com:** dopo verifica e login la Webview resta su it.chaturbate.com. Mangayomi (`MClient.setCookie` a ogni navigazione) salva i cookie dell'URL visitato e cancella quelli degli host collegati (`removeCookiesForHost` con `_hostsMatch` largo), quindi i cookie solo-host di chaturbate.com si perdono. `json(path, check)` prova `this._host` (default chaturbate.com) e poi l'altro; per le seguite `check` = almeno una stanza con `is_following`. Le API rispondono su entrambi gli host (provato). Utente: login come gloriasissypopa, sito mostrava Following (1/10), estensione dava ancora «verifica dell'età».

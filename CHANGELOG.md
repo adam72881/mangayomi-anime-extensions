@@ -1,5 +1,9 @@
 # Novità
 
+## Chaturbate 1.3.2
+
+- **Seguite e verifica dopo il login sulla versione italiana**: la Webview finisce su it.chaturbate.com, mentre l'estensione chiedeva tutto a chaturbate.com. Se su un indirizzo il sito chiede ancora la verifica o non riconosce il login, ora l'estensione prova l'altro (chaturbate.com ↔ it.chaturbate.com) e ricorda quello che funziona.
+
 ## Chaturbate 1.3.1 / Stripchat 1.2.1
 
 - Dall'Italia i siti chiedono la **verifica dell'età** (obbligatoria per legge: Yoti, Face Scan, AgeKey). Prima l'estensione diceva solo «ha risposto in modo inatteso»; ora spiega cosa fare: tocca **Webview**, completa la verifica, torna indietro e tocca **Riprova**. La verifica non si aggira; il sito la chiede di nuovo dopo un po' di inattività.

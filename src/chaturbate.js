@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.1",
+        "version": "1.3.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -80,14 +80,45 @@ class DefaultExtension extends MProvider {
         return { "User-Agent": UA };
     }
 
-    headers() {
-        return { "Referer": BASE + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" };
+    headers(origin) {
+        return { "Referer": (origin || BASE) + "/", "Accept-Language": "it-IT,it;q=0.9,en;q=0.8" };
     }
 
-    async json(url) {
+    // Il sito ha anche la versione italiana it.chaturbate.com, ed è lì che la
+    // Webview finisce dopo la verifica e il login. Mangayomi salva i cookie
+    // dell'ultimo indirizzo visitato e cancella quelli dell'altro: se la verifica
+    // o il login valgono solo su uno dei due, sull'altro il sito li chiede di
+    // nuovo. Si provano tutti e due e si ricorda quello che funziona.
+    hosts() {
+        var first = this._host || BASE;
+        var other = first === BASE ? "https://it.chaturbate.com" : BASE;
+        return [first, other];
+    }
+
+    // path = "/api/…". check(data) facoltativo: false = risposta non buona su
+    // questo indirizzo (es. seguite senza login), si prova l'altro.
+    async json(path, check) {
+        var hosts = this.hosts();
+        var lastError = null, lastData;
+        for (var i = 0; i < hosts.length; i++) {
+            try {
+                var data = await this.jsonFrom(hosts[i] + path, hosts[i]);
+                lastData = data;
+                if (check && data && !check(data)) continue;
+                this._host = hosts[i];
+                return data;
+            } catch (e) {
+                lastError = e;
+            }
+        }
+        if (lastData !== undefined) return lastData;
+        throw lastError;
+    }
+
+    async jsonFrom(url, origin) {
         var res;
         try {
-            res = await this.client.get(url, this.headers());
+            res = await this.client.get(url, this.headers(origin));
         } catch (e) {
             throw new Error("Chaturbate non risponde (problema di connessione). Controlla la rete e tocca Riprova.");
         }
@@ -122,7 +153,7 @@ class DefaultExtension extends MProvider {
     }
 
     async rooms(page, opts) {
-        var url = BASE + "/api/ts/roomlist/room-list/?limit=" + PER_PAGE + "&offset=" + ((page - 1) * PER_PAGE);
+        var url = "/api/ts/roomlist/room-list/?limit=" + PER_PAGE + "&offset=" + ((page - 1) * PER_PAGE);
         if (opts.gender && !opts.follow) url += "&genders=" + opts.gender;
         if (opts.hashtag) url += "&hashtags=" + encodeURIComponent(opts.hashtag);
         if (opts.keywords) url += "&keywords=" + encodeURIComponent(opts.keywords);
@@ -132,7 +163,12 @@ class DefaultExtension extends MProvider {
         // cookie della Webview passano all'estensione. Senza accesso il sito
         // ignora follow e manda la lista normale, con is_following falso.
         if (opts.follow) url += "&follow=true" + (opts.offline ? "&offline=true" : "");
-        var data = await this.json(url);
+        // Seguite: se su un indirizzo il login non risulta (is_following falso),
+        // si prova l'altro.
+        var data = await this.json(url, opts.follow ? function (d) {
+            var r = (d && d.rooms) || [];
+            return !r.length || r.some(function (x) { return x.is_following; });
+        } : null);
         var rooms = (data && data.rooms) || [];
         if (opts.follow && page === 1) {
             if (rooms.length && !rooms.some(function (r) { return r.is_following; })) {
@@ -200,7 +236,7 @@ class DefaultExtension extends MProvider {
     }
 
     async context(user) {
-        var ctx = await this.json(BASE + "/api/chatvideocontext/" + user + "/");
+        var ctx = await this.json("/api/chatvideocontext/" + user + "/");
         if (!ctx) throw new Error("La stanza «" + user + "» non esiste più su Chaturbate.");
         return ctx;
     }
