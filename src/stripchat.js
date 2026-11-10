@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.5",
+        "version": "1.3.6",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,6 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
+const VERSION = "1.3.6";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -313,6 +314,7 @@ class DefaultExtension extends MProvider {
     // window.__PRELOADED_STATE__ = {…} della pagina: l'oggetto preso contando
     // le graffe (dopo può esserci «;» o altro codice nello stesso <script>).
     preloadedState(body) {
+        this._stateError = "";
         var i = body.indexOf("__PRELOADED_STATE__");
         if (i === -1) return null;
         var start = body.indexOf("{", i);
@@ -438,7 +440,15 @@ class DefaultExtension extends MProvider {
         (body.match(/\/api\/front\/[A-Za-z0-9_\/{}-]+/g) || []).forEach(function (x) { apis[x] = 1; });
         var globals = {};
         (body.match(/window\.__?[A-Za-z_]+__?\s*=/g) || []).forEach(function (x) { globals[x.replace(/\s*=$/, "")] = 1; });
-        return (this._stateError ? this._stateError + ", " : "") + title + ", " + Math.round(body.length / 1024) + "KB, username×" + (body.match(/username/g) || []).length +
+        var bits = [];
+        var at = body.indexOf("__PRELOADED_STATE__");
+        if (at !== -1) bits.push("inizio «" + body.slice(at + 19, at + 19 + 70).replace(/\s+/g, " ") + "»");
+        var um, ure = /username/g, k = 0;
+        while ((um = ure.exec(body)) !== null && k < 2) {
+            bits.push("«" + body.slice(Math.max(0, um.index - 15), um.index + 30).replace(/\s+/g, " ") + "»");
+            k++;
+        }
+        return (this._stateError ? this._stateError + ", " : "") + bits.join(" ") + " — " + title + ", " + Math.round(body.length / 1024) + "KB, username×" + (body.match(/username/g) || []).length +
             ", model-list×" + (body.match(/model-list/g) || []).length +
             (Object.keys(globals).length ? ", " + Object.keys(globals).slice(0, 4).join(" ") : "") +
             (Object.keys(apis).length ? ", " + Object.keys(apis).slice(0, 4).join(" ") : "");
@@ -483,7 +493,8 @@ class DefaultExtension extends MProvider {
         if (!best) {
             if (guest) throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
             if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
-            throw new Error("Non riesco a leggere i preferiti di Stripchat [" + notes.join(" | ") + "]. Mandami questo messaggio.");
+            // Il messaggio sul telefono si taglia dopo poche righe: solo l'ultimo indirizzo.
+            throw new Error("Preferiti Stripchat " + VERSION + ": " + notes[notes.length - 1]);
         }
         var self = this;
         var seenIds = {};

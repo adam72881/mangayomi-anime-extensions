@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.6
+
+- Se i preferiti non si leggono, il messaggio ora è più corto e mostra la versione e un pezzo dei dati della pagina, così si capisce cosa sistemare.
+
 ## Stripchat 1.3.5
 
 - **Preferiti:** i dati della pagina sono scritti come codice JavaScript compatto, con i nomi dei campi senza virgolette. Ora l'estensione li converte prima di leggerli.

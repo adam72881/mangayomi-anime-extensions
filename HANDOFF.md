@@ -24,7 +24,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
-| `src/stripchat.js` | Stripchat (dirette) | 1.3.5 |
+| `src/stripchat.js` | Stripchat (dirette) | 1.3.6 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
 
 ## Limiti di Mangayomi v0.9.95
@@ -271,6 +271,7 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 
 - **11/11/2026 — Italia:** dall'Italia Chaturbate risponde alle API con la pagina «Verify your age — Visitors in Italy must verify their age» (Yoti / Face Scan / AgeKey; scade con l'inattività). Obbligo di legge: **non si aggira**. Le estensioni riconoscono la pagina (HTML al posto del JSON, o 401/403/451 con testo di verifica età) e dicono di completarla nella Webview. Da qui (USA) le API rispondono normalmente, quindi i test cloud non vedono questo caso.
 
+- **Stripchat 1.3.6:** stesso errore «expecting property name» dopo 1.3.5 (forse ancora 1.3.4 sul telefono). Messaggio di errore con `VERSION`, solo l'ultimo host, inizio dello stato e due pezzi attorno a «username».
 - **Stripchat 1.3.5:** il telefono riportava «expecting property name» su entrambi gli host (321KB, username×11): letterale JS con chiavi senza virgolette. `jsToJson()` (chiavi, apici singoli, !0/!1, undefined, void 0); `htmlModels` accetta `username:'x'` e `id:1` senza virgolette.
 - **Stripchat 1.3.4:** diagnosi dal telefono: stripchat.com/favorites 323KB con `window.__PRELOADED_STATE__` e username×11, ita 448KB senza titolo. Lo stato non passava `JSON.parse` (probabile letterale JS: `undefined`, `!0`): sostituzioni prima del parse, errore riportato in `pageHints`. `htmlModels` non richiede più oggetti piatti: per ogni `"username"` prende l'`"id"` più vicino prima.
 - **Stripchat 1.3.3:** con 1.3.2 `/favorites` → 200 ma senza `__PRELOADED_STATE__` (ita: shell SPA che inizia con `window.CSP_REPORT_URI`; stripchat.com: titolo «I miei Preferiti | St…»). `htmlModels()` (JSON sparso `"username"`+id, poi `<a class="…model…" href="/nome">`) e `pageHints()` per la diagnosi dal telefono. Con HD account la diretta girava a vuoto: i link dati all'account usano MOUFLON (nomi dei pezzi nascosti, `media.mp4` finto). Decifrarlo = aggirare la protezione del sito → NON farlo; `playable()` li scarta. Le dirette dell'API partner hanno pezzi in chiaro (provato).
