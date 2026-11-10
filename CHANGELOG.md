@@ -1,5 +1,12 @@
 # Novità
 
+## Link universale 1.4.16
+
+- **Filtro Categoria per tutti i siti**: le stesse 27 categorie (MILF, Anal, BDSM, Giapponesi, Lesbiche, Tette grandi…) qualunque sito scegli. L'estensione apre la pagina di quella categoria sul sito (xHamster, Eporner, xVideos, Porntrex, YouJizz, javhd.today…); se il sito non ne ha una, cerca la parola. Con un testo nella ricerca, cerca testo + categoria.
+- **Solo video nelle liste**: se la pagina ha almeno 6 video, le schede di categorie, attrici e canali spariscono (javhd.today mostrava categorie come «Big Tits» o «Massage» al posto dei video).
+- **«Sito» e «Sito JAV» partono entrambi da «—»**: scegline uno e lascia l'altro su «—». Senza scelta vale il sito principale; se scegli in tutti e due vale «Sito JAV».
+- Link scritti male dal sito («hhttps://…») corretti.
+
 ## Link universale 1.4.15
 
 - **Filtro «Sito JAV»**: i siti JAV stanno in un elenco a parte, sotto «Sito». Scegline uno per cercare lì; lasciato su «—» vale «Sito». Se non tocchi niente si cerca nel sito principale.

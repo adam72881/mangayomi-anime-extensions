@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.15 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.16 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -236,3 +236,5 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **1.4.14:** `withLazyList(html,url)`: se ci sono meno di 6 schede «da video» (numero o slug lungo nel link) cerca nello script `fetch('…ajax|load|list|more|page…')`, `$.get`, `axios.get`, fa la richiesta (stesso sito, Referer pagina) e aggiunge l'HTML (JSON → campo html/content/data/items). Usata in `listing` e in `getDetail`. `getDetail`: pagina senza video e con 3+ schede → le schede diventano episodi (categorie, attrici). `videosFromHtml`: attributi `data-embed|src|link|url|video|server|href|player|iframe` in base64 che decodificano in un URL → iframe da seguire (javhd.today: cloudwish.xyz e mycloudz.cc, packer + JW Player → master.m3u8 trovato; da qui il CDN non risponde, IP che cambia). Bandierine: nomi `xx-YY` / `xxxx-YY` e immagini `/flags/` scartati.
 
 - **1.4.15:** `isJavSite(url)` (host con jav, tokyomotion, avhwa, sextb, 7mmtv, missav, supjav, mythav). `getFilterList`: «Sito» = siti non JAV, «Sito JAV» = «— (usa «Sito»)» + siti JAV, sempre state 0. `siteFromFilters`: Sito JAV > 0 vince; poi Sito se state > 0; altrimenti `sites()[0]` (sito principale, anche JAV).
+
+- **1.4.16:** `CATEGORIES` ([nome, parole]) → filtro «Categoria» uguale per tutti i siti (value = indice). `categoryChoice(filters)`; `categoryUrlFor(site, words)`: categorie in cache `PREF_NAV`, poi home e `/categories/` (`noteCategories`), poi link della home con ultimo pezzo = parola (`/big-tits/`, `-12`); nessuna → ricerca della parola; con testo → testo + parola. L'URL della categoria per le pagine dopo è in `PREF_NEXT` (`cat:<sito>|<parola>`). `dropSideCards()` in `listing`: con ≥6 schede non-categoria toglie quelle con `SIDE_PATH`, `isCategoryPath` o percorso di una sola parola-trattino senza query. «Sito» e «Sito JAV» hanno «—» come prima voce (state 0); `siteFromFilters`: JAV > 0, poi Sito > 0 (indice − 1), poi `sites()[0]`. `resolveUrl` corregge `hhttps://`. La vecchia `categoryPick` (URL del sito principale) resta per compatibilità ma il filtro non ne produce più.

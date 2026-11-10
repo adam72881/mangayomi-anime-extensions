@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.15",
+        "version": "1.4.16",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -330,11 +330,56 @@ function pickImage(html) {
     return { tag: best.tag || tags[0] || "", src: best.score >= 0 ? best.src : "" };
 }
 
+// Categorie del filtro, uguali per tutti i siti: [nome, parole da cercare sul sito].
+const CATEGORIES = [
+    ["Amatoriali", ["amateur", "amatoriali", "homemade"]],
+    ["Anal", ["anal"]],
+    ["Asiatiche", ["asian"]],
+    ["BBW", ["bbw"]],
+    ["BDSM", ["bdsm"]],
+    ["Bionde", ["blonde"]],
+    ["Bondage", ["bondage"]],
+    ["Creampie", ["creampie"]],
+    ["Ebony", ["ebony"]],
+    ["Femdom", ["femdom"]],
+    ["Feticismo", ["fetish"]],
+    ["Gangbang", ["gangbang", "gang bang"]],
+    ["Giapponesi", ["japanese"]],
+    ["Hardcore", ["hardcore"]],
+    ["Hentai", ["hentai"]],
+    ["Latine", ["latina"]],
+    ["Lesbiche", ["lesbian"]],
+    ["Massaggio", ["massage"]],
+    ["Mature", ["mature"]],
+    ["MILF", ["milf"]],
+    ["Orge", ["orgy"]],
+    ["Pompini", ["blowjob"]],
+    ["POV", ["pov"]],
+    ["Rosse", ["redhead"]],
+    ["Squirting", ["squirt"]],
+    ["Tette grandi", ["big tits", "big boobs"]],
+    ["Threesome", ["threesome"]],
+];
+
 // Siti JAV (giapponesi/asiatici): vanno nel filtro «Sito JAV», separati dagli altri.
 // Basta «jav» nel nome del sito, più i siti pronti JAV che non lo hanno.
 function isJavSite(url) {
     var h = hostOf(url);
     return /jav|tokyomotion|avhwa|sextb|7mmtv|missav|supjav|mythav/i.test(h);
+}
+
+// Schede che non sono video: categorie (/categories/x, /c/x, /big-tits/),
+// attrici, canali, tag. Se nella pagina ci sono almeno 6 video, si tolgono.
+function isSideCard(c) {
+    var link = String(c.link).split("#")[0];
+    var path = link.replace(/^https?:\/\/[^\/]+/, "");
+    if (SIDE_PATH.test(path) || isCategoryPath(path)) return true;
+    return link.indexOf("?") === -1 && /^\/[a-z]+(?:-[a-z]+){0,2}\/?$/i.test(path);
+}
+
+function dropSideCards(cards) {
+    var videos = cards.filter(function (c) { return !isSideCard(c); });
+    return videos.length >= 6 ? videos : cards;
 }
 
 function hostOf(url) {
@@ -385,6 +430,9 @@ function resolveUrl(href, base) {
         .replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(parseInt(n, 10)); })
         .replace(/&amp;/g, "&");
     if (!href || /^(javascript|mailto|tel|data|blob|about):/i.test(href) || href.charAt(0) === "#") return "";
+    // Link scritti male dal sito: «hhttps://…», «/https://…».
+    var absIn = href.match(/https?:\/\/[^\s"'<>]+$/i);
+    if (absIn && absIn.index > 0 && absIn.index <= 3) href = absIn[0];
     // Spazi e caratteri non ASCII negli indirizzi (frequenti nelle immagini):
     // l'app non li carica se non sono codificati.
     href = href.replace(/[^\x21-\x7e]/g, function (ch) { return encodeURIComponent(ch); });
@@ -983,7 +1031,7 @@ class DefaultExtension extends MProvider {
         // «Sito JAV» scelto (non «—») vince; poi «Sito» se l'hai cambiato;
         // se non hai toccato niente, il sito principale (anche se è JAV).
         if (javIdx > 0 && jav[javIdx - 1]) return jav[javIdx - 1];
-        if (sawNormal && idx > 0 && normal[idx]) return normal[idx];
+        if (sawNormal && idx > 0 && normal[idx - 1]) return normal[idx - 1];
         return sites[0] || "";
     }
 
@@ -1061,6 +1109,52 @@ class DefaultExtension extends MProvider {
             cache[key] = { site: key, at: Date.now(), cats: [] };
             this.prefs.setString(PREF_NAV, JSON.stringify(cache));
         }
+    }
+
+    // Categoria scelta nel filtro: le sue parole, o null.
+    categoryChoice(filters) {
+        var words = null;
+        (filters || []).forEach(function (f) {
+            if (!f || f.type_name !== "SelectFilter" || f.name !== "Categoria") return;
+            var opt = (f.values || [])[f.state || 0];
+            var i = opt && opt.value !== "" ? parseInt(opt.value, 10) : NaN;
+            if (!isNaN(i) && CATEGORIES[i]) words = CATEGORIES[i][1];
+        });
+        return words;
+    }
+
+    // La pagina di una categoria sul sito: dalle categorie già viste (o dalla
+    // home e da /categories), oppure un link della home che finisce con la
+    // parola (/big-tits/, /c/big-tits-12/). Niente: stringa vuota.
+    async categoryUrlFor(site, words) {
+        var origin = originOf(site) || site;
+        var slugs = words.map(function (w) { return w.toLowerCase().replace(/[^a-z0-9]+/g, "-"); });
+        var match = function (name, url) {
+            var n = String(name).toLowerCase(), last = String(url).split("?")[0].replace(/\/+$/, "").split("/").pop().toLowerCase();
+            for (var i = 0; i < words.length; i++) {
+                if (n === words[i] || n === words[i] + "s" || last === slugs[i] || last === slugs[i] + "s" || new RegExp("^" + slugs[i] + "s?-\\d+$").test(last)) return true;
+            }
+            return false;
+        };
+        var cats = this.catsOf(this.readJson(PREF_NAV, {})[origin], origin);
+        for (var i = 0; i < cats.length; i++) if (match(cats[i].name, cats[i].url)) return cats[i].url;
+        var pages = [origin + "/", origin + "/categories/"];
+        for (var p = 0; p < pages.length; p++) {
+            var html = "";
+            try { html = await this.fetchHtml(pages[p], origin + "/"); } catch (e) { continue; }
+            try { this.noteCategories(origin, html, pages[p]); } catch (e) {}
+            cats = this.catsOf(this.readJson(PREF_NAV, {})[origin], origin);
+            for (var j = 0; j < cats.length; j++) if (match(cats[j].name, cats[j].url)) return cats[j].url;
+            var re = /\bhref\s*=\s*["']([^"'#]+)["']/gi, m;
+            while ((m = re.exec(html)) !== null) {
+                var u = resolveUrl(m[1], pages[p]);
+                if (!u || siteOf(u) !== siteOf(origin) || u.indexOf("?") !== -1) continue;
+                var path = u.replace(/^https?:\/\/[^\/]+/, "");
+                if (path.split("/").filter(Boolean).length > 2 || /\/(search|tags?|pornstars?|models?)\//i.test(path)) continue;
+                if (match("", u)) return u;
+            }
+        }
+        return "";
     }
 
     categoryPick(filters, site) {
@@ -1240,6 +1334,20 @@ class DefaultExtension extends MProvider {
         if (!site) return this.historyPage(text);
         var order = this.orderKind(filters);
         var catPick = this.categoryPick(filters, site);
+        var catWords = this.categoryChoice(filters);
+        if (catWords && !text) {
+            var key = "cat:" + site + "|" + catWords[0];
+            var catUrl = page > 1 ? (this.readJson(PREF_NEXT, {})[key] || "") : await this.categoryUrlFor(site, catWords);
+            if (page === 1) {
+                var np = this.readJson(PREF_NEXT, {});
+                np[key] = catUrl;
+                this.prefs.setString(PREF_NEXT, JSON.stringify(np));
+            }
+            if (catUrl) return this.listing(catUrl, page, false);
+            text = catWords[0];
+        } else if (catWords && text) {
+            text = text + " " + catWords[0];
+        }
         if (!text) {
             if (catPick) return this.listing(catPick, page, false);
             if (order) return this.siteSection(site, order, page);
@@ -1453,7 +1561,7 @@ class DefaultExtension extends MProvider {
         seen[url.split("#")[0]] = true;
         seen[url.split("#")[0].replace(/\/+$/, "")] = true;
         seen[url.split("#")[0].replace(/\/?$/, "/")] = true;
-        var cards = this.cardsOf(html, url);
+        var cards = dropSideCards(this.cardsOf(html, url));
         for (var i = 0; i < cards.length; i++) {
             if (seen[cards[i].link]) continue;
             seen[cards[i].link] = true;
@@ -2057,7 +2165,7 @@ class DefaultExtension extends MProvider {
         var filters = [{
             type_name: "HeaderFilter",
             name: sites.length ?
-                "Scrivi per cercare nel sito scelto qui sotto («Sito», o «Sito JAV» se ne scegli uno), oppure incolla il link di un video, di una serie o di un sito." :
+                "Scegli un sito in «Sito» oppure in «Sito JAV» (lascia l'altro su «—»); senza scelta vale il sito principale. Categoria vale per tutti i siti. Puoi anche incollare un link." :
                 "Aggiungi i tuoi siti nelle impostazioni della sorgente. Intanto puoi incollare nella ricerca il link di un video o di un sito.",
         }];
         if (sites.length) {
@@ -2068,9 +2176,9 @@ class DefaultExtension extends MProvider {
                     type_name: "SelectFilter",
                     name: "Sito",
                     state: 0,
-                    values: normal.map(function (x) {
+                    values: [{ type_name: "SelectOption", name: "— (sito principale)", value: "" }].concat(normal.map(function (x) {
                         return { type_name: "SelectOption", name: self.siteName(x), value: x };
-                    }),
+                    })),
                 });
             }
             if (jav.length) {
@@ -2078,7 +2186,7 @@ class DefaultExtension extends MProvider {
                     type_name: "SelectFilter",
                     name: "Sito JAV",
                     state: 0,
-                    values: [{ type_name: "SelectOption", name: "— (usa «Sito»)", value: "" }].concat(jav.map(function (x) {
+                    values: [{ type_name: "SelectOption", name: "—", value: "" }].concat(jav.map(function (x) {
                         return { type_name: "SelectOption", name: self.siteName(x), value: x };
                     })),
                 });
@@ -2095,18 +2203,16 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Più lunghi", value: "longest" },
                 ],
             });
-            var mainOrigin = originOf(sites[0]) || sites[0];
-            var cats = self.catsOf(self.readJson(PREF_NAV, {})[mainOrigin], mainOrigin);
-            if (cats.length) {
-                filters.push({
-                    type_name: "SelectFilter",
-                    name: "Categoria",
-                    state: 0,
-                    values: [{ type_name: "SelectOption", name: "Tutte", value: "" }].concat(cats.map(function (c) {
-                        return { type_name: "SelectOption", name: c.name, value: c.url };
-                    })),
-                });
-            }
+            // Le stesse categorie per tutti i siti: sul sito scelto l'estensione
+            // cerca la pagina di quella categoria, altrimenti cerca la parola.
+            filters.push({
+                type_name: "SelectFilter",
+                name: "Categoria",
+                state: 0,
+                values: [{ type_name: "SelectOption", name: "Tutte", value: "" }].concat(CATEGORIES.map(function (c, i) {
+                    return { type_name: "SelectOption", name: c[0], value: String(i) };
+                })),
+            });
         }
         return filters;
     }
