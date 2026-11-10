@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.11
+
+- **Salva un sito torna al flusso che c’era fino alla 1.4.8.** Il campo è di nuovo `linkuni_add_site`. All’ingresso nella sorgente il filtro Sito riceve il sito scritto lì, insieme a quelli già salvati. La 1.4.9 e la 1.4.10 lo copiavano nel modo sbagliato e la 1.4.10 cambiava anche la chiave del campo.
+- Un link rimasto nel campo della 1.4.10 viene ancora letto. Miniature, video e il divieto di leggere le preferenze dentro la costruzione delle impostazioni restano.
+
 ## Link universale 1.4.10
 
 - **Salva un sito, di nuovo.** Dopo OK la schermata già aperta non cambia: Mangayomi non ricostruisce le altre righe. Si chiudono le impostazioni e si riaprono. Allora «Sito principale» scrive «I tuoi siti: …» e, toccando la riga, il sito è in elenco; «I tuoi siti attivi» lo elenca. Se dopo la riapertura il campo è di nuovo vuoto e il sito non c'è, si riscrive il link e si riapre una volta ancora: l'app può aver tenuto una riga vuota davanti a quella con l'indirizzo.

@@ -23,7 +23,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.10 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.11 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -33,6 +33,10 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 - `getFilterList()` parte all’ingresso nella sorgente e di nuovo solo con **Reset** (`manga_home_screen.dart`). Il filtro Profili non si aggiorna riaprendo il foglio: serve Reset oppure uscire e rientrare nella sorgente.
 - I tab Popolari e Recenti non ricevono i filtri. Tipo, Profili e «Il mio profilo» valgono nella ricerca.
 - I cookie della WebView vengono salvati (`MClient.setCookie` in `webview.dart`) e allegati alle richieste dell’estensione. Il `localStorage` no.
+
+## Link universale — 1.4.11
+
+Regressione del salvataggio. Dalla 1.1.0 alla 1.4.8 il campo è `linkuni_add_site`. `sites()` — chiamato da `getFilterList` all’ingresso nella sorgente — legge quel testo con `get()` e, se è diverso da `linkuni_last_added`, accoda l’origine (`https://` se manca, slash finale tolto, `originOf` oppure il testo). Il filtro Sito usa proprio quell’elenco restituito. `getSourcePreferences` non chiama `get()`. La 1.4.9 ha spostato la copia dentro `getSourcePreferences` (`takeAddedSites`) e la 1.4.10 ha cambiato la chiave in `linkuni_add_site_v2` e ha scartato gli indirizzi che non passano una regex sull’host: il filtro non riceveva più il sito. Ripristinato il ciclo 1.4.8. Se il campo originale è vuoto si legge ancora `linkuni_add_site_v2`, così un link scritto lì non si perde. I siti già in `linkuni_saved_sites` restano. Prova sul codice: `getSourcePreferences` non chiama `get()`; dopo il conferma sul campo, `getFilterList` ha `https://Nuovo.Example` tra le opzioni di Sito insieme a un sito già salvato. Non è una prova sull’iPhone. La schermata impostazioni già aperta non ricostruisce le voci: era già così nella 1.1.0.
 
 ## Link universale — 1.4.10
 

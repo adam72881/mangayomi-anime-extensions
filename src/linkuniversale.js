@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.10",
+        "version": "1.4.11",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -26,8 +26,7 @@ const mangayomiSources = [
 const BRIDGE = "https://adam72881.github.io/mangayomi-anime-extensions";
 const PREF_HISTORY = "linkuni_history";
 const PREF_NEXT = "linkuni_next_pages";
-const PREF_ADD = "linkuni_add_site_v2";
-const PREF_ADD_OLD = "linkuni_add_site";
+const PREF_ADD = "linkuni_add_site";
 const STORE_SAVED = "linkuni_saved_sites";
 const STORE_LAST_ADDED = "linkuni_last_added";
 const STORE_MAIN = "linkuni_main_site";
@@ -844,13 +843,7 @@ class DefaultExtension extends MProvider {
     // Mangayomi tiene fissa una lista di scelte una volta creata: per questo le
     // due liste hanno una chiave nuova ogni volta che l'elenco cambia.
     savedSites() {
-        // La stessa istanza JS resta in memoria (getCachedExtensionService).
-        // Il salvataggio su disco è in coda: una lettura subito dopo può
-        // ancora vedere l'elenco vecchio. La copia in memoria è quella vera
-        // finché il processo vive.
-        if (this._liveSaved) return this._liveSaved.slice();
-        var stored = this.readJson(STORE_SAVED, []);
-        return stored && stored.length ? stored : [];
+        return this.readJson(STORE_SAVED, []);
     }
 
     listKey(prefix, sites) {
@@ -867,90 +860,32 @@ class DefaultExtension extends MProvider {
         }
     }
 
-    // Copia «Salva un sito» nell'elenco. Il testo sta nella preferenza; l'elenco
-    // è un altro archivio. Va fatto anche aprendo le impostazioni, non solo
-    // aprendo la sorgente: se no il sito resta nel campo e non compare da nessuna parte.
-    // Non chiama sites() né applyRename(). get() del campo, se la chiave non è
-    // ancora salvata, richiama getSourcePreferences: lì _readingPrefs è già vero.
-    readAddField(key) {
-        try {
-            var value = this.setting(key);
-            if (value == null) return "";
-            return String(value).trim();
-        } catch (e) {
-            return "";
-        }
-    }
-
-    takeAddedSites() {
-        var saved = this.savedSites().slice();
-        // Il campo nuovo, altrimenti quello della 1.4.9. get() su una chiave
-        // assente crea la riga vuota: se il campo nuovo è vuoto si legge il vecchio.
-        var added = this.readAddField(PREF_ADD) || this.readAddField(PREF_ADD_OLD);
-        if (!added) {
-            this._liveSaved = saved.slice();
-            return saved;
-        }
-        var last = String(this.prefs.getString(STORE_LAST_ADDED, "") || "");
-        var parsed = normalizeSiteInput(added);
-        var fresh = added !== last;
-        if (!parsed.length) {
-            if (fresh) this.prefs.setString(STORE_ADD_NOTE, "Non ho riconosciuto un indirizzo in «" + added.slice(0, 60) + "».");
-            this._liveSaved = saved.slice();
-            return saved;
-        }
-        var dismissed = this.readJson(STORE_DISMISS, []);
-        if (!dismissed || typeof dismissed.length !== "number") dismissed = [];
-        if (fresh) dismissed = dismissed.filter(function (u) { return parsed.indexOf(u) === -1; });
-        var off = this.readJson(STORE_SAVED_OFF, []);
-        if (!off || typeof off.length !== "number") off = [];
-        var changed = false;
-        var hiddenHit = false;
-        var byHost = {};
-        for (var s = 0; s < saved.length; s++) byHost[hostOf(saved[s])] = s;
-        for (var i = 0; i < parsed.length; i++) {
-            var origin = parsed[i];
-            var host = hostOf(origin);
-            if (!fresh && dismissed.indexOf(origin) !== -1) continue;
-            if (byHost[host] === undefined) {
-                saved.unshift(origin);
-                byHost = {};
-                for (var n = 0; n < saved.length; n++) byHost[hostOf(saved[n])] = n;
-                changed = true;
-            } else if (saved[byHost[host]] !== origin && origin.indexOf("https://") === 0) {
-                saved[byHost[host]] = origin;
-                changed = true;
-            } else if (off.indexOf(saved[byHost[host]]) !== -1 || off.indexOf(origin) !== -1) {
-                hiddenHit = true;
-            }
-        }
-        this._liveSaved = saved.slice();
-        if (changed) this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
-        if (fresh) {
-            this.prefs.setString(STORE_LAST_ADDED, added);
-            this.prefs.setString(STORE_DISMISS, JSON.stringify(dismissed));
-            this.prefs.setString(STORE_ADD_NOTE, !changed && hiddenHit ? "Già salvato, ma nascosto: in «I tuoi siti attivi» rimetti la spunta." : "");
-        }
-        return saved;
-    }
-
     sites() {
         this.applyRename();
-        var saved = this.takeAddedSites();
+        var saved = this.savedSites();
+        // Stesso flusso della 1.1.0–1.4.8: il testo confermato in «Salva un sito»
+        // entra nell'elenco quando la sorgente legge i siti (filtro Sito, Popolari).
+        // get() sta qui, non in getSourcePreferences: lì richiamerebbe se stesso.
+        var added = String(this.setting(PREF_ADD) || "").trim();
+        if (!added) added = String(this.setting("linkuni_add_site_v2") || "").trim();
+        if (added && added !== this.prefs.getString(STORE_LAST_ADDED, "")) {
+            added.split(/[\s,;]+/).forEach(function (x) {
+                x = x.trim().replace(/\/+$/, "");
+                if (!x) return;
+                if (!/^https?:\/\//i.test(x)) x = "https://" + x;
+                x = originOf(x) || x;
+                if (saved.indexOf(x) === -1) saved.push(x);
+            });
+            this.prefs.setString(STORE_LAST_ADDED, added);
+            this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
+        }
         if (saved.length) {
             var remove = this.setting(this.listKey("linkuni_remove_", saved));
             if (remove && remove.length) {
-                var dismissed = this.readJson(STORE_DISMISS, []);
-                if (!dismissed || typeof dismissed.length !== "number") dismissed = [];
-                remove.forEach(function (u) { if (dismissed.indexOf(u) === -1) dismissed.push(u); });
-                var before = saved.length;
                 saved = saved.filter(function (x) { return remove.indexOf(x) === -1; });
-                if (saved.length !== before) {
-                    this._liveSaved = saved.slice();
-                    this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
-                    this.prefs.setString(STORE_DISMISS, JSON.stringify(dismissed));
-                    var offLeft = this.readJson(STORE_SAVED_OFF, []).filter(function (u) { return remove.indexOf(u) === -1; });
-                    this.prefs.setString(STORE_SAVED_OFF, JSON.stringify(offLeft));
+                this.prefs.setString(STORE_SAVED, JSON.stringify(saved));
+                if (remove.indexOf(originOf(this.prefs.getString(STORE_LAST_ADDED, "")) || "-") !== -1) {
+                    this.prefs.setString(STORE_LAST_ADDED, "");
                 }
             }
         }
@@ -2077,16 +2012,9 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         var self = this;
-        // Mangayomi, per leggere una preferenza non ancora salvata, richiama
-        // questo metodo. sites() e applyRename non si chiamano. Il testo di
-        // «Salva un sito» si legge solo fuori da quel richiamo: se no è un ciclo.
-        var saved;
-        if (this._readingPrefs) saved = this.savedSites();
-        else {
-            this._readingPrefs = true;
-            try { saved = this.takeAddedSites(); }
-            finally { this._readingPrefs = false; }
-        }
+        // Non chiamare get() / sites() / applyRename qui: Mangayomi, per leggere
+        // una preferenza, richiama questo metodo. Un get() interno è un ciclo.
+        var saved = this.savedSites();
         var all = this.allSites(saved);
         var urls = READY.map(function (r) { return r[0]; });
         var off = this.readJson(STORE_READY_OFF, []);
@@ -2097,7 +2025,7 @@ class DefaultExtension extends MProvider {
                 key: this.listKey("linkuni_main_", all),
                 listPreference: {
                     title: "Sito principale",
-                    summary: (saved.length ? "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + ". " : "") + "Popolari e Recenti usano il sito scelto qui. Si cambia toccando la riga.",
+                    summary: "Quello di Popolari e Recenti, e il primo nel filtro «Sito» della ricerca.",
                     valueIndex: main < 0 ? 0 : main,
                     entries: all.map(function (x) { return self.siteName(x); }),
                     entryValues: all,
@@ -2150,26 +2078,20 @@ class DefaultExtension extends MProvider {
                 dialogMessage: "Indirizzo del sito, una barra verticale, il nome da mostrare.",
             },
         });
-        var savedOff = this.readJson(STORE_SAVED_OFF, []);
-        var hidden = saved.filter(function (u) { return savedOff.indexOf(u) !== -1; });
-        var addNote = String(this.prefs.getString(STORE_ADD_NOTE, "") || "");
-        var addSummary = saved.length
-            ? "Salvati: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + "."
-            : "Scrivi il link della pagina principale, anche senza https.";
-        if (hidden.length) addSummary += " Nascosti (spunta in «I tuoi siti attivi»): " + hidden.map(function (x) { return self.siteName(x); }).join(", ") + ".";
-        if (addNote) addSummary += " " + addNote;
-        addSummary += " Dopo OK chiudi queste impostazioni e riaprile: il nome compare qui e in «Sito principale».";
         prefs.push({
             key: PREF_ADD,
             editTextPreference: {
                 title: "➕ Salva un sito",
-                summary: addSummary,
+                summary: saved.length ?
+                    "I tuoi siti: " + saved.map(function (x) { return self.siteName(x); }).join(", ") + ". Scrivi il link della pagina principale di un altro sito per aggiungerlo." :
+                    "Un sito che non è tra quelli pronti: scrivi il link della pagina principale, poi apri la sorgente.",
                 value: "",
                 dialogTitle: "Salva un sito",
-                dialogMessage: "Link della pagina principale. Con o senza https. Più di uno: spazio o virgola.",
+                dialogMessage: "Link della pagina principale. Puoi metterne più di uno separati da spazio.",
             },
         });
         if (saved.length) {
+            var savedOff = this.readJson(STORE_SAVED_OFF, []);
             prefs.push({
                 key: this.listKey("linkuni_saved_on_", saved),
                 multiSelectListPreference: {

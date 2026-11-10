@@ -27,7 +27,7 @@ Sorgente per i siti che non hanno un'estensione: si adatta da sola al sito.
 
 **Impostazioni della sorgente:**
 - **Siti già pronti**: 56 siti provati che funzionano da soli (Pornhub, xHamster, xVideos, xnxx, Eporner, Porntrex, HQporner, AlphaPorno, HellPorno, YesPorn, FetishShrine, Bdsmstreak, AnalVids, JavGuru, AnimeSaturn, AnimeWorld, HentaiWorld…), tutti attivi. Togli la spunta a quelli che non vuoi.
-- **➕ Salva un sito**: scrivi il link della pagina principale (anche senza `https`). Dopo OK chiudi le impostazioni e riaprile. «Sito principale» mostra «I tuoi siti: …»; toccando la riga il sito è selezionabile. «I tuoi siti attivi» lo elenca. La schermata già aperta non si aggiorna da sola. Più link: spazio o virgola. Un sito nascosto resta salvato.
+- **➕ Salva un sito**: scrivi il link della pagina principale. Aprendo la sorgente il sito è nel filtro Sito, insieme a quelli già salvati. Più link: spazio o virgola.
 - **Sito principale**: quello di Popolari e Recenti (anche uno di quelli pronti).
 - **Sito a sorpresa**: a ogni apertura Popolari e Recenti mostrano un sito a caso tra quelli attivi.
 - **Togli i tuoi siti**: spunta quelli salvati da te da eliminare.
@@ -53,7 +53,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
-- **Link universale 1.4.10** — dopo OK su «Salva un sito» si chiudono e si riaprono le impostazioni: il sito è in «Sito principale» e in «I tuoi siti attivi».
+- **Link universale 1.4.11** — «Salva un sito» torna al flusso precedente: il sito scritto entra nel filtro Sito aprendo la sorgente.
 - **Link universale 1.4.9** — «Salva un sito» entra nell'elenco; niente interruttore per le immagini; categorie del sito principale quando la pagina le ha; la WebView della scheda resta sul video.
 - **Link universale 1.4.8** — miniature e copertina di JavGuru; dopo la WebView una verifica rimasta non sembra più «nessun risultato».
 - **Link universale 1.4.7** — i video di JavGuru partono nell'app (il player era nascosto nella pagina).
