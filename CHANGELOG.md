@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.4
+
+- **Preferiti:** la pagina dei preferiti ha i dati, ma scritti come codice JavaScript e non come dati puri, e le schede hanno oggetti uno dentro l'altro. Ora l'estensione li legge tutti e due.
+
 ## Stripchat 1.3.3
 
 - **La diretta restava a girare con «Ho fatto il login: cerca l'HD» attivo:** per l'account il sito dà una diretta con i pezzi del video nascosti, che il player non può aprire. Ora l'estensione la controlla prima e, se è così, usa la diretta normale.

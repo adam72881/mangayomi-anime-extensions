@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.3",
+        "version": "1.3.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -327,7 +327,15 @@ class DefaultExtension extends MProvider {
             } else if (ch === '"') inStr = true;
             else if (ch === "{") depth++;
             else if (ch === "}" && --depth === 0) {
-                try { return JSON.parse(body.slice(start, j + 1)); } catch (e) { return null; }
+                var raw = body.slice(start, j + 1);
+                try { return JSON.parse(raw); } catch (e) {}
+                // Oggetto JavaScript, non JSON puro: i valori tipici del codice minimizzato.
+                try {
+                    return JSON.parse(raw.replace(/:\s*undefined\b/g, ":null").replace(/:\s*!0\b/g, ":true").replace(/:\s*!1\b/g, ":false"));
+                } catch (e2) {
+                    this._stateError = "stato non leggibile (" + String(e2.message || e2).slice(0, 40) + ")";
+                    return null;
+                }
             }
         }
         return null;
@@ -360,14 +368,17 @@ class DefaultExtension extends MProvider {
     htmlModels(body) {
         var text = body.replace(/\\"/g, '"').replace(/\\u002[fF]/g, "/");
         var out = [], seen = {};
-        var re = /\{[^{}]{0,3000}?"username":"([A-Za-z0-9_-]+)"[^{}]{0,3000}?\}/g, m;
+        // Le schede hanno oggetti dentro oggetti: per ogni «"username":"…"» si
+        // prende l'«"id":…» più vicino prima, nello stesso oggetto.
+        var re = /"username":"([A-Za-z0-9_-]+)"/g, m;
         while ((m = re.exec(text)) !== null) {
-            var o = null;
-            try { o = JSON.parse(m[0]); } catch (e) {}
-            var id = o ? o.id : (m[0].match(/"id":(\d+)/) || [])[1];
+            var before = text.slice(Math.max(0, m.index - 1500), m.index);
+            var ids = before.match(/"id":(\d+)/g);
+            var after = text.slice(m.index, m.index + 1500);
+            var id = ids ? ids[ids.length - 1].slice(5) : (after.match(/"id":(\d+)/) || [])[1];
             if (!id || seen[m[1].toLowerCase()]) continue;
             seen[m[1].toLowerCase()] = true;
-            out.push(o && o.id ? o : { id: id, username: m[1], status: (m[0].match(/"status":"(\w+)"/) || [])[1] });
+            out.push({ id: id, username: m[1], status: (after.match(/"status":"(\w+)"/) || [])[1] });
         }
         if (out.length) return out;
         var cards = /<a\b[^>]*>/g, a;
@@ -388,7 +399,7 @@ class DefaultExtension extends MProvider {
         (body.match(/\/api\/front\/[A-Za-z0-9_\/{}-]+/g) || []).forEach(function (x) { apis[x] = 1; });
         var globals = {};
         (body.match(/window\.__?[A-Za-z_]+__?\s*=/g) || []).forEach(function (x) { globals[x.replace(/\s*=$/, "")] = 1; });
-        return title + ", " + Math.round(body.length / 1024) + "KB, username×" + (body.match(/username/g) || []).length +
+        return (this._stateError ? this._stateError + ", " : "") + title + ", " + Math.round(body.length / 1024) + "KB, username×" + (body.match(/username/g) || []).length +
             ", model-list×" + (body.match(/model-list/g) || []).length +
             (Object.keys(globals).length ? ", " + Object.keys(globals).slice(0, 4).join(" ") : "") +
             (Object.keys(apis).length ? ", " + Object.keys(apis).slice(0, 4).join(" ") : "");
@@ -428,7 +439,7 @@ class DefaultExtension extends MProvider {
                 this._site = hosts[h];
                 break;
             }
-            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + this.pageHints(body));
+            notes.push(hosts[h].replace("https://", "") + ": " + res.statusCode + ", " + (d ? "dati letti, nessun elenco, " : "") + this.pageHints(body));
         }
         if (!best) {
             if (guest) throw new Error("Per vedere le tue preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
