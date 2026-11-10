@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.10",
+        "version": "1.3.11",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.10";
+const VERSION = "1.3.11";
 const API = "https://go.stripchat.com/api/models";
 const PER_PAGE = 60;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -307,8 +307,12 @@ class DefaultExtension extends MProvider {
     // quelli dell'altro, quindi login (e Cloudflare) valgono su uno solo dei due.
     // Si provano tutti e due e si ricorda quello che funziona.
     siteHosts() {
-        var first = this._site || "https://ita.stripchat.com";
-        return [first, first === BASE ? "https://ita.stripchat.com" : BASE];
+        var all = ["https://ita.stripchat.com", "https://www.stripchat.com", BASE];
+        var first = this._site;
+        if (first && all.indexOf(first) !== -1) {
+            return [first].concat(all.filter(function (h) { return h !== first; }));
+        }
+        return all;
     }
 
     // window.__PRELOADED_STATE__ = {…} della pagina: l'oggetto preso contando
@@ -525,95 +529,159 @@ class DefaultExtension extends MProvider {
         return { status: res.statusCode, data: data, body: body };
     }
 
-    // Id dei preferiti, poi le schede. L'endpoint delle schede, senza accesso,
-    // risponde {models:[]} anche se gli si passa un id vero (provato).
+    // Schede dei preferiti. Senza il cookie di accesso l'API risponde 200 con
+    // models vuoto (provato). Con l'accesso, le schede stanno in
+    // /models/favorites; l'id utente, se c'è, si legge da config o dalla pagina.
     async favoriteModels(origin, viewer, token, page) {
         var headers = this.apiHeaders(origin, token);
-        var idsRes = await this.apiJson(origin + "/api/front/users/" + encodeURIComponent(viewer.id) + "/favorites", headers);
-        if (idsRes.status === 401 || idsRes.status === 403) return { auth: false, models: [], more: false };
-        var ids = [];
-        var bag = idsRes.data || {};
-        var rawIds = bag.modelIds || bag.favoriteIds || bag.ids || bag.data || [];
-        if (Array.isArray(rawIds)) {
-            rawIds.forEach(function (x) {
-                var id = x && typeof x === "object" ? (x.id || x.modelId) : x;
-                if (id) ids.push(String(id));
-            });
-        }
         var offset = (page - 1) * PER_PAGE;
-        var slice = ids.slice(offset, offset + PER_PAGE);
-        var models = [];
-        if (slice.length) {
-            var q = slice.map(function (id) { return "favoriteIds[]=" + encodeURIComponent(id); }).join("&");
-            var batch = await this.apiJson(origin + "/api/front/models/favorites?" + q, headers);
-            if (batch.status === 401 || batch.status === 403) return { auth: false, models: [], more: false };
-            models = (batch.data && batch.data.models) || [];
-            if (!models.length) {
-                var self = this;
-                var oneByOne = await Promise.all(slice.map(function (id) {
-                    return self.apiJson(origin + "/api/front/models/" + encodeURIComponent(id), headers).catch(function () { return { data: null }; });
-                }));
-                oneByOne.forEach(function (r) {
-                    if (r.data && r.data.username && r.data.id) models.push(r.data);
-                });
-            }
-        }
+        var listed = await this.apiJson(origin + "/api/front/models/favorites?limit=" + PER_PAGE + "&offset=" + offset, headers);
+        if (listed.status === 401 || listed.status === 403) return { auth: false, models: [], more: false };
+        var models = (listed.data && listed.data.models) || [];
+        var total = (listed.data && listed.data.totalCount) || models.length;
         if (page === 1) {
             var off = await this.apiJson(origin + "/api/front/models/favorites/offline?limit=" + PER_PAGE + "&offset=0", headers);
             ((off.data && off.data.models) || []).forEach(function (m) {
                 if (m && m.username) models.push(m);
             });
         }
-        return { auth: true, models: models, more: ids.length > offset + PER_PAGE };
+        var cfg = await this.apiJson(origin + "/api/front/v3/config/initial?requestPath=%2Ffavorites", headers);
+        var apiUser = cfg.data && cfg.data.initial && cfg.data.initial.client && cfg.data.initial.client.user;
+        var auth = !!(viewer && viewer.id) || !!(apiUser && (apiUser.id || apiUser.username));
+        if (!models.length && viewer && viewer.id) {
+            var idsRes = await this.apiJson(origin + "/api/front/users/" + encodeURIComponent(viewer.id) + "/favorites", headers);
+            if (idsRes.status === 401 || idsRes.status === 403) return { auth: false, models: [], more: false };
+            var ids = [];
+            var bag = idsRes.data || {};
+            var rawIds = bag.modelIds || bag.favoriteIds || bag.ids || [];
+            if (Array.isArray(rawIds)) {
+                rawIds.forEach(function (x) {
+                    var id = x && typeof x === "object" ? (x.id || x.modelId) : x;
+                    if (id) ids.push(String(id));
+                });
+            }
+            var slice = ids.slice(offset, offset + PER_PAGE);
+            if (slice.length) {
+                var q = slice.map(function (id) { return "favoriteIds[]=" + encodeURIComponent(id); }).join("&");
+                var batch = await this.apiJson(origin + "/api/front/models/favorites?" + q, headers);
+                models = (batch.data && batch.data.models) || [];
+                if (!models.length) {
+                    var self = this;
+                    var oneByOne = await Promise.all(slice.map(function (id) {
+                        return self.apiJson(origin + "/api/front/models/" + encodeURIComponent(id), headers).catch(function () { return { data: null }; });
+                    }));
+                    oneByOne.forEach(function (r) {
+                        if (r.data && r.data.username && r.data.id) models.push(r.data);
+                    });
+                }
+                total = ids.length;
+            }
+        }
+        return { auth: auth, models: models, more: total > offset + PER_PAGE };
     }
 
-    // Preferite con l'account. Il login si fa nella Webview: i cookie arrivano
-    // con la pagina e il token che il sito scrive nei dati della pagina si
-    // rimanda all'API, come fa la pagina stessa.
+    // Nomi dei cookie che Mangayomi ha messo sulla richiesta. I valori non si
+    // leggono e non si scrivono da nessuna parte.
+    cookieNames(res) {
+        var headers = (res && res.request && res.request.headers) || {};
+        var raw = "";
+        Object.keys(headers).forEach(function (k) {
+            if (String(k).toLowerCase() === "cookie") raw = String(headers[k] || "");
+        });
+        var names = [];
+        raw.split(";").forEach(function (part) {
+            var name = part.split("=")[0].trim();
+            if (name && names.indexOf(name) === -1) names.push(name);
+        });
+        return names;
+    }
+
+    cookieSummary(names) {
+        var other = names.filter(function (n) { return n.indexOf("ABTest_") !== 0; });
+        var ab = names.length - other.length;
+        var shown = other.slice(0, 12);
+        if (ab) shown.push("ABTest×" + ab);
+        if (other.length > 12) shown.push("+" + (other.length - 12));
+        return names.length + (shown.length ? " (" + shown.join(", ") + ")" : "");
+    }
+
+    sessionCookie(names) {
+        return names.some(function (n) {
+            return n.indexOf("ABTest_") !== 0 && /session|auth|jwt|token/i.test(n);
+        });
+    }
+
+    // Preferite con l'account. Il login della Webview è un cookie di sessione:
+    // Mangayomi 0.9.95 lo copia solo al cambio di indirizzo, come nome=valore.
+    // L'API /models/favorites usa quel cookie. Se la pagina non ha l'utente, il
+    // cookie non è partito: è un limite dell'app, non si inventa un token.
     async favorites(page) {
         var hosts = this.siteHosts();
-        var session = null, blocked = false;
-        for (var h = 0; h < hosts.length && !session; h++) {
+        var notes = [];
+        var found = null;
+        var authed = false;
+        for (var h = 0; h < hosts.length && !found; h++) {
+            var origin = hosts[h];
+            var note = { host: origin.replace("https://", ""), status: "nessuna risposta", bytes: 0, user: "null", jwt: "no", cookies: [], api: "" };
             var res;
             try {
-                res = await this.client.get(hosts[h] + "/favorites", {
-                    "Referer": hosts[h] + "/",
+                res = await this.client.get(origin + "/favorites", {
+                    "Referer": origin + "/",
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
                 });
             } catch (e) {
+                notes.push(note);
                 continue;
             }
             var body = String(res.body || "");
+            note.status = String(res.statusCode);
+            note.bytes = body.length;
+            note.cookies = this.cookieNames(res);
             if (res.statusCode === 403 || res.statusCode === 503 || /<title>\s*(just a moment|attention required)/i.test(body)) {
-                blocked = true;
+                note.api = "Cloudflare";
+                notes.push(note);
                 continue;
             }
             var state = this.preloadedState(body);
             var viewer = this.viewerFrom(state);
-            if (!viewer) continue;
-            session = { origin: hosts[h], viewer: viewer, token: this.jwtFrom(state) };
+            var token = this.jwtFrom(state);
+            note.user = viewer ? "sì" : "null";
+            note.jwt = token ? "sì" : "no";
+            var got;
+            try {
+                got = await this.favoriteModels(origin, viewer, token, page);
+            } catch (e) {
+                note.api = "API muta";
+                notes.push(note);
+                continue;
+            }
+            note.api = got.auth ? "accesso" : "ospite";
+            notes.push(note);
+            if (got.models.length) found = { origin: origin, models: got.models, more: got.more };
+            else if (got.auth) authed = true;
         }
-        if (!session) {
-            if (blocked) throw new Error("Stripchat chiede una verifica (Cloudflare). Tocca Webview, aspetta che si apra la pagina, poi torna qui e tocca Riprova.");
-            throw new Error("Per vedere le preferite devi accedere: tocca Webview (si apre Stripchat), fai il login, poi torna qui e tocca Riprova.");
+        if (!found) {
+            var lines = notes.map(function (n) {
+                return n.host + " HTTP " + n.status + ", " + Math.round(n.bytes / 1024) + "KB, user=" + n.user + ", jwt=" + n.jwt + ", cookie " + this.cookieSummary(n.cookies) + (n.api ? ", " + n.api : "");
+            }, this);
+            var anySession = notes.some(function (n) { return this.sessionCookie(n.cookies); }, this);
+            var anyUser = notes.some(function (n) { return n.user === "sì"; });
+            var cf = notes.length && notes.every(function (n) { return n.api === "Cloudflare" || n.status === "nessuna risposta"; });
+            if (authed) throw new Error("Preferiti Stripchat " + VERSION + ": accesso visto ma elenco vuoto. " + lines.join(" | "));
+            if (cf) throw new Error("Stripchat " + VERSION + " chiede una verifica (Cloudflare). Tocca Webview, aspetta la pagina, poi Riprova. " + lines.join(" | "));
+            var limit = (!anyUser && !anySession)
+                ? " Mangayomi 0.9.95 copia i cookie della Webview solo quando cambia l'indirizzo, e solo come nome=valore: il cookie di accesso non è tra quelli inviati. Dopo il login apri un'altra pagina di Stripchat nella Webview e tocca Riprova. È un limite dell'app."
+                : " Il sito non ha riconosciuto l'accesso in questa richiesta.";
+            throw new Error("Preferiti Stripchat " + VERSION + ". " + lines.join(" | ") + "." + limit);
         }
-        this._site = session.origin;
-        var got;
-        try {
-            got = await this.favoriteModels(session.origin, session.viewer, session.token, page);
-        } catch (e) {
-            throw new Error("Stripchat non ha risposto con i preferiti. Controlla la rete e tocca Riprova.");
-        }
-        if (!got.auth) throw new Error("L'accesso non è arrivato alle richieste. Tocca Webview, entra di nuovo nel tuo account Stripchat, poi torna qui e tocca Riprova.");
-        if (!got.models.length) {
-            if (page > 1) return { list: [], hasNextPage: false };
-            throw new Error("Non hai ancora preferite su Stripchat, oppure in questo momento l'elenco è vuoto.");
-        }
+        this._site = found.origin;
+        var gotModels = found.models;
+        var more = found.more;
         var self = this;
         var seenIds = {};
         var list = [];
-        got.models.forEach(function (o) {
+        gotModels.forEach(function (o) {
             if (!o || !o.username) return;
             var key = String(o.username).toLowerCase();
             if (seenIds[key]) return;
@@ -628,7 +696,7 @@ class DefaultExtension extends MProvider {
         });
         list.sort(function (a, b) { return (b._live ? 1 : 0) - (a._live ? 1 : 0); });
         list.forEach(function (c) { delete c._live; });
-        return { list: list, hasNextPage: !!got.more };
+        return { list: list, hasNextPage: !!more };
     }
 
     // Video da numero della modella, quando non è tra le dirette dell'elenco
@@ -675,12 +743,14 @@ class DefaultExtension extends MProvider {
         if ((!m || !m.stream) && (u.id || (m && m.id))) {
             var hid = u.id || m.id;
             var earlyHeaders = this.playerHeaders(u.name);
+            var earlyNote = "";
             try {
-                var early = await this.publicVideos(hid, u.name, earlyHeaders);
-                if (early.length) return early;
+                var early = await this.publicVideos(hid, u.name, earlyHeaders, m && m.gender);
+                earlyNote = early.note;
+                if (early.videos.length) return early.videos;
             } catch (e) {}
             var direct = await this.streamById(hid);
-            if (direct) return [{ url: direct, originalUrl: direct, quality: "Diretta", headers: earlyHeaders }];
+            if (direct) return [{ url: direct, originalUrl: direct, quality: this.withNote("Diretta", earlyNote), headers: earlyHeaders }];
         }
         if (!m || m.status !== "public" || !m.stream) {
             var st = m ? (STATUS_TEXT[m.status] || "non in diretta pubblica") : "offline";
@@ -694,11 +764,15 @@ class DefaultExtension extends MProvider {
         // indovinato (_160p) punta a una playlist che risponde 404: non si usa
         // e non si decifra.
         var out = [];
+        var note = "";
         if (id) {
             try {
-                out = await this.publicVideos(id, u.name, headers);
+                var offered = await this.publicVideos(id, u.name, headers, m && m.gender);
+                out = offered.videos;
+                note = offered.note;
             } catch (e) {
                 out = [];
+                note = "preset della stanza non letti";
             }
         }
         if (!out.length) {
@@ -719,16 +793,55 @@ class DefaultExtension extends MProvider {
             add(urls.original, origLabel);
             keys.forEach(function (k) { add(urls[k], k); });
             add(m.stream.url, "Diretta");
+            if (out.length) out[0].quality = this.withNote(out[0].quality, note);
         }
         if (!out.length) throw new Error("Non trovo il video della diretta di " + u.name + ". Prova dalla Webview.");
         return out;
     }
 
-    // Qualità che la pagina pubblica della stanza elenca (broadcastSettings.presets).
-    // Il master sta su edge-hls.doppiocdn.media, lo stesso host di hlsPlaylist
-    // dell'API pubblica /api/front/models (60 stanze su 60, 10/11/2026).
-    // Si tiene una qualità solo se playable() trova pezzi video veri.
-    async publicVideos(id, name, headers) {
+    withNote(label, note) {
+        if (!note) return label;
+        return label + " (" + note + ")";
+    }
+
+    cleanPresets(list) {
+        var names = [];
+        (list || []).forEach(function (name) {
+            if (/^\d+p\d*$/.test(name) && names.indexOf(name) === -1) names.push(name);
+        });
+        names.sort(function (a, b) {
+            var pa = a.match(/^(\d+)p(\d+)?$/), pb = b.match(/^(\d+)p(\d+)?$/);
+            var ra = (parseInt(pa[1], 10) * 1000) + (pa[2] ? parseInt(pa[2], 10) : 0);
+            var rb = (parseInt(pb[1], 10) * 1000) + (pb[2] ? parseInt(pb[2], 10) : 0);
+            return rb - ra;
+        });
+        return names;
+    }
+
+    // Preset pubblici: prima l'API /api/front/models (presets + hlsPlaylist),
+    // poi la pagina della stanza se la modella non è tra le prime. Il cam
+    // /v2/models/username/…/cam da qui risponde 418, non si usa.
+    async presetInfo(name, gender) {
+        var want = String(name || "").toLowerCase();
+        var tag = gender === "male" ? "men" : (gender === "maleFemale" || gender === "females") ? "couples" : gender === "tranny" ? "trans" : "girls";
+        var tags = tag === "girls" ? ["girls"] : [tag, "girls"];
+        for (var t = 0; t < tags.length; t++) {
+            var pages = await Promise.all([0, 60, 120].map(function (offset) {
+                return this.apiJson("https://ita.stripchat.com/api/front/models?limit=60&offset=" + offset + "&primaryTag=" + tags[t], {
+                    "Referer": "https://ita.stripchat.com/",
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
+                }).catch(function () { return { data: null }; });
+            }, this));
+            for (var p = 0; p < pages.length; p++) {
+                var models = (pages[p].data && pages[p].data.models) || [];
+                for (var i = 0; i < models.length; i++) {
+                    if (!models[i] || String(models[i].username).toLowerCase() !== want) continue;
+                    var presets = models[i].presets || (models[i].broadcastSettings && models[i].broadcastSettings.presets) || [];
+                    return { presets: this.cleanPresets(presets), hls: models[i].hlsPlaylist || "", source: "api" };
+                }
+            }
+        }
         var page;
         try {
             page = await this.client.get("https://ita.stripchat.com/" + encodeURIComponent(name), {
@@ -738,34 +851,44 @@ class DefaultExtension extends MProvider {
                 "User-Agent": UA,
             });
         } catch (e) {
-            return [];
+            return { presets: [], hls: "", source: "" };
         }
-        var body = String((page && page.body) || "");
-        if (page.statusCode >= 400 || body.indexOf("broadcastSettings") === -1) return [];
-        var found = body.match(/"broadcastSettings":\{[^{}]*"presets":\[([^\]]*)\]/);
-        if (!found) return [];
+        var text = String((page && page.body) || "").replace(/\\u0022/g, '"').replace(/\\\//g, "/");
+        if (!page || page.statusCode >= 400 || text.indexOf("broadcastSettings") === -1) return { presets: [], hls: "", source: "" };
+        var found = text.match(/"broadcastSettings"\s*:\s*\{[\s\S]{0,900}?"presets"\s*:\s*\[([^\]]*)\]/);
         var names = [];
-        var re = /"(\d+p\d*)"/g, mm;
-        while ((mm = re.exec(found[1])) !== null) {
-            if (names.indexOf(mm[1]) === -1) names.push(mm[1]);
+        if (found) {
+            var re = /"(\d+p\d*)"/g, mm;
+            while ((mm = re.exec(found[1])) !== null) {
+                if (names.indexOf(mm[1]) === -1) names.push(mm[1]);
+            }
         }
-        names.sort(function (a, b) {
-            var pa = a.match(/^(\d+)p(\d+)?$/), pb = b.match(/^(\d+)p(\d+)?$/);
-            var ra = (parseInt(pa[1], 10) * 1000) + (pa[2] ? parseInt(pa[2], 10) : 0);
-            var rb = (parseInt(pb[1], 10) * 1000) + (pb[2] ? parseInt(pb[2], 10) : 0);
-            return rb - ra;
-        });
-        var best = names.length ? (parseInt(names[0], 10) || 0) : 0;
-        if (best <= 480) return [];
+        var hls = (text.match(/https:\/\/edge-hls\.[^"'\s]+\/master\/\d+_\d+p\d*\.m3u8/) || [""])[0];
+        return { presets: this.cleanPresets(names), hls: hls, source: names.length ? "page" : "" };
+    }
+
+    // Qualità pubbliche. L'API /api/front/models dà presets e hlsPlaylist senza
+    // aprire l'HTML. Si tiene una qualità solo se playable() trova pezzi video
+    // veri. Niente suffisso _160p e niente decifratura. Se l'HD non si apre, il
+    // ripiego a 480p dice il motivo.
+    async publicVideos(id, name, headers, gender) {
+        var info = await this.presetInfo(name, gender);
+        var names = info.presets;
+        if (!names.length) return { videos: [], note: "preset della stanza non letti" };
+        var best = parseInt(names[0], 10) || 0;
+        if (best <= 480) return { videos: [], note: "la stanza trasmette solo " + names[0] };
         var out = [];
         for (var i = 0; i < names.length && i < 6; i++) {
-            var url = "https://edge-hls.doppiocdn.media/hls/" + id + "/master/" + id + "_" + names[i] + ".m3u8";
+            var url = info.hls && /_\d+p\d*\.m3u8/.test(info.hls)
+                ? info.hls.replace(/_\d+p\d*\.m3u8/, "_" + names[i] + ".m3u8")
+                : "https://edge-hls.doppiocdn.media/hls/" + id + "/master/" + id + "_" + names[i] + ".m3u8";
             if (await this.playable(url, headers)) {
                 out.push({ url: url, originalUrl: url, quality: names[i], headers: headers });
             }
         }
-        if (!out.length || (parseInt(out[0].quality, 10) || 0) <= 480) return [];
-        return out;
+        if (out.length && (parseInt(out[0].quality, 10) || 0) > 480) return { videos: out, note: "" };
+        var hd = names.filter(function (n) { return (parseInt(n, 10) || 0) > 480; });
+        return { videos: [], note: "HD in elenco (" + hd.join(", ") + ") ma la playlist non si apre" };
     }
 
     // Il sito può dare all'account una diretta con i nomi dei pezzi nascosti

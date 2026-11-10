@@ -1,5 +1,10 @@
 # Novità
 
+## Stripchat 1.3.11
+
+- **Preferiti:** se la Webview è loggata ma l'elenco non esce, il messaggio dice versione, sito, stato HTTP, dimensione della pagina, se l'utente c'è, se c'è il token, e solo i nomi dei cookie (mai i valori). Su iPhone Mangayomi copia quei cookie solo quando cambia l'indirizzo.
+- **Qualità:** le qualità si leggono dall'elenco pubblico del sito. Se la stanza ha il 1080p e il video si apre, parte quello. Se no, accanto a 480p c'è il motivo (la stanza non va oltre, oppure l'HD c'è ma la playlist non si apre, oppure i preset non si sono letti).
+
 ## Stripchat 1.3.10
 
 - Tolta l'impostazione «Ho fatto il login: cerca l'HD». Non dava qualità in più: i link dell'account vengono scartati, e l'HD pubblico arriva già da solo.
