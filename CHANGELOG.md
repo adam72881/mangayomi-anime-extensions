@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.20
+
+- **MegaTube:** alcuni risultati della ricerca davano errore 404 perché il sito li scrive senza «/» finale. Ora, se la pagina non esiste, l'estensione riprova con la barra.
+- Ho provato tutti i 63 siti pronti (elenco, ricerca, scheda e video): funzionano. Da verificare sul telefono Eporner, HQporner e PornMZ, che dal server di prova non lasciano scaricare il video.
+
 ## Link universale 1.4.19
 
 - **Nuovi siti hentai pronti:** HentaiMama, Hentaigasm, HentaiStream e HentaiFreak (elenco, ricerca, episodi e video provati). Si aggiungono a HentaiWorld.

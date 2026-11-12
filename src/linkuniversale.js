@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.19",
+        "version": "1.4.20",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -899,7 +899,15 @@ class DefaultExtension extends MProvider {
         var key = String(url).split("#")[0];
         var hit = this._pages[key];
         if (hit && Date.now() - hit.at < 180000) return hit.html;
-        var html = await this.fetchHtml(key, originOf(key) + "/");
+        var html;
+        try {
+            html = await this.fetchHtml(key, originOf(key) + "/");
+        } catch (e) {
+            // Alcuni siti scrivono nei risultati il link senza «/» finale, che
+            // dà 404 mentre con la barra c'è la pagina (megatube.xxx).
+            if (!/errore 404/.test(String(e && e.message)) || !/\/[^\/?.]+$/.test(key)) throw e;
+            html = await this.fetchHtml(key + "/", originOf(key) + "/");
+        }
         this._pages[key] = { at: Date.now(), html: html };
         var keys = Object.keys(this._pages);
         if (keys.length > 30) delete this._pages[keys[0]];
