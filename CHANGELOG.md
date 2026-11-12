@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.19
+
+- **Nuovi siti hentai pronti:** HentaiMama, Hentaigasm, HentaiStream e HentaiFreak (elenco, ricerca, episodi e video provati). Si aggiungono a HentaiWorld.
+- I siti WordPress con il tema DooPlay caricano il player solo quando scegli il server. Ora l'estensione lo chiede da sola, e questo aiuta anche altri siti anime e hentai fatti così.
+- hentaihaven.xxx, hanime.tv, ohentai.org e muchohentai.com hanno una verifica anti-bot: si aprono solo dalla Webview.
 ## Stripchat 1.3.19
 
 - La ricerca usa la stessa chiamata del sito. Se non risponde, compare un errore.

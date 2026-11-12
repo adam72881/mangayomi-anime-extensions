@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.18",
+        "version": "1.4.19",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -106,6 +106,10 @@ const READY = [
     ["https://www.animesaturn.net", "AnimeSaturn"],
     ["https://www.animeworld.ac", "AnimeWorld"],
     ["https://www.hentaiworld.me", "HentaiWorld"],
+    ["https://hentaimama.io", "HentaiMama"],
+    ["https://hentaigasm.com", "Hentaigasm"],
+    ["https://hentaistream.com", "HentaiStream"],
+    ["https://hentaifreak.org", "HentaiFreak"],
 ];
 const PREF_SEARCH = "linkuni_search_patterns";
 const PREF_SECTIONS = "linkuni_sections";
@@ -2200,6 +2204,41 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // Siti WordPress col tema DooPlay (molti siti hentai e anime): il player
+    // non è nella pagina, arriva da admin-ajax.php quando si sceglie il server.
+    async ajaxPlayers(html, pageUrl) {
+        var ajax = (html.match(/https?:\/\/[^"'\s]+\/wp-admin\/admin-ajax\.php/) || [resolveUrl("/wp-admin/admin-ajax.php", pageUrl)])[0].replace(/\\\//g, "/");
+        var h = { "Referer": pageUrl, "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/x-www-form-urlencoded" };
+        var calls = [];
+        var gp = html.match(/action\s*:\s*["']get_player_contents["']\s*,\s*a\s*:\s*["']?(\d+)/);
+        if (gp) calls.push({ body: "action=get_player_contents&a=" + gp[1] + "&i=1", kind: "list" });
+        var opt = /<li\b[^>]*\bdata-type\s*=\s*["'](\w+)["'][^>]*\bdata-post\s*=\s*["'](\d+)["'][^>]*\bdata-nume\s*=\s*["'](\w+)["']/gi, o;
+        while ((o = opt.exec(html)) !== null && calls.length < 4) {
+            if (o[3] === "trailer") continue;
+            calls.push({ body: "action=doo_player_ajax&post=" + o[2] + "&nume=" + o[3] + "&type=" + o[1], kind: "doo" });
+        }
+        if (!calls.length) return [];
+        var self = this;
+        var found = await Promise.all(calls.map(function (c) {
+            return self.client.post(ajax, h, c.body).then(function (res) {
+                var body = String(res.body || "");
+                var out = [];
+                var add = function (u) {
+                    u = resolveUrl(decodeEntities(String(u || "")).replace(/\\\//g, "/"), pageUrl);
+                    if (u && !AD_HOSTS.test(u)) out.push(u);
+                };
+                if (c.kind === "doo") {
+                    try { add(JSON.parse(body).embed_url); } catch (e) {}
+                }
+                var plain = body.replace(/\\\//g, "/").replace(/\\"/g, '"');
+                var re = /<iframe\b[^>]*?\bsrc\s*=\s*["']([^"']+)/gi, m;
+                while ((m = re.exec(plain)) !== null) add(m[1]);
+                return out;
+            }).catch(function () { return []; });
+        }));
+        return [].concat.apply([], found);
+    }
+
     async videosFromHtml(html, pageUrl, depth) {
         var videos = [];
         html = html + unpackAll(html);
@@ -2241,6 +2280,10 @@ class DefaultExtension extends MProvider {
         while ((m = hostRe.exec(text)) !== null) {
             if (frames.indexOf(m[0]) === -1) frames.push(m[0]);
         }
+
+        (await this.ajaxPlayers(html, pageUrl)).forEach(function (u) {
+            if (frames.indexOf(u) === -1) frames.unshift(u);
+        });
 
         // Tutti i player insieme. Appena uno dà un video si aspettano gli altri
         // al massimo 1,2 secondi; in ogni caso non oltre 9 secondi in tutto.
