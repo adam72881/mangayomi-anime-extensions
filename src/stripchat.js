@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.19",
+        "version": "1.3.20",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/stripchat.js",
@@ -22,7 +22,7 @@ const mangayomiSources = [
 // Il primo file del video contiene righe «#EXT-X-MOUFLON» (indicazioni che il player
 // ignora); i pezzi del video sono mp4 normali, non cifrati (provato il 10/11/2026).
 const BASE = "https://stripchat.com";
-const VERSION = "1.3.19";
+const VERSION = "1.3.20";
 const API = "https://go.stripchat.com/api/models";
 const FRONT = "https://stripchat.com/api/front/models";
 const PER_PAGE = 60;
@@ -218,6 +218,7 @@ class DefaultExtension extends MProvider {
         var tag = (opts.gender || "girls") + (extra ? "/" + extra : "");
         var url = API + "?limit=" + PER_PAGE + "&offset=" + ((page - 1) * PER_PAGE) + "&tag=" + encodeURIComponent(tag).replace(/%2F/g, "/");
         if (opts.isNew) url += "&isNew=true";
+        if (opts.sort) url += "&sortBy=" + encodeURIComponent(opts.sort);
         var data = await this.json(url);
         var list = (data && data.models) || [];
         return { raw: list, total: (data && data.total) || 0 };
@@ -397,14 +398,10 @@ class DefaultExtension extends MProvider {
         return { list: [note].concat(result.list || []), hasNextPage: !!result.hasNextPage };
     }
 
+    // Popolare = le ragazze in diretta con più spettatori, dalla più seguita.
+    // L'API pubblica (go.stripchat.com) ordina da sola con sortBy=viewersCount.
     async getPopular(page) {
-        // «Show di sesso dal vivo in evidenza» = blocco topStreamsModels, nello
-        // stesso ordine. Se il blocco non arriva non si mette un altro elenco.
-        if (page === 1 && this._session && !this._session.user) this._session = null;
-        var featured = await this.fillFeatured(page);
-        if (featured && (featured.list.length || page > 1)) return this.withDiag(featured, page);
-        var session = this._session;
-        throw new Error(this.diagText(session, "Popolare") + " Il blocco «in evidenza» non è arrivato. Non mostro un altro elenco.");
+        return this.page(page, { gender: "girls", sort: "viewersCount" });
     }
 
     async getLatestUpdates(page) {

@@ -1,5 +1,9 @@
 # Novità
 
+## Stripchat 1.3.20
+
+- **Popolare = più spettatori:** ragazze in diretta ordinate dalla più seguita, per esempio 5.861 spettatori, poi 3.473 e così via. L'elenco viene dall'API pubblica di Stripchat, quindi si carica senza login e senza la Webview.
+
 ## Chaturbate 1.3.5
 
 - **Dirette che non partivano:** nelle stanze che trasmettono in 4K (2160p) il player partiva dal 4K, troppo pesante per il telefono. Ora parte al massimo da 1080p; il 4K resta sceglibile nel player.
