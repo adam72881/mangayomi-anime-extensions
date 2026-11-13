@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.3.4",
+        "version": "1.3.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/chaturbate.js",
@@ -273,23 +273,31 @@ class DefaultExtension extends MProvider {
         var headers = { "Referer": BASE + "/" + user + "/", "Origin": BASE, "User-Agent": UA };
         // Il link principale (llhls.m3u8?token=…) vale UNA sola apertura. Si legge
         // per conoscere le qualità; al player si danno le singole, che restano
-        // valide. La più alta è la prima. Se il file non si legge, un link nuovo.
+        // valide.
         var auto = {
             url: src,
             originalUrl: src,
             quality: "Auto",
             headers: headers,
         };
-        var master = "";
-        try {
-            master = String((await this.client.get(src, headers)).body || "");
-        } catch (e) {}
-        var variants = this.variants(master, src);
-        if (!variants.length || !variants[0].audio) return [await this.freshAuto(user, auto)];
+        var variants = await this.readVariants(src, headers);
+        // Il file letto per le qualità non si può più usare: se non c'erano
+        // qualità, si prova una volta con un link nuovo. L'«Auto» (llhls.m3u8)
+        // sull'iPhone resta a girare, quindi è l'ultima risorsa.
+        if (!variants.length || !variants[0].audio) {
+            var again = await this.context(user);
+            if (!again.hls_source) throw new Error(user + " ha appena chiuso la diretta.");
+            variants = await this.readVariants(String(again.hls_source), headers);
+            if (!variants.length || !variants[0].audio) return [await this.freshAuto(user, auto)];
+        }
+        // Si parte al massimo da 1080p: il 4K (2160p) e il 1440p sul telefono
+        // spesso non partono o si bloccano. Restano comunque sceglibili nel player.
+        var first = variants.filter(function (v) { return v.height <= 1080; })[0] || variants[variants.length - 1];
+        var ordered = [first].concat(variants.filter(function (v) { return v !== first; }));
         // L'audio è un flusso a parte. L'app lo prende dal primo video e lo usa
         // per tutte le qualità: stesso audio, e niente link «Auto» (audio doppio).
-        var audio = variants[0].audio;
-        return variants.map(function (v) {
+        var audio = first.audio || variants[0].audio;
+        return ordered.map(function (v) {
             return {
                 url: v.url,
                 originalUrl: v.url,
@@ -298,6 +306,14 @@ class DefaultExtension extends MProvider {
                 audios: [{ file: audio, label: "Audio" }],
             };
         });
+    }
+
+    async readVariants(src, headers) {
+        var master = "";
+        try {
+            master = String((await this.client.get(src, headers)).body || "");
+        } catch (e) {}
+        return this.variants(master, src);
     }
 
     // Il link letto per le qualità è ormai usato: per il player ne serve uno nuovo.

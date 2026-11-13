@@ -1,5 +1,10 @@
 # Novità
 
+## Chaturbate 1.3.5
+
+- **Dirette che non partivano:** nelle stanze che trasmettono in 4K (2160p) il player partiva dal 4K, troppo pesante per il telefono. Ora parte al massimo da 1080p; il 4K resta sceglibile nel player.
+- Se l'elenco delle qualità non si legge, l'estensione riprova con un link nuovo invece di passare subito al link «Auto», che sull'iPhone resta a girare.
+
 ## Link universale 1.4.21
 
 - **Niente più caricamento infinito:** se un sito non finisce di caricare l'elenco in 35 secondi (la ricerca in 60), compare un errore che dice dove si è fermato. Mostra la richiesta in attesa e l'ultima risposta del sito, con codice, dimensione, tempo e titolo della pagina. Serve a capire perché Pornhub dal telefono resta a caricare finché non si apre la Webview.
