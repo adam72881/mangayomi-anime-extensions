@@ -19,6 +19,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
 > | Chaturbate 🔞 | chaturbate.com | any | live cams: popular, new, search, gender and hashtag filters, followed rooms with your account |
 > | Stripchat 🔞 | stripchat.com | any | live cams: popular, new, gender and category filters, name search, quality picker |
+> | BongaCams 🔞 | bongacams.com | any | live cams: most viewers first, new, gender and language filters (Italian speakers…), name search, up to 1080p |
 > | Link universale 🔞 | any site | any | save any site in the settings: popular, latest and search adapt to it; or paste a video, series or site link |
 >
 > No Cloudflare/anti-bot bypass: logins only use your own account.

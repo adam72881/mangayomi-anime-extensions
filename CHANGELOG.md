@@ -1,5 +1,13 @@
 # Novità
 
+## BongaCams 1.0.0 (nuova)
+
+- Dirette di BongaCams. **Popolare** mostra le ragazze con più spettatori, dalla più seguita. **Più recente** mostra le stanze nuove.
+- Filtri: **Genere** (ragazze, coppie, trans, uomini), **Tag** (chi parla italiano, spagnolo, inglese… e Squirt, Lovense, BDSM, Fumo) e **Ordine** (più spettatori, in evidenza, nuove).
+- Ricerca per nome tra le stanze in diretta, oppure incolla il link di una stanza.
+- Video senza account fino a 1080p, con audio. Il player parte al massimo da 1080p e nel player trovi le altre qualità.
+- Solo stanze in show pubblico. Se il sito chiede il controllo del browser o la verifica dell'età, l'estensione lo dice: tocca Webview.
+
 ## Stripchat 1.3.20
 
 - **Popolare = più spettatori:** ragazze in diretta ordinate dalla più seguita, per esempio 5.861 spettatori, poi 3.473 e così via. L'elenco viene dall'API pubblica di Stripchat, quindi si carica senza login e senza la Webview.
