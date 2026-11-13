@@ -1,5 +1,9 @@
 # Novità
 
+## Link universale 1.4.21
+
+- **Niente più caricamento infinito:** se un sito non finisce di caricare l'elenco in 35 secondi (la ricerca in 60), compare un errore che dice dove si è fermato. Mostra la richiesta in attesa e l'ultima risposta del sito, con codice, dimensione, tempo e titolo della pagina. Serve a capire perché Pornhub dal telefono resta a caricare finché non si apre la Webview.
+
 ## Link universale 1.4.20
 
 - **MegaTube:** alcuni risultati della ricerca davano errore 404 perché il sito li scrive senza «/» finale. Ora, se la pagina non esiste, l'estensione riprova con la barra.

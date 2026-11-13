@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.20",
+        "version": "1.4.21",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -864,14 +864,20 @@ class DefaultExtension extends MProvider {
     // Una connessione che salta (rete del telefono, server lento) si riprova una
     // volta; poi un messaggio chiaro invece dell'errore tecnico dell'app.
     async getWithRetry(url, headers) {
+        var started = Date.now();
+        this._waiting = { url: url, at: started };
         try {
-            return await this.client.get(url, headers);
+            var res = await this.client.get(url, headers);
+            this.noteResponse(url, res, started);
+            return res;
         } catch (e) {
             await new Promise(function (resolve) {
                 if (typeof setTimeout === "function") setTimeout(resolve, 700); else resolve();
             });
             try {
-                return await this.client.get(url, headers);
+                var again = await this.client.get(url, headers);
+                this.noteResponse(url, again, started);
+                return again;
             } catch (e2) {
                 throw new Error("Il sito " + hostOf(url) + " non risponde (problema di connessione). Controlla la rete e tocca Riprova.");
             }
@@ -1358,12 +1364,41 @@ class DefaultExtension extends MProvider {
         return found || site + "/";
     }
 
+    // Ultima risposta ricevuta: serve a spiegare un caricamento che non finisce.
+    noteResponse(url, res, started) {
+        var body = String(res.body || "");
+        this._waiting = null;
+        this._last = {
+            url: url,
+            text: res.statusCode + ", " + Math.round(body.length / 1024) + "KB, " + Math.round((Date.now() - started) / 1000) + "s, «" +
+                ((body.match(/<title[^>]*>([^<]{0,50})/i) || ["", body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 50)])[1]).trim() + "»",
+        };
+    }
+
+    // Elenco o ricerca che non finiscono: dopo 35 secondi un errore che dice
+    // dove si è fermato, invece della pagina che carica per sempre.
+    async timed(job, ms) {
+        ms = ms || 35000;
+        var self = this;
+        this._waiting = null;
+        this._last = null;
+        if (typeof setTimeout !== "function") return job;
+        var late = {};
+        var timer = new Promise(function (resolve) { setTimeout(function () { resolve(late); }, ms); });
+        var done = await Promise.race([job, timer]);
+        if (done !== late) return done;
+        var parts = [];
+        if (self._waiting) parts.push("in attesa da " + Math.round((Date.now() - self._waiting.at) / 1000) + "s di " + String(self._waiting.url).replace(/^https?:\/\//, "").slice(0, 60));
+        if (self._last) parts.push("ultima risposta " + String(self._last.url).replace(/^https?:\/\//, "").slice(0, 50) + ": " + self._last.text);
+        throw new Error("Il sito non ha finito di caricare in " + Math.round(ms / 1000) + " secondi (" + (parts.join("; ") || "nessuna risposta") + "). Tocca Riprova o mandami questo messaggio.");
+    }
+
     async getPopular(page) {
-        return tagList(await this.sectionListing("popular", page), this.sites()[0] || "");
+        return tagList(await this.timed(this.sectionListing("popular", page)), this.sites()[0] || "");
     }
 
     async getLatestUpdates(page) {
-        return tagList(await this.sectionListing("latest", page), this.sites()[0] || "");
+        return tagList(await this.timed(this.sectionListing("latest", page)), this.sites()[0] || "");
     }
 
     async sectionListing(kind, page) {
@@ -1421,7 +1456,7 @@ class DefaultExtension extends MProvider {
     // ---------- Ricerca: link incollato, ricerca nel sito o nella cronologia ----------
 
     async search(query, page, filters) {
-        return tagList(await this.searchPlain(query, page, filters), this.sites()[0] || "");
+        return tagList(await this.timed(this.searchPlain(query, page, filters), 60000), this.sites()[0] || "");
     }
 
     async searchPlain(query, page, filters) {
