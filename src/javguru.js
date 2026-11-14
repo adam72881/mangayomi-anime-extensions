@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/javguru.js",
@@ -27,7 +27,9 @@ const BASE = "https://jav.guru";
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const VIDEO_EXT = "m3u8|mp4|webm|mkv|mov|m4v";
 
-const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\/|\/vp\/\d+\/|\/p\d{2,4}-\d{2,4}\.(?:mp4|webm)/i;
+const NOT_THE_VIDEO = /\/tmb\/|\/plain\/|rs:fi(?:t|ll)|\/gifs?\/|thumb|preview|sprite|poster|teaser|trailer|\/pics\/|\/vp\/\d+\/|\/p\d{2,4}-\d{2,4}\.(?:mp4|webm)|test-videos\.co\.uk|big[_-]?buck|gtv-videos-bucket|sample-videos\.com/i;
+// Il master su questi host parte con lo User-Agent di Chrome, senza Cookie né Referer.
+const PREFERRED_HOST = /premilkyway|javclan|huntrexus/i;
 const AD_HOSTS = /a-ads\.com|doubleclick|googlesyndication|googletagmanager|google-analytics|facebook\.com|twitter\.com|disqus|recaptcha|hcaptcha|cloudflare|wingsmob|exoclick|juicyads|trafficjunky|adsterra|popads|histats|gsrv\.dev|tsyndicate|magsrv|realsrv|ad-delivery|adnxs|adtng|\bvast\b|mayzaent\.com|pemsrv\.com/i;
 const NOT_VIDEO_KEY = /image|img|thumb|poster|preview|mediabook|trailer|teaser|gif|sprite|avatar|banner/i;
 
@@ -625,7 +627,7 @@ class DefaultExtension extends MProvider {
             originalUrl: url,
             quality: name.trim(),
             headers: this.playerHeaders(referer),
-            _score: isHls && !quality ? 100000 : quality * 10 + (isHls ? 1 : 2),
+            _score: (PREFERRED_HOST.test(hostOf(url)) ? 500000 : 0) + (isHls && !quality ? 100000 : quality * 10 + (isHls ? 1 : 2)),
         };
     }
 
@@ -840,9 +842,11 @@ class DefaultExtension extends MProvider {
         for (var i = 0; i < videos.length && !expanded.length; i++) {
             expanded = await this.expandHls(videos[i]);
         }
+        expanded = expanded.filter(function (v) { return v && v.url && !NOT_THE_VIDEO.test(v.url); });
         if (!expanded.length) {
             throw new Error("Il player non si apre da questa rete. Se il sito ha chiesto un controllo, aprilo dalla Webview e tocca Riprova.");
         }
+        expanded.sort(function (a, b) { return (b._score || 0) - (a._score || 0); });
         expanded.forEach(function (v) { delete v._score; });
         return expanded;
     }

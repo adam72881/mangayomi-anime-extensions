@@ -1,5 +1,10 @@
 # Novità
 
+## JAV Guru 1.0.1
+
+- Si scarta il clip di prova da 10 secondi (Big Buck Bunny su test-videos.co.uk) che alcuni server mettono al posto del filmato.
+- Si preferisce il master su premilkyway/javclan: parte con lo User-Agent di Chrome, senza Cookie né Referer. Non si aggira Cloudflare né la verifica dell'età.
+
 ## JAV Guru 1.0.0 (nuova)
 
 - Estensione a sé per jav.guru. JAV Guru resta anche in Link universale.
