@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.3 / HypnoTube 1.4.5
+
+- **Login sulla TV Samsung (app Mangayomi per Tizen):** lì il cookie della risposta di login non si può leggere. Ora, se il sito ha accettato il login ma il cookie non si vede, l'estensione chiede al sito se sei collegato: PMVHaven con la sessione, HypnoTube cercando il link «logout» nella home. Su telefono non cambia niente.
+
 ## HypnoTube 1.4.4
 
 - **Popolari a sorpresa**: quando pesca un canale, ora lo apre ordinato per più visti (`/channels/<id>/<nome>/views/`). Prima usava l'ordine predefinito del canale, cioè i più recenti, e i primi video erano uguali a Ultimi. Provato con il canale «captions»: nessun video in comune con Ultimi.

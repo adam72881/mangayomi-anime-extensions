@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.2",
+        "version": "1.6.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -429,7 +429,9 @@ class DefaultExtension extends MProvider {
         var pairs = this.cookiePairs(this.headerOf(res, "set-cookie")).filter(function (p) {
             return /session/i.test(p.split("=")[0]);
         });
-        if (!pairs.length) return false;
+        // App per TV (Tizen): il cookie della risposta non si può leggere, ma la TV
+        // può averlo salvato da sola. In quel caso si chiede al sito chi è collegato.
+        if (!pairs.length) return !!(await this.currentUser());
         this.writePref(PREF_SESSION, pairs.join("; "));
         return true;
     }
