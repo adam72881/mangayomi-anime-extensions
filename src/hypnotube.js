@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.3",
+        "version": "1.4.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -290,7 +290,9 @@ class DefaultExtension extends MProvider {
     }
 
     popularPath(pick, page) {
-        if (pick.indexOf("c:") === 0) return { base: "/channels/" + pick.slice(2) + "/", page: page };
+        // Un canale per più visti: l'ordine predefinito di /channels/<id>/<nome>/ è per
+        // recenti e i primi video erano gli stessi di Ultimi (issue #7).
+        if (pick.indexOf("c:") === 0) return { base: "/channels/" + pick.slice(2) + "/" + CHANNEL_SORT["most-viewed"], page: page };
         if (pick.indexOf("o:random:") === 0) {
             var start = Math.max(2, parseInt(pick.slice(9), 10) || 2);
             return { base: "/most-recent/", page: start + (page > 1 ? page - 1 : 0) };
