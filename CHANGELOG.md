@@ -1,5 +1,9 @@
 # Novità
 
+## HypnoTube 1.4.4
+
+- **Popolari a sorpresa**: quando pesca un canale, ora lo apre ordinato per più visti (`/channels/<id>/<nome>/views/`). Prima usava l'ordine predefinito del canale, cioè i più recenti, e i primi video erano uguali a Ultimi. Provato con il canale «captions»: nessun video in comune con Ultimi.
+
 ## JAV Guru 1.0.1
 
 - Si scarta il clip di prova da 10 secondi (Big Buck Bunny su test-videos.co.uk) che alcuni server mettono al posto del filmato.
