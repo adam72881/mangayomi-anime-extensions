@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.1",
+        "version": "1.4.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -93,6 +93,8 @@ const PRESETS = [
     ["lingerie stockings heels", "Lingerie e Tacchi"],
     ["chastity caption", "Chastity"],
     ["bnwo", "BNWO"],
+    ["poppers blacked", "Poppers + Blacked"],
+    ["poppers bbc", "Poppers + BBC (più video)"],
 ];
 
 // Categorie del sito ("channels"): value = "<id>/<slug>".

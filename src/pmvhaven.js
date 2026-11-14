@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.0",
+        "version": "1.6.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -107,6 +107,8 @@ const PRESETS = [
     ["lingerie", "Lingerie e Tacchi"],
     ["chastity", "Chastity"],
     ["bnwo", "BNWO"],
+    ["poppers,blacked", "Poppers + Blacked"],
+    ["poppers,bbc", "Poppers + BBC (più video)"],
 ];
 
 // Playlist: il sito cerca nel nome della playlist (anche parole simili). Scelte le
@@ -117,6 +119,8 @@ const PLAYLIST_TEXT = {
     "egirls,pmv": "egirls",
     "high heels": "heels",
     "extreme": "extreme",
+    "poppers,blacked": "poppers",
+    "poppers,bbc": "poppers",
 };
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
