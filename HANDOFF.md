@@ -25,7 +25,8 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.3.8 |
-| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.18 |
+| `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.22 |
+| `src/javguru.js` | JAV Guru (jav.guru) | 1.0.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -303,3 +304,17 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Chaturbate 1.3.2 — it.chaturbate.com:** dopo verifica e login la Webview resta su it.chaturbate.com. Mangayomi (`MClient.setCookie` a ogni navigazione) salva i cookie dell'URL visitato e cancella quelli degli host collegati (`removeCookiesForHost` con `_hostsMatch` largo), quindi i cookie solo-host di chaturbate.com si perdono. `json(path, check)` prova `this._host` (default chaturbate.com) e poi l'altro; per le seguite `check` = almeno una stanza con `is_following`. Le API rispondono su entrambi gli host (provato). Utente: login come gloriasissypopa, sito mostrava Following (1/10), estensione dava ancora «verifica dell'età».
 
 - **Stripchat 1.3.0:** `CATEGORIES` estese; provate con `tag=girls/<x>` confrontando con `tag=girls` (diverso = funziona). Ignorati: featured, recommended, hd, stockings.
+
+## JAV Guru — 1.0.0
+
+Estensione a sé (`src/javguru.js`, id `8841203391`, `baseUrl` `https://jav.guru`, `lang` `en`, `isNsfw` true). JAV Guru resta in `READY` di Link universale.
+
+- **Recenti:** home `/` e `/page/N/`, schede `class="inside-article"` (titolo nell'`h2 a`, miniatura, tag in `p.tags`).
+- **Popolari:** `/most-watched-rank/`, solo il pannello `content-today` (30 schede `article.rank-item`). Non ha pagina 2. In ricerca, con il testo vuoto e Categoria su Tutte, **Classifica** legge `content-today|week|month|alltime`.
+- **Ricerca:** `/?s=` e `/page/N/?s=`. Categoria vuota + testo = solo la ricerca. Categoria: `/category/<slug>/` (english-subbed, jav, decensored, amateur, idol, 4k, FC2) o `/tag/<slug>/` per i tag messi nel filtro. Pagina dopo: `/page/N/` sul percorso, oppure `/page/N/?s=`.
+- **Scheda:** `h1`, copertina in `.large-screenshot img`, testo da `.infoleft` (Code, Release Date, Category, Director, Studio, Label, Series, Actress, Actor, tag `rel="tag"`), views in `.javstats`, data in `.thedate`. Un capitolo `Video`. `status` 1.
+- **Copertine:** `cdn.javmiku.com` (e gli altri CDN) rispondono 403 HTML. `coverUrl` sposta `/wp-content/uploads/` su `https://jav.guru` + lo stesso path. `getHeaders` manda solo lo User-Agent iPhone già usato dalle altre estensioni. Provato il 14 novembre 2026: la copertina intera e la miniatura della classifica sono `200 image/jpeg` (`ffd8`). Il CDN non si aggira.
+- **Video:** stessa lettura di Link universale, copiata qui (`hiddenPlayerUrls`, `unpackAll`, `directCandidates`, `declaredCandidates`, `KNOWN_HOSTS`). La pagina ha `iframe_url` in base64 verso `/searcho/?xd=`; quella pagina ricostruisce `/searcho/?xr=` invertendo i `data-*` (`cid` / `base` / `rtype` / `keys`); il 302 arriva al player e il packer ha il master `.m3u8`. I server si leggono insieme (tetto 20 s). Un master che risponde 403 si salta, senza aggirarlo. `getVideoList` legge il primo master che è una playlist e restituisce le varianti (`RESOLUTION`) più Auto. Provato il 14 novembre 2026 su DLDSS-581: un server (`maxstream`) è 403 e si lascia; il successivo è `#EXTM3U` con 1080p, 720p e 480p, `200 application/vnd.apple.mpegurl`. Non si decifra altro.
+- **Esclusi:** slug `girl` (sul sito è Loli), `girl+mini` (Teen), schoolgirl(s), shotacon, loli, rape e gli altri di minori o non consensuali. Non sono nel filtro. Una scheda con quel tag o con quelle parole nel titolo non entra in lista e `getDetail` / `getVideoList` non la aprono. `beautiful-girl` e `young-wife` restano. Idol è stato aperto: titoli di adulte (es. «thirty-something»), resta.
+- **Non si aggira:** pagina «Just a moment» / challenge senza elenco né player, e la verifica dell'età. Messaggio e Webview. Nessun cookie e nessuno User-Agent diverso da quello del repo.
+- Verifica: `node --check src/javguru.js` e uno stub Node che chiama `getPopular`, `getLatestUpdates`, `search`, `getDetail`, `getVideoList` sul sito vero.

@@ -1,5 +1,14 @@
 # Novità
 
+## JAV Guru 1.0.0 (nuova)
+
+- Estensione a sé per jav.guru. JAV Guru resta anche in Link universale.
+- **Popolari**: classifica di oggi. **Recenti**: gli ultimi video della home, con le pagine dopo.
+- **Ricerca**: codice o titolo. Con la ricerca vuota, **Categoria** (Sub inglese, JAV, senza mosaico, Amateur, Idol, 4K, FC2 e i tag più usati) e **Classifica** (oggi, settimana, mese, di sempre).
+- Scheda con titolo, copertina, codice, data, studio, attrice e tag. Il video usa gli stessi player di Link universale (fino a 1080p).
+- Non ci sono le categorie di minori né quelle non consensuali (loli, teen, schoolgirl, shotacon, rape). Se un video è in una di queste, non viene aperto.
+- Se il sito chiede il controllo del browser o la verifica dell'età, l'estensione lo dice: tocca Webview. Non le aggira.
+
 ## PMVHaven 1.6.2
 
 - Preset **Poppers + Blacked / BBC / BNWO**: tutti i video con il tag Poppers e almeno uno fra Blacked, BBC e BNWO, senza doppioni (circa 314 video, prima 102). Funzionano tutti gli ordini, anche Casuale. Resta anche **Poppers + Blacked (solo)**.
