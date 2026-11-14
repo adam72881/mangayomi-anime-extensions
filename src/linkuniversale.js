@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.21",
+        "version": "1.4.22",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -236,6 +236,16 @@ function videoFacts(html) {
     return { duration: dur, date: date };
 }
 
+// Raccolta «Gooning»: PMV, goon, hypno ed edging su più siti insieme.
+const GOON_SITES = [
+    "https://xhamster.com", "https://www.pornhub.com", "https://www.xvideos.com", "https://www.xnxx.com",
+    "https://www.eporner.com", "https://www.porntrex.com", "https://pornone.com", "https://www.youjizz.com",
+    "https://www.xozilla.com", "https://www.sunporno.com",
+];
+// Titoli che sono davvero da gooning: tiene fuori i video qualsiasi che i siti
+// mettono tra i risultati (consigliati, popolari).
+const GOON_TITLE = /pmv|hmv|goon|hypno|trance|edg(e|ing)|cock ?hero|compil|mix\b|tribute|\bjoi\b|\bcei\b|beat|bambi|sissy|brainwash|mindless/i;
+const GOON_WORDS = ["pmv", "goon", "hypno", "edging"];
 const SIDE_PATH = /\/(c|cat|cats|category|categories|tags?|channels?|pornstars?|models?|studios?|genres?|generi|genere|users?|members?|playlists?|search|albums?|photos?|gallery|galleries|pics)(\/|\?|$)|[?&](genre|tag|category|cat)=/i;
 
 // Prima i video/le serie, poi categorie, tag, canali ecc. Tra i video, prima il
@@ -1464,6 +1474,7 @@ class DefaultExtension extends MProvider {
         var urlMatch = text.match(/https?:\/\/\S+/i);
         if (!urlMatch && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text)) urlMatch = ["https://" + text];
         if (urlMatch) return this.listing(urlMatch[0].replace(/[)\].,;]+$/, ""), page, true);
+        if (this.goonPick(filters)) return this.gooning(text, page);
 
         var site = this.siteFromFilters(filters);
         if (!site) return this.historyPage(text);
@@ -1529,6 +1540,70 @@ class DefaultExtension extends MProvider {
         };
         if (videoLike(kept) >= Math.max(6, videoLike(res.list) / 2)) res.list = kept;
         return res;
+    }
+
+    goonPick(filters) {
+        var on = false;
+        (filters || []).forEach(function (f) {
+            if (!f || f.type_name !== "SelectFilter" || f.name !== "Raccolta") return;
+            var opt = (f.values || [])[f.state || 0];
+            if (opt && opt.value === "goon") on = true;
+        });
+        return on;
+    }
+
+    // Una parola per pagina (pmv, goon, hypno, edging, poi di nuovo pmv con la
+    // pagina dopo dei siti), cercata su tutti i siti insieme. I risultati si
+    // alternano un sito per volta. Con un testo si cerca quello su questi siti.
+    async gooning(text, page) {
+        var self = this;
+        var word = text || GOON_WORDS[(page - 1) % GOON_WORDS.length];
+        var sitePage = text ? page : Math.floor((page - 1) / GOON_WORDS.length) + 1;
+        var enabled = this.sites();
+        var sites = GOON_SITES.filter(function (x) { return enabled.indexOf(x) !== -1; });
+        if (!sites.length) sites = GOON_SITES;
+        var late = {};
+        var perSite = await Promise.all(sites.map(function (site) {
+            var job = (async function () {
+                var first = sitePage > 1 ?
+                    (self.readJson(PREF_NEXT, {})["goon:" + site + "|" + word] || "") :
+                    await self.searchUrl(site, word);
+                if (!first) return [];
+                if (sitePage === 1) {
+                    var np = self.readJson(PREF_NEXT, {});
+                    np["goon:" + site + "|" + word] = first;
+                    self.prefs.setString(PREF_NEXT, JSON.stringify(np));
+                }
+                var res = await self.listing(first, sitePage, false);
+                var home = await self.homeLinks(site);
+                var name = self.siteName(site);
+                return res.list.filter(function (c) {
+                    if (home[c.link] || SIDE_PATH.test(String(c.link).replace(/^https?:\/\/[^\/]+/, ""))) return false;
+                    return text ? true : GOON_TITLE.test(c.name);
+                }).map(function (c) {
+                    c.name = c.name + " · " + name;
+                    return c;
+                });
+            })().catch(function () { return []; });
+            var timer = new Promise(function (resolve) {
+                if (typeof setTimeout === "function") setTimeout(function () { resolve(late); }, 20000);
+            });
+            return Promise.race([job, timer]).then(function (r) { return r === late ? [] : r; });
+        }));
+        var list = [], seen = {};
+        for (var i = 0; ; i++) {
+            var any = false;
+            perSite.forEach(function (l) {
+                if (i >= l.length) return;
+                any = true;
+                if (seen[l[i].link]) return;
+                seen[l[i].link] = true;
+                list.push(l[i]);
+            });
+            if (!any) break;
+        }
+        if (!list.length && page === 1) throw new Error("Nessun sito ha risposto per «" + word + "». Tocca Riprova.");
+        return { list: list, hasNextPage: text ? list.length > 0 : true };
     }
 
     async homeLinks(site) {
@@ -2438,10 +2513,19 @@ class DefaultExtension extends MProvider {
         var filters = [{
             type_name: "HeaderFilter",
             name: sites.length ?
-                "Scegli un sito in «Sito» oppure in «Sito JAV» (lascia l'altro su «—»); senza scelta vale il sito principale. Categoria vale per tutti i siti. Puoi anche incollare un link." :
+                "Scegli un sito in «Sito» oppure in «Sito JAV» (lascia l'altro su «—»); senza scelta vale il sito principale. Categoria vale per tutti i siti. «Raccolta → Gooning» cerca PMV, goon, hypno ed edging su più siti insieme. Puoi anche incollare un link." :
                 "Aggiungi i tuoi siti nelle impostazioni della sorgente. Intanto puoi incollare nella ricerca il link di un video o di un sito.",
         }];
         if (sites.length) {
+            filters.push({
+                type_name: "SelectFilter",
+                name: "Raccolta",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "—", value: "" },
+                    { type_name: "SelectOption", name: "Gooning: PMV, goon, hypno, edging (più siti insieme)", value: "goon" },
+                ],
+            });
             var normal = sites.filter(function (x) { return !isJavSite(x); });
             var jav = sites.filter(function (x) { return isJavSite(x); });
             if (normal.length) {

@@ -1,5 +1,10 @@
 # Novità
 
+## Link universale 1.4.22
+
+- **Raccolta → Gooning** nei filtri: cerca PMV, goon, hypno ed edging insieme su 10 siti (xHamster, Pornhub, xVideos, xnxx, Eporner, Porntrex, PornOne, YouJizz, Xozilla, SunPorno). Mostra tutto in un elenco unico, un sito per volta, con il nome del sito su ogni video.
+- Ogni pagina usa una parola diversa (pmv, goon, hypno, edging), poi si ricomincia con le pagine successive dei siti. Restano solo i video con titoli da gooning (PMV, HMV, goon, compilation, edging, hypno, JOI…). Se scrivi un testo, lo cerca su quei siti.
+
 ## PMVHaven 1.6.1 / HypnoTube 1.4.2
 
 - Nuovi preset in **Preset sessione**: **Poppers + Blacked** e **Poppers + BBC** (più video). Su PMVHaven devono esserci tutti e due i tag (102 e 295 video). Su HypnoTube è una ricerca con le due parole.
