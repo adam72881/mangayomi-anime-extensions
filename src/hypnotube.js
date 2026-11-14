@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.2",
+        "version": "1.4.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -256,7 +256,11 @@ class DefaultExtension extends MProvider {
 
     popularPool() {
         var pool = [];
-        for (var i = 0; i < ORDERS.length; i++) pool.push({ pick: "o:" + ORDERS[i][0], w: 5 });
+        // "Recenti" ha già la sua scheda (Ultimi): Popolari non deve ripeterla.
+        for (var i = 0; i < ORDERS.length; i++) {
+            if (ORDERS[i][0] === "most-recent") continue;
+            pool.push({ pick: "o:" + ORDERS[i][0], w: 5 });
+        }
         for (var j = 0; j < PREFERRED_CHANNELS.length; j++) pool.push({ pick: "c:" + PREFERRED_CHANNELS[j], w: 1 });
         pool.push({ pick: "c:91/gooning", w: 1 });
         return pool;
@@ -277,7 +281,8 @@ class DefaultExtension extends MProvider {
             acc += choices[c].w;
             if (hit < acc) {
                 var chosen = choices[c].pick;
-                if (chosen === "o:random") chosen = "o:random:" + (1 + Math.floor(Math.random() * 10));
+                // Mai la pagina 1 dei recenti: sarebbe identica a Ultimi.
+                if (chosen === "o:random") chosen = "o:random:" + (2 + Math.floor(Math.random() * 10));
                 return chosen;
             }
         }
@@ -287,7 +292,7 @@ class DefaultExtension extends MProvider {
     popularPath(pick, page) {
         if (pick.indexOf("c:") === 0) return { base: "/channels/" + pick.slice(2) + "/", page: page };
         if (pick.indexOf("o:random:") === 0) {
-            var start = parseInt(pick.slice(9), 10) || 1;
+            var start = Math.max(2, parseInt(pick.slice(9), 10) || 2);
             return { base: "/most-recent/", page: start + (page > 1 ? page - 1 : 0) };
         }
         var ord = pick.indexOf("o:") === 0 ? pick.slice(2) : "most-viewed";
@@ -799,6 +804,8 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (!this.surpriseOn()) return this.applyDuration(await this.listing("/most-viewed/", page, false), 0);
         var prev = this.savedPopular();
+        // Una scelta salvata da una versione precedente può essere "Recenti": si scarta.
+        if (prev === "o:most-recent") prev = "";
         var pick = page > 1 && prev ? prev : this.rollPopular(prev);
         if (page <= 1 || !prev) this.savePopular(pick);
         var spec = this.popularPath(pick, page);
