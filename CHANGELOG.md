@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.2
+
+- Preset **Poppers + Blacked / BBC / BNWO**: tutti i video con il tag Poppers e almeno uno fra Blacked, BBC e BNWO, senza doppioni (circa 314 video, prima 102). Funzionano tutti gli ordini, anche Casuale. Resta anche **Poppers + Blacked (solo)**.
+
 ## Link universale 1.4.22
 
 - **Raccolta → Gooning** nei filtri: cerca PMV, goon, hypno ed edging insieme su 10 siti (xHamster, Pornhub, xVideos, xnxx, Eporner, Porntrex, PornOne, YouJizz, Xozilla, SunPorno). Mostra tutto in un elenco unico, un sito per volta, con il nome del sito su ogni video.

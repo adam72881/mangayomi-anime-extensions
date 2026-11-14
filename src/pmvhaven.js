@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.1",
+        "version": "1.6.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -107,8 +107,8 @@ const PRESETS = [
     ["lingerie", "Lingerie e Tacchi"],
     ["chastity", "Chastity"],
     ["bnwo", "BNWO"],
-    ["poppers,blacked", "Poppers + Blacked"],
-    ["poppers,bbc", "Poppers + BBC (più video)"],
+    ["poppers,blacked|poppers,bbc|poppers,bnwo", "Poppers + Blacked / BBC / BNWO"],
+    ["poppers,blacked", "Poppers + Blacked (solo)"],
 ];
 
 // Playlist: il sito cerca nel nome della playlist (anche parole simili). Scelte le
@@ -120,7 +120,7 @@ const PLAYLIST_TEXT = {
     "high heels": "heels",
     "extreme": "extreme",
     "poppers,blacked": "poppers",
-    "poppers,bbc": "poppers",
+    "poppers,blacked|poppers,bbc|poppers,bnwo": "poppers",
 };
 
 // value = nome tag (il filtro ?tags= è case-insensitive).
@@ -537,6 +537,63 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // Preset «uno o l'altro»: gruppi separati da «|», ognuno con tutti i suoi tag
+    // (es. poppers+blacked | poppers+bbc | poppers+bnwo). Il sito non fa l'OR fra
+    // tag, quindi si leggono tutti i gruppi (fino a 12 pagine ciascuno), si tolgono
+    // i doppioni e si ordinano qui. Tenuti 10 minuti per scorrere le pagine.
+    async anyOfGroups(groups, extraTags, spec, minSec, page, extreme) {
+        var self = this;
+        var key = groups.join("|") + "#" + extraTags.join(",") + "#" + spec.sort + "#" + (spec.random ? "r" : "") + "#" + (extreme ? "x" : "");
+        this._anyOf = this._anyOf || {};
+        var hit = this._anyOf[key];
+        if (!hit || Date.now() - hit.at > 600000 || page === 1 && spec.random) {
+            var sort = spec.random ? "-releaseDate" : spec.sort;
+            var lists = await Promise.all(groups.map(async function (g) {
+                var tags = extraTags.concat(g.split(","));
+                var path = "/api/videos?tags=" + encodeURIComponent(tags.join(",")) + "&tagMode=AND&expandTags=false&sort=" + encodeURIComponent(sort);
+                if (extreme) path += "&includeExtreme=true";
+                var rows = [];
+                for (var p = 1; p <= 12; p++) {
+                    var json;
+                    try { json = await self.api(path + "&page=" + p); } catch (e) { break; }
+                    var part = json.data || json.videos || [];
+                    rows = rows.concat(part);
+                    if (!part.length || !(json.pagination && json.pagination.hasNext)) break;
+                }
+                return rows;
+            }));
+            var seen = {}, all = [];
+            lists.forEach(function (rows) {
+                rows.forEach(function (v) {
+                    if (!v || !v._id || seen[v._id]) return;
+                    seen[v._id] = 1;
+                    all.push(v);
+                });
+            });
+            if (spec.random) {
+                for (var i = all.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var t = all[i]; all[i] = all[j]; all[j] = t;
+                }
+            } else {
+                var desc = sort.charAt(0) === "-";
+                var field = sort.replace(/^-/, "");
+                if (field === "duration") field = "durationSeconds";
+                var val = function (v) {
+                    var x = v[field];
+                    if (typeof x === "string" && /date/i.test(field)) return Date.parse(x) || 0;
+                    return Number(x) || 0;
+                };
+                all.sort(function (a, b) { return desc ? val(b) - val(a) : val(a) - val(b); });
+            }
+            hit = { at: Date.now(), rows: all };
+            this._anyOf[key] = hit;
+        }
+        var per = 32;
+        var slice = hit.rows.slice((page - 1) * per, page * per);
+        return this.toList({ data: slice, pagination: { hasNext: hit.rows.length > page * per } }, minSec);
+    }
+
     async loadQuery(path, page, random, maxRandom) {
         var join = path.indexOf("?") >= 0 ? "&" : "?";
         if (!random) return this.api(path + join + "page=" + page);
@@ -784,6 +841,12 @@ class DefaultExtension extends MProvider {
             if (section.indexOf("tag:") === 0) tags.push(section.slice(4));
             if (principale && !extreme) tags.push(principale);
             if (tag) tags.push(tag);
+            if (preset && preset.indexOf("|") !== -1) {
+                var ord = kind || "views";
+                out = await this.anyOfGroups(preset.split("|"), tags, this.orderQuery(this.videoSort(ord)), minSec, page, extreme);
+                if (unseen) out = this.hideSeen(out);
+                return out;
+            }
             if (preset) tags = tags.concat(preset.split(","));
             // La lista tendenza non riporta l'etichetta «estremo»: con Estremi si usano i più visti.
             if (section === "trending" && !tags.length && !extreme) {
