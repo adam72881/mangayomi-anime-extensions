@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.1 / HypnoTube 1.4.2
+
+- Nuovi preset in **Preset sessione**: **Poppers + Blacked** e **Poppers + BBC** (più video). Su PMVHaven devono esserci tutti e due i tag (102 e 295 video). Su HypnoTube è una ricerca con le due parole.
+
 ## BongaCams 1.0.0 (nuova)
 
 - Dirette di BongaCams. **Popolare** mostra le ragazze con più spettatori, dalla più seguita. **Più recente** mostra le stanze nuove.
