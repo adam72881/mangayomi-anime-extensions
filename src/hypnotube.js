@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.4",
+        "version": "1.4.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hypnotube.js",
@@ -378,10 +378,20 @@ class DefaultExtension extends MProvider {
         var loc = this.headerOf(res, "location");
         var html = res && res.body ? String(res.body) : "";
         var ok = /my-profile/.test(loc) || this.isLoggedIn(html);
-        if (!ok) return false;
+        // App per TV (Tizen): il reindirizzamento arriva senza «Location» e i cookie della
+        // risposta non si leggono, ma la TV può averli salvati da sola. Allora si controlla
+        // sulla home se c'è il link di uscita, cioè se l'accesso è riuscito.
+        var tv = !ok && res && res.statusCode >= 300 && res.statusCode < 400 && !loc;
+        if (!ok && !tv) return false;
         this._cookie = null;
         this.rememberCookies(res);
-        return !!(this._cookie && this._cookie.PHPSESSID);
+        if (this._cookie && this._cookie.PHPSESSID) return true;
+        try {
+            var home = await new Client().get(this.getBaseUrl() + "/", { "User-Agent": UA });
+            return this.isLoggedIn(home && home.body);
+        } catch (e) {
+            return false;
+        }
     }
 
     filterValue(filters, name) {

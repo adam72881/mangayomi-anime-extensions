@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.2",
+        "version": "1.6.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -429,7 +429,9 @@ class DefaultExtension extends MProvider {
         var pairs = this.cookiePairs(this.headerOf(res, "set-cookie")).filter(function (p) {
             return /session/i.test(p.split("=")[0]);
         });
-        if (!pairs.length) return false;
+        // App per TV (Tizen): il cookie della risposta non si può leggere, ma la TV
+        // può averlo salvato da sola. In quel caso si chiede al sito chi è collegato.
+        if (!pairs.length) return !!(await this.currentUser());
         this.writePref(PREF_SESSION, pairs.join("; "));
         return true;
     }
@@ -1041,8 +1043,13 @@ class DefaultExtension extends MProvider {
             return detail;
         }
 
-        var json = await this.api("/api/videos/" + id);
+        var both = await Promise.all([
+            this.api("/api/videos/" + id),
+            this.credentials() ? null : this.currentUser().catch(function () { return null; }),
+        ]);
+        var json = both[0];
         var v = json.data || json.video || json;
+        var logged = !!(this.credentials() || both[1]);
 
         var genre = [];
         var main = Array.isArray(v.top5Tags) ? v.top5Tags.slice(0, 3) : [];
@@ -1083,6 +1090,12 @@ class DefaultExtension extends MProvider {
             status: 1,
             chapters: [this.videoChapter(play, v.uploadDate, v.thumbnailUrl || v.thumbnail)],
         };
+        if (logged && id) {
+            detail.chapters.push({
+                name: v.isFavorited ? "★ Togli dai preferiti PMVHaven" : "☆ Aggiungi ai preferiti PMVHaven",
+                url: "pmv:fav:" + id,
+            });
+        }
         if (uploader) {
             detail.author = uploader;
             this.rememberProfile(uploader);
@@ -1091,8 +1104,37 @@ class DefaultExtension extends MProvider {
         return detail;
     }
 
+    // Lo stato si rilegge al momento: il nome del capitolo resta quello di quando
+    // la scheda è stata aperta e può non essere più vero.
+    async toggleFavorite(id) {
+        var json = await this.api("/api/videos/" + id);
+        var v = json.data || json.video || json;
+        var action = v.isFavorited ? "unfavorite" : "favorite";
+        var send = async function () {
+            var h = this.headers();
+            h["Content-Type"] = "application/json";
+            h["Origin"] = this.getBaseUrl();
+            return await this.client.put(this.getBaseUrl() + "/api/videos/" + id + "/favorite", h, { action: action });
+        }.bind(this);
+        var res = await send();
+        if (res && (res.statusCode === 401 || res.statusCode === 403) && this.credentials()) {
+            var ok = false;
+            try { ok = await this.login(); } catch (e) {}
+            if (ok) res = await send();
+        }
+        var code = res ? res.statusCode : 0;
+        if (code === 401 || code === 403) {
+            throw new Error("PMVHaven: accedi (email e password nelle impostazioni, o dalla WebView) per usare i preferiti.");
+        }
+        if (code < 200 || code >= 300) throw new Error("PMVHaven: preferiti non aggiornati (HTTP " + code + ").");
+        throw new Error(action === "favorite"
+            ? "★ Aggiunto ai preferiti di PMVHaven. Aggiorna la scheda per vedere il pulsante cambiato."
+            : "☆ Tolto dai preferiti di PMVHaven. Aggiorna la scheda per vedere il pulsante cambiato.");
+    }
+
     async getVideoList(url) {
         var raw = String(url);
+        if (raw.indexOf("pmv:fav:") === 0) return await this.toggleFavorite(raw.slice(8));
         try { raw = decodeURIComponent(raw); } catch (e) {}
         var lastHttp = raw.lastIndexOf("http");
         if (lastHttp > 0) raw = raw.slice(lastHttp);
