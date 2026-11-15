@@ -675,6 +675,15 @@ const AUDIO = [
     ["ch", "Cinese"],
 ];
 
+// Playlist verificata il 15 novembre 2026 su play.saturncdn.net.
+// Risponde 200 se il Referer è https://play.saturncdn.net/ (anche con
+// Sec-Fetch-Site: cross-site) oppure se Sec-Fetch-Site è same-origin.
+// same-site, cross-site e none, senza quel Referer, rispondono 403
+// {"ok":false}. Un parametro ?referer= non basta. L'embed, /api/watch,
+// ?download=1 e gli altri percorsi /api non contengono l'mp4: downloadUrl
+// è null. Il file, una volta decodificato, è su un CDN e parte senza Referer.
+// Sulla TV fetch non può impostare Referer né Sec-Fetch-Site: servono le
+// API native descritte nella PR. Qui non si aggira quel controllo.
 const REFERER_MSG =
     "Il player di AnimeSaturn consegna il link del file solo se la richiesta porta il Referer di play.saturncdn.net. " +
     "Su telefono e computer l'estensione lo invia e poi il video parte. " +
