@@ -4,7 +4,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 
 🔞 Alcune sorgenti sono per soli maggiorenni.
 
-> 🇬🇧 **English** — Anime and video extensions for Mangayomi: an Italian anime source (AnimeWorld) and three 18+ video sources (HentaiWorld, HypnoTube, PMVHaven). Add this anime repository in Mangayomi (**Settings → Browse → anime repository**):
+> 🇬🇧 **English** — Anime and video extensions for Mangayomi: Italian anime sources (AnimeWorld, AnimeSaturn) and 18+ video sources (HentaiWorld, HypnoTube, PMVHaven and others). Add this anime repository in Mangayomi (**Settings → Browse → anime repository**):
 >
 > `https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/anime_index.json`
 >
@@ -14,6 +14,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | Source | Site | Language | Highlights |
 > |---|---|---|---|
 > | AnimeWorld | animeworld.ac | IT (sub/dub) | sort, status, dub filter, 45 genres, episode air dates and thumbnails (AniList) |
+> | AnimeSaturn | animesaturn.net | IT (sub/dub) | popular, latest, search, genres, year, status, type, season, audio, studio, full plot; mp4 without Referer once the link is known |
 > | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
@@ -57,6 +58,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **AnimeSaturn 1.0.0** — nuova estensione per animesaturn.net (non 18+). Popolari sono gli anime in corso, Recenti le ultime uscite, con le pagine dopo. Ricerca e filtri del sito: generi, anno, stato, tipo, stagione, audio, Doppiato ITA / Sub ITA, ordinamento e studio. Scheda con trama intera, generi, stato e studio. Il file è un mp4 che parte senza Referer. Non c'è un altro indirizzo del sito che lo dia senza il Referer di play.saturncdn.net: su telefono e computer l'estensione lo invia; sulla TV Tizen fetch non può impostarlo e l'episodio non si apre. AnimeSaturn resta anche in Link universale.
 - **JAV Guru 1.0.0** — nuova estensione per jav.guru: Popolari, Recenti, ricerca, categorie e classifica. Scheda con titolo, copertina, descrizione e tag. Il video parte nell'app, fino a 1080p. JAV Guru resta anche in Link universale. Le categorie di minori e quelle non consensuali non ci sono.
 - **Stripchat 1.1.0 / Chaturbate 1.2.0** — filtro Paese (Italiane…), solo dirette che si aprono, preferite di Stripchat con l'account.
 - **Stripchat 1.0.0** — nuova estensione per le dirette: più viste, nuove, genere, categorie, ricerca per nome, più qualità.
@@ -104,6 +106,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | Sorgente | Versione | Sito | Lingua | Contenuto |
 |---|---|---|---|---|
 | **AnimeWorld** | 1.5.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
+| **AnimeSaturn** | 1.0.0 | animesaturn.net | IT | Anime sub/dub ITA: generi, anno, stato, tipo, stagione, audio, studio, trama intera |
 | **HentaiWorld** | 2.8.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
 | **PMVHaven** | 1.6.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
