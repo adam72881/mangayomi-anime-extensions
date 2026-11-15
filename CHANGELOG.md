@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.4
+
+- **Preferiti dalla scheda del video:** se sei collegato, sotto «Episodio 1» c'è «☆ Aggiungi ai preferiti PMVHaven» (o «★ Togli dai preferiti PMVHaven» se il video c'è già). Toccalo: l'estensione aggiorna i preferiti sul sito e mostra un messaggio con l'esito. Funziona da Mangayomi 0.9.96, che manda davvero le richieste PUT (correzione della segnalazione #1130). Da ospite il pulsante non compare.
+
 ## PMVHaven 1.6.3 / HypnoTube 1.4.5
 
 - **Login sulla TV Samsung (app Mangayomi per Tizen):** lì il cookie della risposta di login non si può leggere. Ora, se il sito ha accettato il login ma il cookie non si vede, l'estensione chiede al sito se sei collegato: PMVHaven con la sessione, HypnoTube cercando il link «logout» nella home. Su telefono non cambia niente.
