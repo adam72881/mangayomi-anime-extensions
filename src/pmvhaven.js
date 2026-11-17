@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.4",
+        "version": "1.6.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -25,6 +25,9 @@ const PREF_QUALITY = "pmvhaven_quality";
 const PREF_EMAIL = "pmvhaven_email";
 const PREF_PASS = "pmvhaven_password";
 const PREF_SESSION = "pmvhaven_session";
+const PREF_RELATED = "pmvhaven_related";
+const PREF_FAV_TAGS = "pmvhaven_fav_tags";
+const FAV_TAG = /^[☆★] (?:Aggiungi ai|Togli dai) preferiti: (.+)$/;
 const UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -791,6 +794,8 @@ class DefaultExtension extends MProvider {
         var tipo = this.filterValue(filters, "Tipo") || "video";
         if (tipo === "profile") return this.myProfile(page);
         var text = query && String(query).trim() ? String(query).trim() : "";
+        var favMatch = FAV_TAG.exec(text);
+        if (favMatch) return page > 1 ? { list: [], hasNextPage: false } : this.favoriteFromTag(favMatch[1]);
         var profile = this.filterValue(filters, "Profili");
         var who = text.charAt(0) === "@" ? text.slice(1).trim() : (profile ? String(profile).trim() : "");
         if (who) {
@@ -991,6 +996,46 @@ class DefaultExtension extends MProvider {
         return this.chapterExtras({ name: "Episodio 1", url: url }, dateValue, thumb);
     }
 
+    // Video con gli stessi tag messi dopo «Episodio 1», così a fine video il player
+    // passa al successivo. Prima i due tag principali insieme, poi solo il primo.
+    async relatedVideos(v, id) {
+        var mode = this.getPreference(PREF_RELATED) || "mix";
+        if (mode === "off") return [];
+        var tags = (Array.isArray(v.top5Tags) && v.top5Tags.length ? v.top5Tags : (v.tags || []))
+            .map(function (t) { return this.cleanLine(t); }.bind(this))
+            .filter(function (t) { return t; });
+        if (!tags.length) return [];
+        var self = this;
+        var want = 10;
+        var fetchSort = async function (sort) {
+            var out = [];
+            var groups = tags.length > 1 ? [tags.slice(0, 2), tags.slice(0, 1)] : [tags.slice(0, 1)];
+            for (var g = 0; g < groups.length && out.length < want; g++) {
+                try {
+                    var json = await self.api("/api/videos?tags=" + encodeURIComponent(groups[g].join(",")) +
+                        "&tagMode=AND&expandTags=false&sort=" + sort + "&limit=20&page=1");
+                    out = out.concat(json.data || json.videos || []);
+                } catch (e) {}
+            }
+            return out;
+        };
+        var lists = await Promise.all([
+            mode === "recent" ? [] : fetchSort("-views"),
+            mode === "popular" ? [] : fetchSort("-uploadDate"),
+        ]);
+        var seen = {};
+        seen[id] = 1;
+        var picked = [];
+        for (var i = 0; picked.length < want && (i < lists[0].length || i < lists[1].length); i++) {
+            [lists[0][i], lists[1][i]].forEach(function (x) {
+                if (!x || !x._id || seen[x._id] || picked.length >= want) return;
+                seen[x._id] = 1;
+                picked.push(x);
+            });
+        }
+        return picked;
+    }
+
     async getDetail(url) {
         var raw = String(url);
         if (raw.indexOf("pmv:login") !== -1) {
@@ -1090,12 +1135,18 @@ class DefaultExtension extends MProvider {
             status: 1,
             chapters: [this.videoChapter(play, v.uploadDate, v.thumbnailUrl || v.thumbnail)],
         };
-        if (logged && id) {
-            detail.chapters.push({
-                name: v.isFavorited ? "★ Togli dai preferiti PMVHaven" : "☆ Aggiungi ai preferiti PMVHaven",
-                url: "pmv:fav:" + id,
-            });
+        var related = [];
+        try { related = await this.relatedVideos(v, String(id || "")); } catch (e) {}
+        for (var k = 0; k < related.length; k++) {
+            var rv = related[k];
+            detail.chapters.push(this.chapterExtras({
+                name: "Episodio " + (k + 2) + " - " + (this.cleanLine(rv.title) || "Video"),
+                url: rv._id,
+            }, rv.uploadDate, rv.thumbnailUrl || rv.thumbnail));
         }
+        // Preferiti come tag, non come episodio: un episodio senza numero finirebbe in
+        // testa e «Inizia» lo aprirebbe al posto del video.
+        if (logged && id) genre.unshift(this.favTag(v.isFavorited, this.cleanLine(v.title) || "video", String(id)));
         if (uploader) {
             detail.author = uploader;
             this.rememberProfile(uploader);
@@ -1104,8 +1155,34 @@ class DefaultExtension extends MProvider {
         return detail;
     }
 
-    // Lo stato si rilegge al momento: il nome del capitolo resta quello di quando
-    // la scheda è stata aperta e può non essere più vero.
+    // Il tag porta solo il titolo: l'id si ritrova qui quando l'app lo cerca.
+    favTag(isFav, title, id) {
+        var tag = (isFav ? "★ Togli dai" : "☆ Aggiungi ai") + " preferiti: " + title;
+        try {
+            var map = JSON.parse(this.readPref(PREF_FAV_TAGS) || "{}");
+            delete map[title];
+            map[title] = id;
+            var keys = Object.keys(map);
+            for (var i = 0; i < keys.length - 100; i++) delete map[keys[i]];
+            new SharedPreferences().setString(PREF_FAV_TAGS, JSON.stringify(map));
+        } catch (e) {}
+        return tag;
+    }
+
+    async favoriteFromTag(title) {
+        var map = {};
+        try { map = JSON.parse(this.readPref(PREF_FAV_TAGS) || "{}"); } catch (e) {}
+        var id = map[title];
+        if (!id) throw new Error("PMVHaven: riapri la scheda del video e tocca di nuovo il tag dei preferiti.");
+        var r = await this.toggleFavorite(id);
+        return {
+            list: [{ name: r.message, imageUrl: this.httpUrl(r.video.thumbnailUrl || r.video.thumbnail), link: id }],
+            hasNextPage: false,
+        };
+    }
+
+    // Lo stato si rilegge al momento: il tag resta quello di quando la scheda è
+    // stata aperta e può non essere più vero.
     async toggleFavorite(id) {
         var json = await this.api("/api/videos/" + id);
         var v = json.data || json.video || json;
@@ -1127,14 +1204,15 @@ class DefaultExtension extends MProvider {
             throw new Error("PMVHaven: accedi (email e password nelle impostazioni, o dalla WebView) per usare i preferiti.");
         }
         if (code < 200 || code >= 300) throw new Error("PMVHaven: preferiti non aggiornati (HTTP " + code + ").");
-        throw new Error(action === "favorite"
-            ? "★ Aggiunto ai preferiti di PMVHaven. Aggiorna la scheda per vedere il pulsante cambiato."
-            : "☆ Tolto dai preferiti di PMVHaven. Aggiorna la scheda per vedere il pulsante cambiato.");
+        var title = this.cleanLine(v.title) || "video";
+        return {
+            video: v,
+            message: action === "favorite" ? "★ Aggiunto ai preferiti: " + title : "☆ Tolto dai preferiti: " + title,
+        };
     }
 
     async getVideoList(url) {
         var raw = String(url);
-        if (raw.indexOf("pmv:fav:") === 0) return await this.toggleFavorite(raw.slice(8));
         try { raw = decodeURIComponent(raw); } catch (e) {}
         var lastHttp = raw.lastIndexOf("http");
         if (lastHttp > 0) raw = raw.slice(lastHttp);
@@ -1264,6 +1342,16 @@ class DefaultExtension extends MProvider {
                     valueIndex: 1,
                     entries: ["1080p", "720p", "480p", "360p", "Auto (adattiva)", "Originale (mp4, pesante)", "Massima disponibile (fino a 4K)", "2160p (4K)", "1440p (2K)"],
                     entryValues: ["1080", "720", "480", "360", "auto", "mp4", "max", "2160", "1440"],
+                },
+            },
+            {
+                key: PREF_RELATED,
+                listPreference: {
+                    title: "Video simili dopo il video",
+                    summary: "Sotto «Episodio 1» mette 10 video con gli stessi tag, così a fine video parte il successivo. Recenti cambia spesso: se tieni i video in libreria, Popolari dà meno aggiornamenti.",
+                    valueIndex: 0,
+                    entries: ["Popolari e recenti", "Solo popolari", "Solo recenti", "Spento"],
+                    entryValues: ["mix", "popular", "recent", "off"],
                 },
             },
             {
