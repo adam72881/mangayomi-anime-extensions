@@ -1,5 +1,9 @@
 # Novità
 
+## PMVHaven 1.6.6
+
+- **Video simili e playlist: ora a fine video si passa al successivo.** Gli episodi arrivano a Mangayomi dall'ultimo al primo, come in AnimeWorld. Con l'ordine opposto, «Episodio 1» veniva preso per l'ultimo: il pulsante ⏭ restava spento e non partiva il successivo. Sulle schede già aperte, trascina in basso per aggiornarle.
+
 ## PMVHaven 1.6.5
 
 - **Video simili dopo il video:** sotto «Episodio 1» ci sono altri 10 video con gli stessi tag (Episodio 2–11): prima i due tag principali insieme, poi solo il primo. Così, quando il video finisce, il player passa da solo al successivo, sul telefono con «Riproduci automaticamente il prossimo episodio» e sulla TV con il conto alla rovescia. Nelle impostazioni c'è **«Video simili dopo il video»**: Popolari e recenti (predefinito), Solo popolari, Solo recenti, Spento. I recenti cambiano spesso: se tieni dei video in libreria, con «Solo popolari» arrivano meno aggiornamenti. Le playlist non cambiano: hanno già i loro episodi.
