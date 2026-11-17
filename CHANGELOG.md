@@ -1,8 +1,13 @@
 # Novità
 
+## PMVHaven 1.6.5
+
+- **Video simili dopo il video:** sotto «Episodio 1» ci sono altri 10 video con gli stessi tag (Episodio 2–11): prima i due tag principali insieme, poi solo il primo. Così, quando il video finisce, il player passa da solo al successivo, sul telefono con «Riproduci automaticamente il prossimo episodio» e sulla TV con il conto alla rovescia. Nelle impostazioni c'è **«Video simili dopo il video»**: Popolari e recenti (predefinito), Solo popolari, Solo recenti, Spento. I recenti cambiano spesso: se tieni dei video in libreria, con «Solo popolari» arrivano meno aggiornamenti. Le playlist non cambiano: hanno già i loro episodi.
+- **Preferiti spostati tra i tag:** il pulsante della 1.6.4 era un «episodio» senza numero, e Mangayomi lo metteva in testa all'elenco: «Inizia» avrebbe aggiornato i preferiti invece di aprire il video. Ora è il primo tag della scheda, «☆ Aggiungi ai preferiti: <titolo>» (o «★ Togli dai preferiti: <titolo>»). Toccalo e scegli di cercare nella sorgente: l'estensione aggiorna i preferiti e mostra il risultato. Serve Mangayomi 0.9.96. Da ospite il tag non c'è.
+
 ## PMVHaven 1.6.4
 
-- **Preferiti dalla scheda del video:** se sei collegato, sotto «Episodio 1» c'è «☆ Aggiungi ai preferiti PMVHaven» (o «★ Togli dai preferiti PMVHaven» se il video c'è già). Toccalo: l'estensione aggiorna i preferiti sul sito e mostra un messaggio con l'esito. Funziona da Mangayomi 0.9.96, che manda davvero le richieste PUT (correzione della segnalazione #1130). Da ospite il pulsante non compare.
+- Preferiti dalla scheda del video, come «episodio» (sostituito nella 1.6.5).
 
 ## PMVHaven 1.6.3 / HypnoTube 1.4.5
 
