@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.5",
+        "version": "1.6.6",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -1079,7 +1079,9 @@ class DefaultExtension extends MProvider {
                 description: about.join("\n\n") || this.cleanLine(d.name) || "Playlist",
                 genre: [],
                 status: 0, // in corso: le playlist crescono, l'aggiornamento della libreria le controlla
-                chapters: chapters,
+                // Dall'ultimo al primo, come le altre sorgenti: con l'ordine opposto
+                // Mangayomi non trovava l'episodio successivo (⏭ spento).
+                chapters: chapters.reverse(),
             };
             if (who) {
                 detail.author = who;
@@ -1144,6 +1146,7 @@ class DefaultExtension extends MProvider {
                 url: rv._id,
             }, rv.uploadDate, rv.thumbnailUrl || rv.thumbnail));
         }
+        detail.chapters.reverse();
         // Preferiti come tag, non come episodio: un episodio senza numero finirebbe in
         // testa e «Inizia» lo aprirebbe al posto del video.
         if (logged && id) genre.unshift(this.favTag(v.isFavorited, this.cleanLine(v.title) || "video", String(id)));
