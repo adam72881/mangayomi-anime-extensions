@@ -1,5 +1,14 @@
 # Novità
 
+## HentaiWorld 2.9.0
+
+- **Il sito è stato rifatto (novembre 2026) e l'estensione diceva «Nessun risultato».** Aggiornata alle nuove pagine:
+  - Popolari, Ricerca e filtri leggono le nuove schede dell'archivio (`a.ar`, `.ar-title`). La pagina successiva si riconosce da `rel="next"`;
+  - Recenti: `/api/episodes` ora manda l'HTML delle schede invece dell'elenco JSON. Si leggono le schede degli episodi e si apre la serie;
+  - scheda della serie: trama (`.dt-plot`), generi (`a.dt-genre`), stato (`.dt-tag`), episodi (`.ep-item[data-ep]`). La data di ogni episodio ora è nella scheda stessa, quindi non serve più aprire tutte le pagine degli episodi e la scheda si apre più in fretta;
+  - filtro Stato: il sito ora vuole `status[]`.
+- La riproduzione non cambia: la pagina dell'episodio ha ancora il link mp4.
+
 ## PMVHaven 1.6.6
 
 - **Video simili e playlist: ora a fine video si passa al successivo.** Gli episodi arrivano a Mangayomi dall'ultimo al primo, come in AnimeWorld. Con l'ordine opposto, «Episodio 1» veniva preso per l'ultimo: il pulsante ⏭ restava spento e non partiva il successivo. Sulle schede già aperte, trascina in basso per aggiornarle.

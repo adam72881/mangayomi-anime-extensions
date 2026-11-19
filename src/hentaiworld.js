@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "2.8.0",
+        "version": "2.9.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaiworld.js",
@@ -143,25 +143,23 @@ class DefaultExtension extends MProvider {
         return parts.length ? parts[parts.length - 1] : "";
     }
 
-    // Schede archivio: <h3 class="line-clamp-2"> + <a href="/hentai/<slug>">
+    // Schede archivio (sito rifatto a novembre 2026): div.ar-item > a.ar[href="/hentai/<slug>"],
+    // titolo in b.ar-title. La pagina successiva c'è se esiste a[rel=next].
     parseArchive(doc) {
         var list = [];
         var seen = {};
-        for (var article of doc.select("article")) {
-            var h3 = article.selectFirst("h3.line-clamp-2");
-            var a = article.selectFirst('a[href*="/hentai/"]');
-            if (!h3 || !a) continue;
-            var href = a.getHref || a.attr("href") || "";
-            var slug = this.slugOf(href);
+        for (var a of doc.select("a.ar")) {
+            var slug = this.slugOf(a.attr("href") || "");
             if (!slug || seen[slug]) continue;
-            var name = h3.text.trim();
+            var t = a.selectFirst(".ar-title");
+            var name = t ? t.text.trim() : "";
             if (!name) continue;
             seen[slug] = true;
-            var img = article.selectFirst("img");
+            var img = a.selectFirst("img");
             var imageUrl = img ? img.attr("src") || img.attr("data-src") || "" : "";
             list.push({ name: name, imageUrl: imageUrl, link: "/hentai/" + slug });
         }
-        return { list: list, hasNextPage: list.length >= PER_PAGE };
+        return { list: list, hasNextPage: !!doc.selectFirst('a[rel="next"]') };
     }
 
     genreFor(text) {
@@ -250,25 +248,29 @@ class DefaultExtension extends MProvider {
             this.getBaseUrl() + "/api/episodes?page=" + page + "&per_page=" + per,
             this.headers(this.getBaseUrl() + "/"),
         );
-        var eps = (JSON.parse(res.body) || {}).episodes || [];
+        // Ora /api/episodes risponde con l'HTML delle schede: a.card-ep[href="/watch/<serie>-episode-N"].
+        var data = JSON.parse(res.body) || {};
+        var cards = new Document("<div>" + (data.html || "") + "</div>").select("a.card-ep");
         var shown = page > 1 ? this.readStore(LATEST_SEEN).split(" ") : [];
         var seen = {};
         for (var k = 0; k < shown.length; k++) if (shown[k]) seen[shown[k]] = true;
         var list = [];
-        for (var i = 0; i < eps.length; i++) {
-            var ep = eps[i] || {};
-            var slug = String(ep.media_slug || "");
+        for (var i = 0; i < cards.length; i++) {
+            var slug = this.slugOf(cards[i].attr("href") || "").replace(/-episode-[0-9.]+$/, "");
             if (!slug || seen[slug]) continue;
             seen[slug] = true;
             shown.push(slug);
+            var t = cards[i].selectFirst(".card-title");
+            var img = cards[i].selectFirst("img");
+            var thumb = img ? img.attr("src") || "" : "";
             list.push({
-                name: this.decodeHtml(ep.media_title || slug),
-                imageUrl: /^https?:\/\//.test(ep.thumbnail || "") ? ep.thumbnail : "",
+                name: (t && t.text.trim()) || slug,
+                imageUrl: /^https?:\/\//.test(thumb) ? thumb : "",
                 link: "/hentai/" + slug,
             });
         }
         this.writeStore(LATEST_SEEN, shown.slice(-400).join(" "));
-        return { list: list, hasNextPage: eps.length >= per };
+        return { list: list, hasNextPage: !!data.has_more };
     }
 
     readStore(key) {
@@ -292,7 +294,7 @@ class DefaultExtension extends MProvider {
         var langs = this.checkedValues(filters, "Lingua");
         if (this.filterValue(filters, "Raccolta") === "extreme") {
             var extra = [];
-            if (status) extra.push("status=" + encodeURIComponent(status));
+            if (status) extra.push("status%5B%5D=" + encodeURIComponent(status));
             for (var x = 0; x < langs.length; x++) extra.push("language%5B%5D=" + encodeURIComponent(langs[x]));
             return this.extremeListing(page, extra.join("&"));
         }
@@ -313,7 +315,7 @@ class DefaultExtension extends MProvider {
         if (query && query.length) parts.push("search=" + encodeURIComponent(query));
         for (var g = 0; g < genres.length; g++) parts.push("genre%5B%5D=" + encodeURIComponent(genres[g]));
         if (sort) parts.push("sort=" + encodeURIComponent(sort));
-        if (status) parts.push("status=" + encodeURIComponent(status));
+        if (status) parts.push("status%5B%5D=" + encodeURIComponent(status));
         for (var l = 0; l < langs.length; l++) parts.push("language%5B%5D=" + encodeURIComponent(langs[l]));
         return this.archive(parts.join("&"), page);
     }
@@ -321,53 +323,46 @@ class DefaultExtension extends MProvider {
     async getDetail(url) {
         var slug = this.slugOf(url);
         var doc = await this.doc("/hentai/" + slug);
-        var article = doc.selectFirst("article");
-        var header = article ? article.selectFirst("header") : null;
 
-        // Trama della serie: div.entry > p. I p.line-clamp-6 della pagina
-        // sono le schede «serie simili», non la sinossi.
-        var description = "";
-        var entry = article ? article.selectFirst("div.entry") : doc.selectFirst("div.entry");
-        var plot = entry ? entry.selectFirst("p") : null;
-        if (plot) description = plot.text.trim();
-        else if (entry) description = entry.text.trim();
+        var plot = doc.selectFirst(".dt-plot .more-text") || doc.selectFirst(".dt-plot p");
+        var description = plot ? plot.text.trim() : "";
 
         var genre = [];
-        var genreRoot = header || article || doc;
-        for (var g of genreRoot.select('a[href*="genre="]')) {
+        for (var g of doc.select("a.dt-genre")) {
             var t = g.text.trim();
             if (t && genre.indexOf(t) === -1) genre.push(t);
         }
 
         var status = 5;
-        var spans = header ? header.select("span") : [];
-        for (var i = 0; i < spans.length; i++) {
-            var label = spans[i].text.trim();
+        for (var tag of doc.select(".dt-tag")) {
+            var label = tag.text.trim();
             if (label === "In corso") status = 0;
             else if (label === "Finito" || label === "Terminato") status = 1;
             else if (label === "Droppato") status = 3;
         }
 
+        // Episodi: div.ep-item[data-ep] > a[href="/watch/..."]; la data è nel <time datetime>.
         var chapters = [];
         var seen = {};
-        var eps = doc.select("#episodes-grid article.episode-item");
-        if (!eps.length) eps = doc.select("article.episode-item");
-        for (var k = 0; k < eps.length; k++) {
-            var card = eps[k];
+        var items = doc.select(".ep-item");
+        for (var k = 0; k < items.length; k++) {
+            var card = items[k];
             var a = card.selectFirst('a[href*="/watch/"]');
             if (!a) continue;
-            var href = a.getHref || a.attr("href") || "";
+            var href = a.attr("href") || "";
             if (!href || seen[href]) continue;
             seen[href] = true;
-            var num = card.attr("data-episode") || String(chapters.length + 1);
-            var ep = { name: "Episodio " + num, url: href, _n: parseInt(num, 10) || 0 };
+            var num = card.attr("data-ep") || String(chapters.length + 1);
+            var ep = { name: "Episodio " + num, url: href, _n: parseFloat(num) || 0 };
             var img = card.selectFirst("img");
             var thumb = img ? (img.attr("src") || img.attr("data-src") || "") : "";
             if (/^https?:\/\//.test(thumb)) ep.thumbnailUrl = thumb;
+            var time = card.selectFirst("time");
+            var ms = time ? Date.parse(time.attr("datetime") || "") : NaN;
+            if (isFinite(ms)) ep.dateUpload = String(ms);
             chapters.push(ep);
         }
         chapters.sort(function (a, b) { return b._n - a._n; });
-        await this.addEpisodeDates(chapters);
         for (var c = 0; c < chapters.length; c++) delete chapters[c]._n;
 
         var langName = { eng: "SUB ENG", dubita: "DUB ITA", ita: "SUB ITA" }[langOf(slug)] || "";
@@ -389,24 +384,6 @@ class DefaultExtension extends MProvider {
             status: status,
             chapters: chapters,
         };
-    }
-
-    // La data di uscita sta solo nella pagina di ogni episodio ("uploadDate" nel
-    // JSON-LD). Le serie sono corte: si leggono in parallelo, al massimo 24.
-    async addEpisodeDates(chapters) {
-        var self = this;
-        var jobs = chapters.slice(0, 24).map(function (ch) {
-            var slug = String(ch.url).split("?")[0].replace(/\/+$/, "").split("/").pop();
-            return self.client.get(self.getBaseUrl() + "/watch/" + slug, self.headers(self.getBaseUrl() + "/"))
-                .then(function (res) {
-                    var m = String((res && res.body) || "").match(/"uploadDate"\s*:\s*"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
-                    if (!m) return;
-                    var ms = Date.parse(m[1] + "T" + m[2] + "Z");
-                    if (isFinite(ms)) ch.dateUpload = String(ms);
-                })
-                .catch(function () {});
-        });
-        await Promise.all(jobs);
     }
 
     async getVideoList(url) {
