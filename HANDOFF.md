@@ -26,7 +26,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.3.8 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.22 |
-| `src/javguru.js` | JAV Guru (jav.guru) | 1.0.0 |
+| `src/javguru.js` | JAV Guru (jav.guru) | 1.1.0 |
 
 ## Limiti di Mangayomi v0.9.95
 
@@ -304,6 +304,13 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Chaturbate 1.3.2 — it.chaturbate.com:** dopo verifica e login la Webview resta su it.chaturbate.com. Mangayomi (`MClient.setCookie` a ogni navigazione) salva i cookie dell'URL visitato e cancella quelli degli host collegati (`removeCookiesForHost` con `_hostsMatch` largo), quindi i cookie solo-host di chaturbate.com si perdono. `json(path, check)` prova `this._host` (default chaturbate.com) e poi l'altro; per le seguite `check` = almeno una stanza con `is_following`. Le API rispondono su entrambi gli host (provato). Utente: login come gloriasissypopa, sito mostrava Following (1/10), estensione dava ancora «verifica dell'età».
 
 - **Stripchat 1.3.0:** `CATEGORIES` estese; provate con `tag=girls/<x>` confrontando con `tag=girls` (diverso = funziona). Ignorati: featured, recommended, hd, stockings.
+
+## JAV Guru — 1.1.0
+
+- **Popolari:** `/?orderby=views&order=DESC` e `/page/N/?orderby=views&order=DESC`. L'app legge due pagine del sito per volta (il 19 novembre 2026: 40 e 36 schede dopo il filtro, `hasNextPage` vero, zero schede in comune). Il sito arriva a pagina 5785. Prima era solo `content-today` di `/most-watched-rank/` (30 schede nel pannello, 29 dopo il filtro, pagina 2 vuota). `orderby=likes-today|week|month` sulla home non cambia l'ordine: è uguale ai recenti. I pannelli today/week/month/alltime restano nel filtro Classifica e non hanno pagina 2. Più piaciuti = `orderby=likes`, più commentati = `orderby=comment_count`, stessa doppia pagina.
+- **Categorie:** le 7 di `/category/` (english-subbed, jav, decensored, amateur, idol, 4k, FC2) e i 515 tag di `/jav-tags-list/` che non sono nella lista esclusa. Scelta una, `/category/<slug>/` o `/tag/<slug>/` con `/page/N/`. Classifica non si applica insieme a una categoria.
+- **Non nel filtro, e una scheda con quello slug non si apre:** girl (il sito la chiama Teen), girl+mini (Teen nel menu), young, schoolgirl(s), school-girls, school, school-uniform, school-swimsuit, school-themed, school-stuff, sailor-suit, bloomers, shotacon, c-student, other-students, girl-cosplay, rape, molester, confinement, drug, hypnosis, dead-drunk, time-stop, abuse, trture, toy-trture, clit-trture, vomit. Zoofilia: nessuno slug del sito. Attrici (circa 18.000), studi (circa 4.700) e maker (1.000) paginano, ma non stanno nel menu a tendina. La ricerca per nome resta. Senza mosaico è la categoria `decensored`; i tag uncensored, no-mosaic, digital-mosaic e censored ci sono.
+- **Video:** non toccato. Stesso player di Link universale, stesso scarto del clip Big Buck Bunny.
 
 ## JAV Guru — 1.0.0
 

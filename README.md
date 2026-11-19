@@ -22,7 +22,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | Chaturbate 🔞 | chaturbate.com | any | live cams: popular, new, search, gender and hashtag filters, followed rooms with your account |
 > | Stripchat 🔞 | stripchat.com | any | live cams: popular, new, gender and category filters, name search, quality picker |
 > | BongaCams 🔞 | bongacams.com | any | live cams: most viewers first, new, gender and language filters (Italian speakers…), name search, up to 1080p |
-> | JAV Guru 🔞 | jav.guru | EN | popular, latest, search, categories; detail with cover, description and tags; stream up to 1080p |
+> | JAV Guru 🔞 | jav.guru | EN | paginated most-viewed, latest, search, all site categories; detail with cover, description and tags; stream up to 1080p |
 > | Link universale 🔞 | any site | any | save any site in the settings: popular, latest and search adapt to it; or paste a video, series or site link |
 >
 > No Cloudflare/anti-bot bypass: logins only use your own account.
@@ -59,6 +59,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **JAV Guru 1.1.0** — Popolari è la classifica di tutti i più visti, con le pagine dopo (prima solo i 30 di oggi). Nel filtro ci sono tutte le categorie e i tag del sito: sceglierne una elenca i suoi video, pagina dopo pagina. Non ci sono minori, contenuti non consensuali, violenza, zoofilia e shock. Il video non cambia.
 - **AnimeSaturn 1.0.0** — nuova estensione per animesaturn.net (non 18+). Popolari sono gli anime in corso, Recenti le ultime uscite, con le pagine dopo. Ricerca e filtri del sito: generi, anno, stato, tipo, stagione, audio, Doppiato ITA / Sub ITA, ordinamento e studio. Scheda con trama intera, generi, stato e studio. Il file è un mp4 che parte senza Referer. Non c'è un altro indirizzo del sito che lo dia senza il Referer di play.saturncdn.net: su telefono e computer l'estensione lo invia; sulla TV Tizen fetch non può impostarlo e l'episodio non si apre. AnimeSaturn resta anche in Link universale.
 - **JAV Guru 1.0.0** — nuova estensione per jav.guru: Popolari, Recenti, ricerca, categorie e classifica. Scheda con titolo, copertina, descrizione e tag. Il video parte nell'app, fino a 1080p. JAV Guru resta anche in Link universale. Le categorie di minori e quelle non consensuali non ci sono.
 - **Stripchat 1.1.0 / Chaturbate 1.2.0** — filtro Paese (Italiane…), solo dirette che si aprono, preferite di Stripchat con l'account.
