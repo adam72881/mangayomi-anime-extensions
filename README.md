@@ -15,6 +15,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > |---|---|---|---|
 > | AnimeWorld | animeworld.ac | IT (sub/dub) | sort, status, dub filter, 45 genres, episode air dates and thumbnails (AniList) |
 > | AnimeSaturn | animesaturn.net | IT (sub/dub) | popular, latest, search, genres, year, status, type, season, audio, studio, full plot; mp4 without Referer once the link is known |
+> | HentaiSaturn (18+) | hentaisaturn.tv | IT (sub/dub) | most viewed, newest, search, genres, year, status, type, audio, studio, sort; HentaiSaturn server + Streamtape; series tagged Loli/Shota are blocked |
 > | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
 > | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
@@ -107,6 +108,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 |---|---|---|---|---|
 | **AnimeWorld** | 1.5.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
 | **AnimeSaturn** | 1.0.0 | animesaturn.net | IT | Anime sub/dub ITA: generi, anno, stato, tipo, stagione, audio, studio, trama intera |
+| **HentaiSaturn** (18+) | 1.0.0 | hentaisaturn.tv | IT | Hentai sub/dub ITA: generi, anno, stato, tipo, audio, studio, ordine; serie Loli/Shota bloccate |
 | **HentaiWorld** | 2.8.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
 | **PMVHaven** | 1.6.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
