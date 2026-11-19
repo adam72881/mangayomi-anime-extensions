@@ -1,5 +1,12 @@
 # Novità
 
+## JAV Guru 1.1.0
+
+- **Popolari:** prima erano solo i 30 video di oggi, senza pagina 2. Ora è la classifica di tutti i più visti del sito. Ogni pagina ne legge due del sito (circa 40 video: quelle con un tag escluso non si mostrano) e si continua finché il sito ha pagine.
+- **Categorie:** nel filtro ci sono le 7 categorie del sito e tutti i tag della lista (515). Sceglierne una mostra i suoi video, con le pagine dopo.
+- **Classifica** (ricerca vuota, categoria su Tutte): più visti, più piaciuti e più commentati, con le pagine dopo. Oggi, settimana, mese e di sempre restano i 30 video del sito, senza un'altra pagina.
+- Non ci sono le categorie di minori, quelle non consensuali, la violenza, la zoofilia e lo shock. Recenti, ricerca, scheda e video non cambiano.
+
 ## HentaiSaturn 1.0.1
 
 - La trama ora è in cima alla descrizione, e tipo e lingua vanno in fondo. Prima Mangayomi mostrava solo «Tipo / Lingua» e la trama sembrava mancare finché non si espandeva il testo. Le serie Loli/Shota mostrano invece il messaggio del blocco.
