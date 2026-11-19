@@ -1,5 +1,9 @@
 # Novità
 
+## HentaiSaturn 1.0.1
+
+- La trama ora è in cima alla descrizione, e tipo e lingua vanno in fondo. Prima Mangayomi mostrava solo «Tipo / Lingua» e la trama sembrava mancare finché non si espandeva il testo. Le serie Loli/Shota mostrano invece il messaggio del blocco.
+
 ## HentaiSaturn 1.0.0 (nuova, 18+)
 
 - Estensione per **hentaisaturn.tv**, lo stesso motore di AnimeSaturn.

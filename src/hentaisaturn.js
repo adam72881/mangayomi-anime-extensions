@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/hentaisaturn.js",
@@ -594,8 +594,9 @@ class DefaultExtension extends MProvider {
         var lines = [];
         if (tipo) lines.push("Tipo: " + tipo);
         if (audio) lines.push("Lingua: " + audio);
-        var description = lines.join("\n");
-        if (story) description = description ? description + "\n\n" + story : story;
+        // Trama in cima: Mangayomi mostra solo le prime righe della descrizione.
+        var description = story;
+        if (lines.length) description = description ? description + "\n\n" + lines.join("\n") : lines.join("\n");
 
         var poster = doc.selectFirst(".hs-dposter img");
         var imageUrl = poster ? this.absUrl(poster.attr("src") || "") : "";
