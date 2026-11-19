@@ -1,5 +1,14 @@
 # Novità
 
+## HentaiSaturn 1.0.0 (nuova, 18+)
+
+- Estensione per **hentaisaturn.tv**, lo stesso motore di AnimeSaturn.
+- **Popolari:** i più visti. **Recenti:** le ultime serie aggiunte. Tutte e due hanno le pagine successive.
+- **Ricerca e filtri del sito:** testo, Ordine (Ultime aggiunte, A-Z, Z-A, anno, Più/Meno visti, Meglio/Peggio valutati), Lingua (Doppiato ITA / Sub ITA), Stato, Tipo (OVA, Special, ONA), Audio, Anno, Generi e Studio (si scrive il nome). Se scrivi il nome di un genere nella ricerca, cerca quel genere.
+- **Scheda:** trama, generi, stato, tipo, lingua, studio, copertina ed episodi dall'ultimo al primo.
+- **Video:** server HentaiSaturn (mp4, con il Referer del suo player come in AnimeSaturn) e Streamtape come riserva, tramite l'estrattore di Mangayomi. Sulla TV Tizen il server HentaiSaturn non si apre, perché lì il Referer viene tolto.
+- **Personaggi minorenni:** i generi Loli e Shota non sono nei filtri. Le serie che li hanno non mostrano episodi, e cercare quelle parole non dà risultati.
+
 ## HentaiWorld 2.9.0
 
 - **Il sito è stato rifatto (novembre 2026) e l'estensione diceva «Nessun risultato».** Aggiornata alle nuove pagine:
