@@ -18,7 +18,7 @@ Estensioni anime e video per l'app [Mangayomi](https://github.com/kodjodevf/mang
 > | HentaiSaturn (18+) | hentaisaturn.tv | IT (sub/dub) | most viewed, newest, search, genres, year, status, type, audio, studio, sort; HentaiSaturn server + Streamtape; series tagged Loli/Shota are blocked |
 > | HentaiWorld 🔞 | hentaiworld.me | IT/EN subs, IT dub | multi-select genres and languages, episode thumbnails and dates |
 > | HypnoTube 🔞 | hypnotube.com | EN | channels, sorts, search, playlists; 720p with a (free) account |
-> | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p) |
+> | PMVHaven 🔞 | pmvhaven.com | EN | tag filters with every sort, trending, playlists, HLS quality picker (360p–2160p), CJK-title filter |
 > | Chaturbate 🔞 | chaturbate.com | any | live cams: popular, new, search, gender and hashtag filters, followed rooms with your account |
 > | Stripchat 🔞 | stripchat.com | any | live cams: popular, new, gender and category filters, name search, quality picker |
 > | BongaCams 🔞 | bongacams.com | any | live cams: most viewers first, new, gender and language filters (Italian speakers…), name search, up to 1080p |
@@ -59,6 +59,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **PMVHaven 1.7.0** — filtro Asiatiche: solo titoli con scrittura cinese, coreana o giapponese (Tutte, Cinese, Coreano, Giapponese). Non è la ricerca «asian», che sul sito è in inglese.
 - **JAV Guru 1.1.0** — Popolari è la classifica di tutti i più visti, con le pagine dopo (prima solo i 30 di oggi). Nel filtro ci sono tutte le categorie e i tag del sito: sceglierne una elenca i suoi video, pagina dopo pagina. Non ci sono minori, contenuti non consensuali, violenza, zoofilia e shock. Il video non cambia.
 - **AnimeSaturn 1.0.0** — nuova estensione per animesaturn.net (non 18+). Popolari sono gli anime in corso, Recenti le ultime uscite, con le pagine dopo. Ricerca e filtri del sito: generi, anno, stato, tipo, stagione, audio, Doppiato ITA / Sub ITA, ordinamento e studio. Scheda con trama intera, generi, stato e studio. Il file è un mp4 che parte senza Referer. Non c'è un altro indirizzo del sito che lo dia senza il Referer di play.saturncdn.net: su telefono e computer l'estensione lo invia; sulla TV Tizen fetch non può impostarlo e l'episodio non si apre. AnimeSaturn resta anche in Link universale.
 - **JAV Guru 1.0.0** — nuova estensione per jav.guru: Popolari, Recenti, ricerca, categorie e classifica. Scheda con titolo, copertina, descrizione e tag. Il video parte nell'app, fino a 1080p. JAV Guru resta anche in Link universale. Le categorie di minori e quelle non consensuali non ci sono.
@@ -112,7 +113,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | **HentaiSaturn** (18+) | 1.0.0 | hentaisaturn.tv | IT | Hentai sub/dub ITA: generi, anno, stato, tipo, audio, studio, ordine; serie Loli/Shota bloccate |
 | **HentaiWorld** | 2.8.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
-| **PMVHaven** | 1.6.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, ricerca, playlist, profili, «Mai visti» |
+| **PMVHaven** | 1.7.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, Asiatiche (titoli CJK), ricerca, playlist, profili, «Mai visti» |
 
 Se un sito cambia dominio: apri le impostazioni della sorgente e aggiorna il campo **Dominio**.
 
