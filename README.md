@@ -59,6 +59,7 @@ Poi in **Browse → Anime Extensions** installa le sorgenti che vuoi. Per gli ag
 
 ## Ultime novità
 
+- **JAV Guru 1.1.1** — nel filtro ci sono i tag tra adulti che prima mancavano. Teen, schoolgirl, shotacon e loli restano fuori.
 - **PMVHaven 1.7.0** — filtro Asiatiche: solo titoli con scrittura cinese, coreana o giapponese (Tutte, Cinese, Coreano, Giapponese). Non è la ricerca «asian», che sul sito è in inglese.
 - **JAV Guru 1.1.0** — Popolari è la classifica di tutti i più visti, con le pagine dopo (prima solo i 30 di oggi). Nel filtro ci sono tutte le categorie e i tag del sito: sceglierne una elenca i suoi video, pagina dopo pagina. Non ci sono minori, contenuti non consensuali, violenza, zoofilia e shock. Il video non cambia.
 - **AnimeSaturn 1.0.0** — nuova estensione per animesaturn.net (non 18+). Popolari sono gli anime in corso, Recenti le ultime uscite, con le pagine dopo. Ricerca e filtri del sito: generi, anno, stato, tipo, stagione, audio, Doppiato ITA / Sub ITA, ordinamento e studio. Scheda con trama intera, generi, stato e studio. Il file è un mp4 che parte senza Referer. Non c'è un altro indirizzo del sito che lo dia senza il Referer di play.saturncdn.net: su telefono e computer l'estensione lo invia; sulla TV Tizen fetch non può impostarlo e l'episodio non si apre. AnimeSaturn resta anche in Link universale.

@@ -1,5 +1,10 @@
 # Novità
 
+## JAV Guru 1.1.1
+
+- Nel filtro ci sono anche i tag tra adulti che prima erano fuori (abuse, rape, hypnosis, vomit e gli altri dello stesso tipo). Sceglierli elenca i video, con le pagine dopo.
+- Restano fuori Teen, schoolgirl, le divise scolastiche, shotacon e loli. Una scheda con quei tag non si apre.
+
 ## PMVHaven 1.7.0
 
 - **Asiatiche:** nuovo filtro in ricerca. Tutte, Cinese, Coreano o Giapponese. Restano solo i video il cui titolo ha caratteri cinesi (han), coreani (hangul) o giapponesi (hiragana/katakana). Non usa la ricerca «asian» del sito, perché quella trova soprattutto titoli in inglese.

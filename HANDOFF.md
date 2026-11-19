@@ -26,7 +26,7 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.3.8 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.22 |
-| `src/javguru.js` | JAV Guru (jav.guru) | 1.1.0 |
+| `src/javguru.js` | JAV Guru (jav.guru) | 1.1.1 |
 
 ## PMVHaven 1.7.0 — Asiatiche
 
@@ -312,6 +312,11 @@ Attenzione (Mangayomi `MCookieManager`): se la richiesta ha già un header `Cook
 - **Chaturbate 1.3.2 — it.chaturbate.com:** dopo verifica e login la Webview resta su it.chaturbate.com. Mangayomi (`MClient.setCookie` a ogni navigazione) salva i cookie dell'URL visitato e cancella quelli degli host collegati (`removeCookiesForHost` con `_hostsMatch` largo), quindi i cookie solo-host di chaturbate.com si perdono. `json(path, check)` prova `this._host` (default chaturbate.com) e poi l'altro; per le seguite `check` = almeno una stanza con `is_following`. Le API rispondono su entrambi gli host (provato). Utente: login come gloriasissypopa, sito mostrava Following (1/10), estensione dava ancora «verifica dell'età».
 
 - **Stripchat 1.3.0:** `CATEGORIES` estese; provate con `tag=girls/<x>` confrontando con `tag=girls` (diverso = funziona). Ignorati: featured, recommended, hd, stockings.
+
+## JAV Guru — 1.1.1
+
+- Richiesta: togliere le esclusioni. Tornano nel filtro i tag tra adulti che c'erano sul sito e non c'entrano con i minori: abuse, clit-trture, confinement, dead-drunk, drug, hypnosis, molester, rape, time-stop, toy-trture, trture, vomit. Una scheda con solo quei tag si apre.
+- Restano bloccati, anche se la richiesta li voleva dentro: girl (il sito lo chiama Teen), girl+mini (Teen), schoolgirl(s), school-girls, school, school-uniform, school-swimsuit, school-themed, school-stuff, sailor-suit, bloomers, shotacon, shota, loli, young, c-student, other-students, girl-cosplay. Zoofilia resta bloccata. Il titolo con teen o schoolgirl non entra in lista.
 
 ## JAV Guru — 1.1.0
 

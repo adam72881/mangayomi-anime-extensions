@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.1.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/javguru.js",
@@ -52,8 +52,8 @@ const KNOWN_HOSTS = [
 ];
 
 // Categorie del menu e tutti i tag di /jav-tags-list/ (19 novembre 2026).
-// Fuori dal filtro: minori, non consensuale, violenza, zoofilia, shock.
-// «girl» sul sito si chiama Teen. beautiful-girl e young-wife restano.
+// Fuori dal filtro restano le categorie di minori: Teen (slug girl e girl+mini),
+// schoolgirl e divise scolastiche, shotacon, loli. beautiful-girl e young-wife restano.
 const CATEGORIES = [
     ["", "Tutte"],
     ["cat:english-subbed", "Sub inglese"],
@@ -71,6 +71,7 @@ const CATEGORIES = [
     ["tag:4hr", "4HR"],
     ["tag:4p", "4P"],
     ["tag:69", "69"],
+    ["tag:abuse", "abuse"],
     ["tag:action", "Action"],
     ["tag:adopted-daughter", "Adopted Daughter"],
     ["tag:adultery", "Adultery"],
@@ -163,6 +164,7 @@ const CATEGORIES = [
     ["tag:cheerleader", "Cheerleader"],
     ["tag:cheongsam", "Cheongsam"],
     ["tag:chubby", "Chubby"],
+    ["tag:clit-trture", "Clit t*rture"],
     ["tag:close-contact", "Close contact"],
     ["tag:close-up", "Close Up"],
     ["tag:clothed-sex", "Clothed Sex"],
@@ -171,6 +173,7 @@ const CATEGORIES = [
     ["tag:college-student", "College student"],
     ["tag:companion", "Companion"],
     ["tag:conceived", "Conceived"],
+    ["tag:confinement", "Confinement"],
     ["tag:cosplay", "Cosplay"],
     ["tag:couple", "Couple"],
     ["tag:cowgirl", "Cowgirl"],
@@ -192,6 +195,7 @@ const CATEGORIES = [
     ["tag:dark-system", "Dark System"],
     ["tag:date", "Date"],
     ["tag:daughter", "Daughter"],
+    ["tag:dead-drunk", "Dead Drunk"],
     ["tag:debut-production", "Debut Production"],
     ["tag:deep-throat", "Deep Throat"],
     ["tag:deepthroat", "Deepthroat"],
@@ -210,6 +214,7 @@ const CATEGORIES = [
     ["tag:double-penetration", "Double Penetration"],
     ["tag:drama", "Drama"],
     ["tag:drinking-party", "Drinking Party"],
+    ["tag:drug", "Drug"],
     ["tag:early-ejaculation", "Early ejaculation"],
     ["tag:eatpussy", "eatpussy"],
     ["tag:edgeplay", "Edgeplay"],
@@ -306,6 +311,7 @@ const CATEGORIES = [
     ["tag:huge-tits", "Huge Tits"],
     ["tag:humiliation", "Humiliation"],
     ["tag:hyper-girimoza", "Hyper-Girimoza"],
+    ["tag:hypnosis", "Hypnosis"],
     ["tag:idol-celebrity", "Idol & Celebrity"],
     ["tag:idol", "Idol (tag)"],
     ["tag:image-video", "Image video"],
@@ -372,6 +378,7 @@ const CATEGORIES = [
     ["tag:missionary-position", "missionary position"],
     ["tag:mistress", "Mistress"],
     ["tag:model", "Model"],
+    ["tag:molester", "Molester"],
     ["tag:mom-friends", "Mom Friends"],
     ["tag:mom-on-top", "Mom on top"],
     ["tag:mother", "Mother"],
@@ -459,6 +466,7 @@ const CATEGORIES = [
     ["tag:pure", "Pure"],
     ["tag:pussy", "Pussy"],
     ["tag:race-queen", "Race Queen"],
+    ["tag:rape", "Rape"],
     ["tag:rare", "Rare"],
     ["tag:raw", "Raw"],
     ["tag:raw-change-of-clothes", "Raw change of clothes"],
@@ -524,6 +532,7 @@ const CATEGORIES = [
     ["tag:sweat", "Sweat"],
     ["tag:swimsuit", "Swimsuit"],
     ["tag:swingers", "Swingers"],
+    ["tag:trture", "T*rture"],
     ["tag:taiwan", "Taiwan"],
     ["tag:taiwan-model", "Taiwan Model"],
     ["tag:tall", "Tall"],
@@ -534,10 +543,12 @@ const CATEGORIES = [
     ["tag:therapist", "Therapist"],
     ["tag:threesome-foursome", "Threesome / Foursome"],
     ["tag:tickling", "Tickling"],
+    ["tag:time-stop", "Time Stop"],
     ["tag:tit-fuck", "Tit fuck"],
     ["tag:titfuck-ejaculation", "Titfuck ejaculation"],
     ["tag:titty-fuck", "Titty fuck"],
     ["tag:toy", "Toy"],
+    ["tag:toy-trture", "Toy t*rture"],
     ["tag:toys", "Toys"],
     ["tag:training", "Training"],
     ["tag:transformed-heroine", "Transformed Heroine"],
@@ -562,6 +573,7 @@ const CATEGORIES = [
     ["tag:virgin-man", "virgin man"],
     ["tag:virginity", "Virginity"],
     ["tag:voluptuous", "Voluptuous"],
+    ["tag:vomit", "Vomit"],
     ["tag:voyeur", "Voyeur"],
     ["tag:voyeurism", "Voyeurism"],
     ["tag:vr", "VR"],
@@ -581,44 +593,25 @@ const CATEGORIES = [
 ];
 
 const BLOCKED_SLUGS = {
-    "abduction": 1,
-    "abuse": 1,
     "animal-sex": 1,
     "bestiality": 1,
     "bloomers": 1,
     "c-student": 1,
     "child": 1,
     "children": 1,
-    "clit-trture": 1,
-    "confinement": 1,
-    "dead-drunk": 1,
-    "drug": 1,
     "girl": 1,
     "girl+mini": 1,
     "girl-cosplay": 1,
-    "gore": 1,
-    "guro": 1,
-    "hypnosis": 1,
     "infant": 1,
     "jailbait": 1,
-    "kidnap": 1,
-    "kidnapping": 1,
     "loli": 1,
     "lolicon": 1,
     "lolita": 1,
     "minor": 1,
-    "molester": 1,
-    "necro": 1,
-    "necrophilia": 1,
-    "non-con": 1,
-    "noncon": 1,
     "other-students": 1,
     "pre-teen": 1,
     "preteen": 1,
-    "rape": 1,
-    "raped": 1,
     "sailor-suit": 1,
-    "scat": 1,
     "school": 1,
     "school-girl": 1,
     "school-girls": 1,
@@ -630,15 +623,9 @@ const BLOCKED_SLUGS = {
     "schoolgirls": 1,
     "shota": 1,
     "shotacon": 1,
-    "snuff": 1,
     "teen": 1,
     "teens": 1,
-    "time-stop": 1,
-    "torture": 1,
-    "toy-trture": 1,
-    "trture": 1,
     "underage": 1,
-    "vomit": 1,
     "young": 1,
     "zoophilia": 1,
 };
@@ -663,12 +650,11 @@ function blockedSlug(slug) {
 function blockedLabel(name) {
     var n = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
     if (n === "young wife" || n === "young lady" || n === "beautiful girl") return false;
-    if (/^(loli|lolitas?|shotacon|shota|schoolgirls?|teens?|underage|pre-?teens?|jailbait|raped?|non-?con|child|children|infant|minor|molester|vomit|abuse|hypnosis|confinement|dead drunk|time stop|young|c student|other students|school|school uniform|school swimsuit|school-themed|school stuff|bloomers|sailor suit|girl cosplay)$/i.test(n)) return true;
-    return /torture|t\*rture/.test(n);
+    return /^(loli|lolitas?|shotacon|shota|schoolgirls?|teens?|underage|pre-?teens?|jailbait|child|children|infant|minor|young|c student|other students|school|school uniform|school swimsuit|school-themed|school stuff|bloomers|sailor suit|girl cosplay)$/i.test(n);
 }
 
 function blockedTitle(title) {
-    return /\blolis?\b|\blolitas?\b|\bshotas?\b|\bshotacon\b|\bunderage\b|\bpre-?teens?\b|\bjailbait\b|\bschool\s*girls?\b|\byoung\s+teens?\b|\bteens?\b|\brapes?\b|\braped\b|\bnon-?consensual\b|\bchild\s*porn/i.test(String(title || ""));
+    return /\blolis?\b|\blolitas?\b|\bshotas?\b|\bshotacon\b|\bunderage\b|\bpre-?teens?\b|\bjailbait\b|\bschool\s*girls?\b|\byoung\s+teens?\b|\bteens?\b|\bchild\s*porn/i.test(String(title || ""));
 }
 
 function hostOf(url) {
@@ -1131,7 +1117,7 @@ class DefaultExtension extends MProvider {
         var slugs = tagSlugs(infoHtml);
         var labels = tagLabels(infoHtml);
         if (blockedTitle(title) || slugs.some(blockedSlug) || labels.some(blockedLabel)) {
-            throw new Error("Questo video è in una categoria esclusa (minori o contenuto non consensuale) e non viene aperto.");
+            throw new Error("Questo video è in una categoria di minori e non viene aperto.");
         }
         var shot = html.match(/class="large-screenshot"[\s\S]{0,1200}?<img\b[^>]*>/i);
         var image = coverUrl(shot ? cardImage(shot[0]) : "", abs);
@@ -1376,7 +1362,7 @@ class DefaultExtension extends MProvider {
         var h1 = detailHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
         var title = decodeEntities(h1 ? h1[1].replace(/<[^>]+>/g, " ") : "");
         if (blockedTitle(title) || tagSlugs(infoHtml).some(blockedSlug) || tagLabels(infoHtml).some(blockedLabel)) {
-            throw new Error("Questo video è in una categoria esclusa (minori o contenuto non consensuale) e non viene aperto.");
+            throw new Error("Questo video è in una categoria di minori e non viene aperto.");
         }
         var videos = await this.videosFromHtml(detailHtml, link, 0);
         videos.sort(function (a, b) { return (b._score || 0) - (a._score || 0); });
@@ -1410,7 +1396,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Popolari è la classifica di tutti i più visti, con le pagine dopo. In ricerca, con il testo vuoto: scegli una Categoria, oppure Classifica con Categoria su Tutte. Oggi, settimana, mese e di sempre sono i 30 video del sito e non hanno un'altra pagina. Non ci sono le categorie di minori, quelle non consensuali, la violenza, la zoofilia e lo shock.",
+                name: "Popolari è la classifica di tutti i più visti, con le pagine dopo. In ricerca, con il testo vuoto: scegli una Categoria, oppure Classifica con Categoria su Tutte. Oggi, settimana, mese e di sempre sono i 30 video del sito e non hanno un'altra pagina. Non ci sono Teen, schoolgirl, shotacon e loli.",
             },
             { type_name: "SelectFilter", name: "Categoria", state: 0, values: options(CATEGORIES) },
             { type_name: "SelectFilter", name: "Classifica", state: 0, values: options(PERIODS) },
