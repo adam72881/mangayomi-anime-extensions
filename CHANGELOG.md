@@ -1,5 +1,12 @@
 # Novità
 
+## PMVHaven 1.7.0
+
+- **Asiatiche:** nuovo filtro in ricerca. Tutte, Cinese, Coreano o Giapponese. Restano solo i video il cui titolo ha caratteri cinesi (han), coreani (hangul) o giapponesi (hiragana/katakana). Non usa la ricerca «asian» del sito, perché quella trova soprattutto titoli in inglese.
+- Cinese = han senza kana né hangul (un titolo giapponese scritto solo in kanji finisce qui). Giapponese = c'è hiragana o katakana. Coreano = c'è hangul.
+- Si può combinare con ordine, sezione, categoria, preset e durata. Le pagine si riempiono da più ricerche del sito e si fermano quando i titoli finiscono. Popolari, Ultimi, Cerca, Profili, Il mio profilo e la riproduzione restano come prima.
+- Non entrano titoli di minori, non consensuali, violenza, zoofilia o shock.
+
 ## JAV Guru 1.1.0
 
 - **Popolari:** prima erano solo i 30 video di oggi, senza pagina 2. Ora è la classifica di tutti i più visti del sito. Ogni pagina ne legge due del sito (circa 40 video: quelle con un tag escluso non si mostrano) e si continua finché il sito ha pagine.

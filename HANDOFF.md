@@ -22,11 +22,19 @@ User-Agent fisso di HypnoTube e PMVHaven: iPhone Safari 17.
 | `src/animeworld.js` | AnimeWorld (animeworld.ac) | 1.5.0 |
 | `src/hentaiworld.js` | HentaiWorld (hentaiworld.me) | 2.8.0 |
 | `src/hypnotube.js` | HypnoTube (hypnotube.com) | 1.4.1 |
-| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.6.0 |
+| `src/pmvhaven.js` | PMVHaven (pmvhaven.com) | 1.7.0 |
 | `src/chaturbate.js` | Chaturbate (dirette) | 1.3.3 |
 | `src/stripchat.js` | Stripchat (dirette) | 1.3.8 |
 | `src/linkuniversale.js` | Link universale (qualsiasi sito) | 1.4.22 |
 | `src/javguru.js` | JAV Guru (jav.guru) | 1.1.0 |
+
+## PMVHaven 1.7.0 — Asiatiche
+
+Filtro di ricerca «Asiatiche» (Nessuna / Tutte / Cinese / Coreano / Giapponese). Non usa `q=asian`: quella ricerca è quasi tutta in inglese (circa 6200 risultati, quasi nessun titolo CJK). Gli elenchi recenti e più visti, sulle prime pagine, non hanno titoli CJK.
+
+Metodo: `/api/videos/search?q=<carattere>&sort=-uploadDate&limit=100` per i caratteri in `CJK_QUERIES` (fino a 4 pagine, 6 in parallelo), unione per `_id`, poi regex sul titolo pulito. Han `\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF`, hangul, kana senza il solo `ー`/`・`. Cinese = han senza kana né hangul (i kanji da soli finiscono qui). Cache 10 minuti, 32 per pagina, `hasNextPage` se ne restano. Ordine, tag, preset, durata ed Estremi si applicano sull'elenco già raccolto. Profili, `@nome`, playlist e Il mio profilo non passano da qui. Il blocco minori / non consensuale / violenza / zoofilia / shock sta solo su questo elenco.
+
+Verifica sul sito (19 novembre 2026): 612 titoli (455 cinese, 139 giapponese, 22 coreano; 4 titoli hanno sia kana sia hangul e compaiono in entrambe). Pagina 1 e 2 di Tutte: 32 e 32, `hasNextPage` true (20 pagine in tutto). Cinese e Giapponese uguale, 32 e 32. Coreano sta tutto in una pagina (22, `hasNextPage` false). Il primo video della pagina 1 ha le varianti 720p, 1080p, 480p, 360p, Auto e Originale; la playlist è 200 e un segmento è 206 `video/mp2t`. Ultimi resta 32 titoli senza CJK; la ricerca «asian» resta in inglese (1 titolo CJK su 32).
 
 ## Limiti di Mangayomi v0.9.95
 

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.6.6",
+        "version": "1.7.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/pmvhaven.js",
@@ -205,6 +205,38 @@ function rememberTag(pair) {
 }
 for (var _i = 0; _i < TAGS.length; _i++) rememberTag(TAGS[_i]);
 for (var _j = 0; _j < FRONT_TAGS.length; _j++) rememberTag(FRONT_TAGS[_j]);
+
+// Asiatiche non usa la parola «asian»: sul sito quella ricerca è quasi tutta in inglese.
+// Si interrogano caratteri che l'indice del sito trova davvero (misurati: coprono la
+// quasi totalità dei titoli con han, hangul o kana) e poi si tiene solo il titolo
+// che contiene quella scrittura. Hiragana/katakana senza il solo trattino ー o il
+// punto ・, così un titolo inglese con un trattino non passa per giapponese.
+var CJK_HAN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+var CJK_HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]/;
+var CJK_KANA = /[\u3041-\u3096\u30A1-\u30FA\u31F0-\u31FF\uFF66-\uFF6F\uFF71-\uFF9D]/;
+var CJK_QUERIES = [
+    "的", "女", "小", "日", "丝", "美", "情", "み", "子", "な",
+    "り", "娘", "多", "の", "本", "乳", "一", "出", "し", "交",
+    "き", "不", "国", "射", "黑", "教", "수", "白", "和", "人",
+    "无", "る", "나", "口", "夜", "한", "이", "더", "快", "了",
+    "中", "服", "生", "겨울", "밤", "다", "한국",
+];
+// Stesse esclusioni del resto del repo: minori, non consensuale, violenza, zoofilia, shock.
+// Vale solo per Asiatiche. Popolari, Ultimi e la ricerca normale non cambiano.
+var CJK_BLOCK = new RegExp([
+    "\\blolis?\\b", "\\blolitas?\\b", "\\blolicon\\b", "\\bshotas?\\b", "\\bshotacon\\b",
+    "\\bunderage\\b", "\\bpre[-\\s]?teens?\\b", "\\bjailbait\\b", "\\bpedoph", "\\bpaedophil",
+    "\\bschoolgirls?\\b", "\\bchild(?:ren)?\\b", "\\binfant\\b", "\\btoddler\\b",
+    "\\brapes?\\b", "\\braping\\b", "\\braped\\b", "\\bnon[-\\s]?consens", "\\bchikan\\b", "\\bmolester",
+    "\\bsnuff\\b", "\\bgore\\b", "\\bguro\\b", "\\bbehead", "\\bnecro", "\\bscat\\b",
+    "\\bbestial", "\\bzoophil",
+    "獣姦", "獸姦", "兽交", "兽奸", "ロリ", "ロリータ", "ショタ", "幼女",
+    "小学生", "中学生", "女学生", "女子生徒", "女子校生", "女子高生", "高校生", "児童", "未成年",
+    "レイプ", "強姦", "强奸", "輪姦", "轮奸", "凌辱", "強制", "强制", "强迫", "強迫",
+    "痴汉", "痴漢", "チカン", "パパと娘", "父と娘", "父娘", "実娘",
+    "father\\s*-?\\s*daughter", "dad(?:dy)?\\s*-?\\s*daughter",
+    "(?:^|[^\\d])(?:1[0-7]|[1-9])\\s*(?:yo|y\\.o\\.?|years?\\s*old)\\b",
+].join("|"), "i");
 
 class DefaultExtension extends MProvider {
     constructor() {
@@ -790,6 +822,207 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: start + size < rows.length };
     }
 
+    cjkScriptOf(name) {
+        if (CJK_HANGUL.test(name)) return "ko";
+        if (CJK_KANA.test(name)) return "ja";
+        if (CJK_HAN.test(name)) return "zh";
+        return "";
+    }
+
+    cjkScriptOk(name, mode) {
+        var han = CJK_HAN.test(name);
+        var hangul = CJK_HANGUL.test(name);
+        var kana = CJK_KANA.test(name);
+        if (mode === "ko") return hangul;
+        if (mode === "ja") return kana;
+        if (mode === "zh") return han && !hangul && !kana;
+        return han || hangul || kana;
+    }
+
+    cjkBlocked(v, name) {
+        var parts = [name || ""];
+        parts.push(this.cleanBlock(v && v.description));
+        parts.push(this.cleanLine(v && (v.uploader || v.uploaderUsername)));
+        var tags = ((v && v.tags) || []).concat((v && v.top5Tags) || []);
+        for (var i = 0; i < tags.length; i++) parts.push(this.cleanLine(tags[i]));
+        return CJK_BLOCK.test(parts.join("\n"));
+    }
+
+    cjkHasTags(v, need) {
+        if (!need || !need.length) return true;
+        var have = {};
+        var tags = v.tags || [];
+        for (var i = 0; i < tags.length; i++) have[String(tags[i]).toLowerCase()] = 1;
+        for (var j = 0; j < need.length; j++) {
+            if (!have[String(need[j]).toLowerCase()]) return false;
+        }
+        return true;
+    }
+
+    cjkAnyGroup(v, groups) {
+        for (var g = 0; g < groups.length; g++) {
+            var parts = String(groups[g] || "").split(",");
+            var need = [];
+            for (var i = 0; i < parts.length; i++) if (parts[i]) need.push(parts[i]);
+            if (need.length && this.cjkHasTags(v, need)) return true;
+        }
+        return false;
+    }
+
+    cjkShuffle(rows) {
+        var arr = rows.slice();
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i];
+            arr[i] = arr[j];
+            arr[j] = t;
+        }
+        return arr;
+    }
+
+    sortCjk(rows, kind) {
+        var arr = rows.slice();
+        var date = function (v) { return Date.parse(v.releaseDate || "") || 0; };
+        var seconds = function (v) { return Number(v.durationSeconds) || 0; };
+        var key = {
+            recent: date,
+            old: function (v) { return -date(v); },
+            rated: function (v) { return Number(v.bayesianRating) || 0; },
+            views: function (v) { return Number(v.views) || 0; },
+            likes: function (v) { return Number(v.likes) || 0; },
+            long: seconds,
+            short: function (v) { return -seconds(v); },
+        }[kind || "recent"];
+        if (key) arr.sort(function (a, b) { return key(b) - key(a); });
+        return arr;
+    }
+
+    async mapPool(items, limit, fn) {
+        var out = new Array(items.length);
+        var next = 0;
+        var run = async function () {
+            while (next < items.length) {
+                var i = next++;
+                out[i] = await fn(items[i]);
+            }
+        };
+        var jobs = [];
+        var n = limit < items.length ? limit : items.length;
+        for (var w = 0; w < n; w++) jobs.push(run());
+        await Promise.all(jobs);
+        return out;
+    }
+
+    async fetchCjkQuery(q) {
+        var rows = [];
+        for (var p = 1; p <= 4; p++) {
+            var json;
+            try {
+                json = await this.api("/api/videos/search?q=" + encodeURIComponent(q) + "&sort=-uploadDate&limit=100&page=" + p);
+            } catch (e) {
+                break;
+            }
+            var part = (json && (json.data || json.videos)) || [];
+            for (var i = 0; i < part.length; i++) rows.push(part[i]);
+            var pag = json && json.pagination;
+            if (!part.length || !pag || !pag.hasNext) break;
+        }
+        return rows;
+    }
+
+    cjkSlim(v, name) {
+        var tags = [];
+        var seen = {};
+        var src = (v.tags || []).concat(v.top5Tags || []);
+        for (var i = 0; i < src.length; i++) {
+            var t = this.cleanLine(src[i]);
+            var key = t.toLowerCase();
+            if (!t || seen[key]) continue;
+            seen[key] = 1;
+            tags.push(t);
+        }
+        var up = this.cleanLine(v.uploader || v.uploaderUsername);
+        var desc = this.cleanBlock(v.description || "");
+        if (desc.length > 2000) desc = desc.slice(0, 2000);
+        return {
+            _id: v._id,
+            name: name,
+            imageUrl: v.thumbnailUrl || v.thumbnail || "",
+            tags: tags,
+            releaseDate: v.releaseDate || v.uploadDate || "",
+            views: Number(v.views) || 0,
+            likes: Number(v.likes) || 0,
+            bayesianRating: Number(v.bayesianRating) || 0,
+            durationSeconds: v.durationSeconds != null ? Number(v.durationSeconds) : null,
+            hasExtremeContent: !!v.hasExtremeContent,
+            text: (name + "\n" + up + "\n" + tags.join(" ") + "\n" + desc).toLowerCase(),
+        };
+    }
+
+    // Elenco unico, tenuto 10 minuti: le pagine dopo non rifanno le ricerche.
+    async cjkCorpus() {
+        var now = Date.now();
+        if (this._cjk && this._cjk.rows && this._cjk.rows.length && now - this._cjk.at < 600000) return this._cjk.rows;
+        var self = this;
+        var lists = await this.mapPool(CJK_QUERIES, 6, function (q) { return self.fetchCjkQuery(q); });
+        var seen = {};
+        var rows = [];
+        for (var i = 0; i < lists.length; i++) {
+            var part = lists[i] || [];
+            for (var j = 0; j < part.length; j++) {
+                var v = part[j];
+                if (!v || !v._id || seen[v._id]) continue;
+                var name = this.cleanLine(v.title);
+                if (!name || !this.cjkScriptOf(name)) continue;
+                if (this.cjkBlocked(v, name)) continue;
+                seen[v._id] = 1;
+                rows.push(this.cjkSlim(v, name));
+            }
+        }
+        if (!rows.length) throw new Error("PMVHaven: elenco Asiatiche non disponibile.");
+        this._cjk = { at: now, rows: rows };
+        return rows;
+    }
+
+    async cjkVideos(script, tags, groups, kind, minSec, page, extreme, text) {
+        var all = await this.cjkCorpus();
+        var needle = text ? String(text).toLowerCase() : "";
+        var rows = [];
+        for (var i = 0; i < all.length; i++) {
+            var v = all[i];
+            if (!this.cjkScriptOk(v.name, script)) continue;
+            if (extreme && !v.hasExtremeContent) continue;
+            if (minSec && v.durationSeconds != null && v.durationSeconds < minSec) continue;
+            if (needle && v.text.indexOf(needle) === -1) continue;
+            if (!this.cjkHasTags(v, tags)) continue;
+            if (groups && !this.cjkAnyGroup(v, groups)) continue;
+            rows.push(v);
+        }
+        var sig = [script, (tags || []).join(","), (groups || []).join("|"), kind || "", minSec, extreme ? "1" : "0", needle].join("#");
+        if (kind === "random") {
+            if (page <= 1 || !this._cjkRand || this._cjkRand.sig !== sig) {
+                rows = this.cjkShuffle(rows);
+                this._cjkRand = { sig: sig, rows: rows };
+            } else {
+                rows = this._cjkRand.rows;
+            }
+        } else {
+            rows = this.sortCjk(rows, kind || "recent");
+        }
+        var per = 32;
+        var start = ((page > 1 ? page : 1) - 1) * per;
+        var slice = rows.slice(start, start + per);
+        var list = [];
+        for (var n = 0; n < slice.length; n++) {
+            list.push({
+                name: slice[n].name,
+                imageUrl: this.httpUrl(slice[n].imageUrl),
+                link: slice[n]._id,
+            });
+        }
+        return { list: list, hasNextPage: start + per < rows.length };
+    }
+
     async search(query, page, filters) {
         var tipo = this.filterValue(filters, "Tipo") || "video";
         if (tipo === "profile") return this.myProfile(page);
@@ -839,7 +1072,22 @@ class DefaultExtension extends MProvider {
                 text = "";
             }
         }
+        var scrittura = this.filterValue(filters, "Asiatiche");
         var out;
+        if (scrittura) {
+            // Il testo, se c'è, restringe questo elenco: non si usa la ricerca «asian».
+            var tagsC = [];
+            if (section.indexOf("tag:") === 0) tagsC.push(section.slice(4));
+            if (principale && !extreme) tagsC.push(principale);
+            if (tag) tagsC.push(tag);
+            var groups = null;
+            if (preset && preset.indexOf("|") !== -1) groups = preset.split("|");
+            else if (preset) tagsC = tagsC.concat(preset.split(","));
+            var order = kind || (section === "popular" && !tagsC.length ? "likes" : (section === "trending" ? "views" : "recent"));
+            out = await this.cjkVideos(scrittura, tagsC, groups, order, minSec, page, extreme, text);
+            if (unseen) out = this.hideSeen(out);
+            return out;
+        }
         if (text) {
             out = await this.searchText(text, kind, minSec, page, extreme);
         } else {
@@ -1301,7 +1549,7 @@ class DefaultExtension extends MProvider {
         return [
             {
                 type_name: "HeaderFilter",
-                name: "Senza testo: sezione, categorie e preset si sommano. Se scrivi un testo vale la ricerca per testo (lì Più lunghi/Più corti ordinano solo la pagina). L'Ordine vale anche per le playlist.",
+                name: "Senza testo: sezione, categorie e preset si sommano. Se scrivi un testo vale la ricerca per testo (lì Più lunghi/Più corti ordinano solo la pagina). Asiatiche tiene solo i titoli con scrittura cinese, coreana o giapponese. L'Ordine vale anche per le playlist.",
             },
             {
                 type_name: "SelectFilter",
@@ -1320,6 +1568,18 @@ class DefaultExtension extends MProvider {
             { type_name: "SelectFilter", name: "Categorie principali", state: 0, values: this.options(PRINCIPALI, "Nessuna") },
             { type_name: "SelectFilter", name: "Durata minima", state: 0, values: this.options(DURATIONS, "Tutte") },
             { type_name: "SelectFilter", name: "Categoria", state: 0, values: this.options(this.orderedTags(), "Tutte") },
+            {
+                type_name: "SelectFilter",
+                name: "Asiatiche",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Nessuna", value: "" },
+                    { type_name: "SelectOption", name: "Tutte", value: "all" },
+                    { type_name: "SelectOption", name: "Cinese", value: "zh" },
+                    { type_name: "SelectOption", name: "Coreano", value: "ko" },
+                    { type_name: "SelectOption", name: "Giapponese", value: "ja" },
+                ],
+            },
         ];
     }
 
