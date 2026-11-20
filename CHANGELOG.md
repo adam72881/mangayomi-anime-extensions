@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.12.4
+
+- **Più link con un nome solo:** in «➕ Salva un link» puoi incollare più link e alla fine `| Nome` (es. `link link link | Asuna`): prendono tutti quel nome e finiscono nella stessa raccolta.
+- **Link Gofile con un solo video:** Gofile li apre direttamente nel suo lettore, senza la lista dei file, e l'estensione diceva «Nessun file trovato». Ora prende il video dal lettore della pagina, con nome e miniatura. Il titolo della scheda è il nome del file senza estensione.
+
 ## Gofile 1.12.3
 
 - La scritta «Per: …» sotto «✏️ Nome dell'ultimo link» ora segue davvero l'ultimo link salvato. Prima Mangayomi mostrava quella della prima volta. Il nome andava comunque al link giusto.
