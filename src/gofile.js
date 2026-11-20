@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.12.3",
+        "version": "1.12.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -54,12 +54,20 @@ function listScript() {
         var count = parseInt((body.match(/(\\d+)\\s+items?\\b/i) || [])[1], 10);
         var complete = rows.length && count > 0 && rows.length >= count;
         var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
-        if (!(complete || same >= 3 || stop || ticks > 50)) return;
+        // Un link con un solo file apre subito il lettore, senza lista.
+        var vid = document.querySelector('video');
+        var vsrc = vid ? (vid.currentSrc || vid.src || ((vid.querySelector('source') || {}).src) || '') : '';
+        var single = !rows.length && /gofile\\.io\\/download\\//.test(vsrc);
+        if (!(complete || single || same >= 3 || stop || ticks > 50)) return;
         clearInterval(timer);
         var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [] };
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
             out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
+        }
+        if (single) {
+            var fname = decodeURIComponent(vsrc.split('?')[0].split('/').pop());
+            out.rows.push({ id: 'single', type: 'file', name: fname, img: vid.poster || vsrc.replace(/[^\\/]+$/, '') });
         }
         window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
     }, 500);
@@ -158,8 +166,12 @@ class DefaultExtension extends MProvider {
         var line = String(text || "").trim();
         if (!line) return out;
         var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+)/gi) || [];
+        // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
-            for (var i = 0; i < links.length; i++) out.push({ code: this.linkCode(links[i]), name: "" });
+            var common = line;
+            for (var j = 0; j < links.length; j++) common = common.replace(links[j], " ");
+            common = common.replace(/^[\s|:;,\-–—]+|[\s|:;,\-–—]+$/g, "").slice(0, 60);
+            for (var i = 0; i < links.length; i++) out.push({ code: this.linkCode(links[i]), name: common });
             return out;
         }
         var code, rest;
@@ -330,6 +342,7 @@ class DefaultExtension extends MProvider {
         var notFound = !rows.length && /not found/i.test(String(data.text || ""));
         if (!rows.length && !notFound) return data;
         var title = notFound ? "Gofile " + code + " (non trovata)" : String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
+        if (VIDEO_EXT.test(title)) title = this.episodeName(title);
         var files = rows.filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); })
             .map(function (r) { return { n: r.name, img: r.img }; });
         var fm = this.filesMap();
