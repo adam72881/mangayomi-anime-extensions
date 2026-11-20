@@ -1,5 +1,16 @@
 # Novità
 
+## Gofile 1.0.0 (nuova)
+
+- Per guardare le **tue cartelle Gofile** dentro Mangayomi. Nelle impostazioni dell'estensione metti i link `https://gofile.io/d/…`, uno per riga: ogni link diventa una scheda in Popolari, e i video della cartella sono gli episodi, con miniatura. Per aprire un link al volo, incollalo nella ricerca.
+- La lista la disegna il sito di Gofile: l'estensione apre la pagina nella **WebView nascosta di Mangayomi** (`evaluateJavascriptViaWebview`, serve la 0.9.96) e legge le righe, come nel browser. Il video parte con il cookie `accountToken` di quella stessa visita.
+- Limiti:
+  - la scheda si apre in circa 5–10 secondi;
+  - le sottocartelle vanno aggiunte come link a parte;
+  - i file senza anteprima non si possono aprire da qui;
+  - cartelle protette da password o scadute mostrano un messaggio;
+  - sulla TV Tizen non funziona, perché lì non c'è la WebView.
+
 ## PMVHaven 1.7.0
 
 - **Asiatiche:** nuovo filtro in ricerca. Tutte, Cinese, Coreano o Giapponese. Restano solo i video il cui titolo ha caratteri cinesi (han), coreani (hangul) o giapponesi (hiragana/katakana). Non usa la ricerca «asian» del sito, perché quella trova soprattutto titoli in inglese.
