@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.7.0
+
+- **Copertina piena:** la miniatura di Gofile è un quadrato con bande nere. Ora la WebView toglie le bande e la allarga fino a riempire tutta la copertina verticale (400×600). La copertina viene creata insieme alla lettura della cartella; per i link già salvati viene rifatta una volta sola. Se l'immagine non si riesce a fare, resta la miniatura di prima.
+
 ## Gofile 1.6.0
 
 - **«✏️ Nome dell'ultimo link»** al posto di «Rinomina link». Sotto il titolo c'è scritto a quale link si riferisce («Per: …»); scrivi solo il nome e premi OK. Vale anche se hai appena salvato il link nella stessa visita. Il trattino `-` toglie il nome. Per gli altri link: rimettili in «Salva un link» con `link | nome nuovo`.

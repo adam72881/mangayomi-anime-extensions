@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.6.0",
+        "version": "1.7.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -42,13 +42,50 @@ const LIST_SCRIPT = `(function () {
         var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
         if (!(same >= 3 || stop || ticks > 50)) return;
         clearInterval(timer);
-        var out = { title: document.title, cookie: document.cookie, text: document.body ? document.body.innerText.slice(0, 300) : '', rows: [] };
+        var out = { title: document.title, cookie: document.cookie, text: document.body ? document.body.innerText.slice(0, 300) : '', rows: [], cover: '' };
+        var first = '';
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
             out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
+            if (!first && img && r.getAttribute('data-type') === 'file') first = img.src;
         }
-        window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
+        var sent = false;
+        var send = function (cover) {
+            if (sent) return;
+            sent = true;
+            out.cover = cover || '';
+            window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
+        };
+        if (!first) return send('');
+        setTimeout(function () { send(''); }, 6000);
+        makeCover(first, send);
     }, 500);
+    // Copertina verticale 400x600: la miniatura di Gofile è un quadrato con bande
+    // nere; si tolgono le bande e la si allarga fino a riempire.
+    function makeCover(src, done) {
+      var img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas');
+          c.width = w; c.height = h; var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+          var d = x.getImageData(0, 0, w, h).data;
+          var dark = function (y0, horiz) { var n = horiz ? w : h, s = 0; for (var i = 0; i < n; i += 2) { var p = horiz ? (y0 * w + i) * 4 : (i * w + y0) * 4; s += d[p] + d[p + 1] + d[p + 2]; } return s / (n / 2) / 3 < 24; };
+          var top = 0, bot = h - 1, left = 0, right = w - 1;
+          while (top < h / 3 && dark(top, true)) top++;
+          while (bot > h * 2 / 3 && dark(bot, true)) bot--;
+          while (left < w / 3 && dark(left, false)) left++;
+          while (right > w * 2 / 3 && dark(right, false)) right--;
+          var cw = right - left + 1, ch = bot - top + 1, W = 400, H = 600;
+          var scale = Math.max(W / cw, H / ch), sw = W / scale, sh = H / scale;
+          var sx = left + (cw - sw) / 2, sy = top + (ch - sh) / 2;
+          var out = document.createElement('canvas'); out.width = W; out.height = H;
+          out.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+          done(out.toDataURL('image/jpeg', 0.82));
+        } catch (e) { done(''); }
+      };
+      img.onerror = function () { done(''); };
+      img.src = src;
+    }
 })();`;
 
 class DefaultExtension extends MProvider {
@@ -213,7 +250,7 @@ class DefaultExtension extends MProvider {
             var title = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim();
             if (!(data.rows || []).length) title = "Gofile " + code + " (non trovata)";
             var map = this.infoMap();
-            map[code] = { name: title || code, image: files.length ? files[0].img : "" };
+            map[code] = { name: title || code, image: data.cover || (files.length ? files[0].img : ""), cv: 2 };
             this.writeStore(STORE_INFO, JSON.stringify(map));
         } catch (e) {}
     }
@@ -222,7 +259,8 @@ class DefaultExtension extends MProvider {
         if (page > 1) return { list: [], hasNextPage: false };
         var links = this.savedLinks();
         var known = this.infoMap();
-        var missing = links.filter(function (l) { return !known[l.code]; }).map(function (l) { return l.code; });
+        // Anche le copertine fatte prima della 1.7 (miniatura con bande nere) si rifanno, una volta.
+        var missing = links.filter(function (l) { var k = known[l.code]; return !k || (k.image && k.cv !== 2 && !/non trovata/.test(k.name || "")); }).map(function (l) { return l.code; });
         for (var k = 0; k < missing.length; k++) await this.remember(missing[k]);
         var list = [];
         for (var i = links.length - 1; i >= 0; i--) list.push(this.card(links[i].code, links[i].name));
@@ -286,10 +324,10 @@ class DefaultExtension extends MProvider {
         // Dall'ultimo al primo, come le altre sorgenti: così Mangayomi trova il successivo.
         chapters.reverse();
 
-        var image = files.length && files[0].img ? files[0].img : "";
+        var image = data.cover || (files.length && files[0].img ? files[0].img : "");
         if ((data.rows || []).length) {
             var map = this.infoMap();
-            map[code] = { name: folderTitle, image: image };
+            map[code] = { name: folderTitle, image: image, cv: data.cover ? 2 : 1 };
             this.writeStore(STORE_INFO, JSON.stringify(map));
         }
 
