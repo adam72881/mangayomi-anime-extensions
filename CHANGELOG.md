@@ -1,9 +1,13 @@
 # Novità
 
+## Gofile 1.12.1
+
+- Il messaggio per Bunkr non raggiungibile non consiglia più VPN o DNS: dice solo quali domini sono stati provati.
+
 ## Gofile 1.12.0
 
 - **Copertine di nuovo visibili:** quelle composte (ritaglio delle bande e collage della 1.7–1.11) erano immagini «data:», e Mangayomi, salvando la scheda, ci mette davanti l'indirizzo del sito: sul telefono la copertina risultava rotta. Ora la copertina è di nuovo la miniatura del primo video, con un indirizzo http. L'impostazione «Copertina» è stata tolta, e le copertine rotte già salvate vengono sistemate da sole.
-- **Bunkr sul telefono:** se un dominio Bunkr non risponde o è bloccato dall'operatore (arriva un'altra pagina al posto di Bunkr), l'estensione prova da sola gli altri (bunkr.si, .fi, .ph, .ws, .site, .pk) e ricorda quello che funziona. Album e video si aprono dal dominio che risponde. «Non trovata» compare solo se Bunkr dice davvero che l'album non c'è. Se tutti i domini sono bloccati, la scheda lo spiega e consiglia VPN o un altro DNS. Gli album segnati per errore «non trovata» vengono riletti.
+- **Bunkr sul telefono:** se un dominio Bunkr non risponde o è bloccato dall'operatore (arriva un'altra pagina al posto di Bunkr), l'estensione prova da sola gli altri (bunkr.si, .fi, .ph, .ws, .site, .pk) e ricorda quello che funziona. Album e video si aprono dal dominio che risponde. «Non trovata» compare solo se Bunkr dice davvero che l'album non c'è. Se tutti i domini sono bloccati, la scheda lo spiega. Gli album segnati per errore «non trovata» vengono riletti.
 - Più veloce: la WebView di Gofile non prepara più copertine.
 
 ## Gofile 1.11.0
