@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.14.0
+
+- **Rinominare insieme i link aggiunti insieme:** se incolli più link in «➕ Salva un link» (per esempio 5 link della stessa creator), la voce qui sotto diventa **«✏️ Nome dei link aggiunti insieme»** e il nome che scrivi va a **tutti**, così finiscono in un'unica raccolta. Se hai aggiunto un solo link, resta «Nome dell'ultimo link» come prima.
+
 ## Gofile 1.13.1
 
 - **Link incapsulati (es. capistock): la scheda non scade più.** Il parametro `t=` di quelle pagine è la scadenza della pagina del sito, non del file. Il link Gofile che c'è dentro continua a rispondere con il Referer giusto anche dopo che il `t=` è passato, finché il file resta su Gofile. Quindi basta salvare il link una volta: la scheda funziona anche dopo. La 1.13.0 lo bloccava quando il `t=` era passato.

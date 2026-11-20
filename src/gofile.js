@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.13.1",
+        "version": "1.14.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -23,6 +23,7 @@ const STORE_LINKS = "gofile_saved_links";
 const STORE_ADD_N = "gofile_add_n";
 const STORE_MIGRATED = "gofile_migrated";
 const STORE_REN_N = "gofile_ren_n";
+const STORE_BATCH = "gofile_last_batch";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const STORE_FILES = "gofile_folder_files";
@@ -176,12 +177,31 @@ class DefaultExtension extends MProvider {
         return "gofile_add_" + (parseInt(this.readStore(STORE_ADD_N), 10) || 0);
     }
 
-    // «Nome dell'ultimo link»: vale per il link salvato per ultimo. La chiave cambia
-    // dopo ogni uso (casella di nuovo vuota) e quando cambia l'ultimo link: Mangayomi
-    // mostra la scritta salvata la prima volta, che altrimenti resterebbe quella vecchia.
+    _hash(str) {
+        var h = 0;
+        for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+        return (h >>> 0).toString(36);
+    }
+
+    // I link aggiunti con l'ultimo «Salva un link» (anche più d'uno, incollati insieme),
+    // che sono ancora salvati. Se non ce ne sono, l'ultimo link.
+    lastBatch(links) {
+        var codes = this.readJson(STORE_BATCH, []);
+        var present = {};
+        for (var i = 0; i < links.length; i++) present[links[i].code] = links[i];
+        var out = [];
+        for (var j = 0; j < codes.length; j++) if (present[codes[j]]) out.push(present[codes[j]]);
+        if (!out.length && links.length) out = [links[links.length - 1]];
+        return out;
+    }
+
+    // «Nome dell'ultimo link»: vale per i link dell'ultimo salvataggio. La chiave cambia
+    // dopo ogni uso (casella di nuovo vuota) e quando cambia il gruppo: Mangayomi mostra
+    // la scritta salvata la prima volta, che altrimenti resterebbe quella vecchia.
     renameKey(links) {
-        var last = links && links.length ? links[links.length - 1] : null;
-        return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0) + (last ? "_" + last.code + "_" + (last.name ? "n" : "") : "");
+        var batch = this.lastBatch(links);
+        var sig = batch.map(function (l) { return l.code + (l.name ? "n" : ""); }).join(",");
+        return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0) + "_" + this._hash(sig);
     }
 
     shortLink(code) {
@@ -276,11 +296,15 @@ class DefaultExtension extends MProvider {
         if (added.length) {
             added.forEach(push);
             this.writeStore(STORE_ADD_N, String((parseInt(this.readStore(STORE_ADD_N), 10) || 0) + 1));
+            this.writeStore(STORE_BATCH, JSON.stringify(added.map(function (a) { return a.code; })));
         }
         var newName = links.length ? String(this.setting(renKey) || "").trim() : "";
         if (newName) {
-            var lastLink = links[links.length - 1];
-            lastLink.name = newName === "-" || newName === this.shortLink(lastLink.code) ? "" : newName.replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
+            var value = newName === "-" ? "" : newName.replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
+            var batch = this.lastBatch(links);
+            for (var bi = 0; bi < batch.length; bi++) {
+                batch[bi].name = value === this.shortLink(batch[bi].code) ? "" : value;
+            }
             changed = true;
             this.writeStore(STORE_REN_N, String((parseInt(this.readStore(STORE_REN_N), 10) || 0) + 1));
         }
@@ -731,15 +755,22 @@ class DefaultExtension extends MProvider {
             },
         }];
         if (links.length) {
-            var last = links[links.length - 1];
+            var batch = this.lastBatch(links);
+            var one = batch.length === 1 ? batch[0] : null;
+            var batchName = batch[0] && batch[0].name ? batch[0].name : "";
+            var forWhat = one
+                ? (one.name ? one.name + " — " : "") + this.shortLink(one.code) + (one.name ? "" : " (senza nome)")
+                : batch.length + " link appena aggiunti" + (batchName ? " — " + batchName : " (senza nome)");
             prefs.push({
                 key: this.renameKey(links),
                 editTextPreference: {
-                    title: "✏️ Nome dell'ultimo link",
-                    summary: "Per: " + (last.name ? last.name + " — " : "") + this.shortLink(last.code) + (last.name ? "" : " (senza nome)"),
+                    title: one ? "✏️ Nome dell'ultimo link" : "✏️ Nome dei link aggiunti insieme",
+                    summary: "Per: " + forWhat,
                     value: "",
-                    dialogTitle: "Nome dell'ultimo link",
-                    dialogMessage: "Nome della scheda per " + this.shortLink(last.code) + ". Scrivi - per togliere il nome e vedere il link.",
+                    dialogTitle: one ? "Nome dell'ultimo link" : "Nome dei " + batch.length + " link aggiunti insieme",
+                    dialogMessage: (one
+                        ? "Nome della scheda per " + this.shortLink(one.code) + "."
+                        : "Nome della scheda per i " + batch.length + " link appena salvati insieme (così finiscono in un'unica raccolta).") + " Scrivi - per togliere il nome.",
                 },
             });
         }
