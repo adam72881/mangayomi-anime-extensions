@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.14.1",
+        "version": "1.14.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -118,7 +118,16 @@ class DefaultExtension extends MProvider {
         var m = String(text || "").match(/(?:https?:\/\/)?[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*/i);
         if (!m) return "";
         var url = /^https?:/i.test(m[0]) ? m[0] : "https://" + m[0];
-        return this.embedTarget(url) ? "em~" + url : "";
+        // Si salva se dentro em= c'è un indirizzo qualsiasi; se non è un file Gofile,
+        // la scheda lo dirà. Così un link incapsulato non sparisce in silenzio.
+        return this.embedInner(url) ? "em~" + url : "";
+    }
+
+    // L'indirizzo decodificato da em=, qualunque sia il sito.
+    embedInner(url) {
+        var em = (String(url).match(/[?&]em=([^&#\s]+)/) || [])[1];
+        var target = em ? this.b64(decodeURIComponent(em)) : "";
+        return /^https?:\/\/\S+$/i.test(target) ? target : "";
     }
 
     isEmbed(code) {
@@ -497,23 +506,29 @@ class DefaultExtension extends MProvider {
         return { rows: files, text: notFound ? "not found" : "" };
     }
 
-    // Link incapsulato: un video solo, senza letture (nome dal file).
+    // Link incapsulato. Se dentro em= c'è un file Gofile → un video. Se c'è un altro
+    // sito (es. uno streaming con video protetto) → non si può aprire, e si dice perché.
     readEmbed(code) {
-        var target = this.embedTarget(this.linkUrl(code));
-        var complete = this.embedComplete(target);
+        var inner = this.embedInner(this.linkUrl(code));
+        var gofile = this.embedTarget(this.linkUrl(code));
+        var complete = gofile && this.embedComplete(gofile);
+        var state = "";
+        if (!gofile) state = "other";          // altro sito, non Gofile
+        else if (!complete) state = "cut";      // Gofile ma tagliato nell'incollare
         var name = "";
-        try { name = decodeURIComponent(target.split("?")[0].split("/").pop()); } catch (e) { name = target.split("?")[0].split("/").pop(); }
+        try { name = decodeURIComponent(gofile.split("?")[0].split("/").pop()); } catch (e) { name = gofile.split("?")[0].split("/").pop(); }
+        var otherHost = state === "other" ? (inner.match(/^https?:\/\/([^/]+)/) || [])[1] || "" : "";
         var fm = this.filesMap();
         fm[code] = {
-            title: complete ? (this.episodeName(name) || this.shortLink(code)) : "Link incompleto",
-            files: complete ? [{ n: name || "video.mp4", img: "", em: code }] : [],
-            folders: 0, at: Date.now(), cut: !complete,
+            title: state === "other" ? (otherHost + " (non Gofile)") : state === "cut" ? "Link incompleto" : (this.episodeName(name) || this.shortLink(code)),
+            files: state ? [] : [{ n: name || "video.mp4", img: "", em: code }],
+            folders: 0, at: Date.now(), embState: state, otherHost: otherHost,
         };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: fm[code].title, image: "" };
         this.writeStore(STORE_INFO, JSON.stringify(map));
-        return { rows: fm[code].files, text: complete ? "" : "embed-cut" };
+        return { rows: fm[code].files, text: state === "other" ? "embed-other:" + otherHost : state === "cut" ? "embed-cut" : "" };
     }
 
     // Tre cartelle alla volta.
@@ -636,12 +651,13 @@ class DefaultExtension extends MProvider {
             info = this.infoMap();
         }
 
-        var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0, cut = 0;
+        var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0, cut = 0, other = "";
         for (var i = 0; i < codes.length; i++) {
             var f = fm[codes[i]];
             if (!f) continue;
             if (/non trovata/.test(f.title || "")) gone++;
-            if (f.cut) cut++;
+            if (f.embState === "cut") cut++;
+            if (f.embState === "other") other = f.otherHost || "quel sito";
             folders += f.folders || 0;
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
@@ -671,9 +687,11 @@ class DefaultExtension extends MProvider {
         if (missingThumb) lines.push(missingThumb + " video senza anteprima non si possono aprire da qui.");
         if (folders) lines.push(folders + " sottocartelle: aggiungile come link a parte.");
         if (gone) lines.push(codes.length > 1 ? gone + " link non esistono più su Gofile." : "Questa cartella non esiste più su Gofile.");
+        if (other && !videos) lines = ["Questo link non porta a un file Gofile ma a " + other + ", un sito di streaming con il video protetto. L'estensione apre solo i file Gofile (e gli album Bunkr), non lo streaming protetto di altri siti."];
+        else if (other) lines.push("Un link porta a " + other + " (streaming protetto), non apribile qui.");
         if (cut && !videos) lines = ["Link incompleto: si è tagliato quando l'hai incollato. Toglilo da «Togli i link» e reincollalo per intero, fino alla fine."];
         else if (cut) lines.push(cut + " link si sono tagliati nell'incollare: reincollali per intero.");
-        if (problem && !videos && !cut) lines = [problem];
+        if (problem && !videos && !cut && !other) lines = [problem];
         else if (problem) lines.push(problem);
         if (!videos && !problem && !gone && !Object.keys(fm).some(function (c) { return codes.indexOf(c) !== -1; })) {
             lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
@@ -721,7 +739,12 @@ class DefaultExtension extends MProvider {
     async embedVideo(code) {
         var page = this.linkUrl(code);
         var target = this.embedTarget(page);
-        if (!target || !this.embedComplete(target)) {
+        if (!target) {
+            var inner = this.embedInner(page);
+            var host = (inner.match(/^https?:\/\/([^/]+)/) || [])[1] || "un altro sito";
+            throw new Error("Questo link porta a " + host + ", non a Gofile: è uno streaming protetto che l'estensione non apre.");
+        }
+        if (!this.embedComplete(target)) {
             throw new Error("Questo link si è tagliato quando l'hai incollato. Toglilo e reincollalo per intero, fino alla fine.");
         }
         var origin = page.match(/^https?:\/\/[^/]+/)[0];
