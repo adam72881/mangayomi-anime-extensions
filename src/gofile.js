@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.12.2",
+        "version": "1.12.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -135,9 +135,11 @@ class DefaultExtension extends MProvider {
     }
 
     // «Nome dell'ultimo link»: vale per il link salvato per ultimo. La chiave cambia
-    // dopo ogni uso, così la casella torna vuota.
-    renameKey() {
-        return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0);
+    // dopo ogni uso (casella di nuovo vuota) e quando cambia l'ultimo link: Mangayomi
+    // mostra la scritta salvata la prima volta, che altrimenti resterebbe quella vecchia.
+    renameKey(links) {
+        var last = links && links.length ? links[links.length - 1] : null;
+        return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0) + (last ? "_" + last.code + "_" + (last.name ? "n" : "") : "");
     }
 
     shortLink(code) {
@@ -217,6 +219,8 @@ class DefaultExtension extends MProvider {
         // prima), poi si toglie, si aggiunge, e il nome va all'ultimo link salvato,
         // anche se è appena stato aggiunto.
         var remove = links.length ? this.setting(this.removeKey(links)) : null;
+        // La casella del nome mostrata era quella dell'elenco di prima di questa lettura.
+        var renKey = this.renameKey(links);
         if (remove && remove.length) {
             links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
             changed = true;
@@ -226,7 +230,7 @@ class DefaultExtension extends MProvider {
             added.forEach(push);
             this.writeStore(STORE_ADD_N, String((parseInt(this.readStore(STORE_ADD_N), 10) || 0) + 1));
         }
-        var newName = links.length ? String(this.setting(this.renameKey()) || "").trim() : "";
+        var newName = links.length ? String(this.setting(renKey) || "").trim() : "";
         if (newName) {
             var lastLink = links[links.length - 1];
             lastLink.name = newName === "-" || newName === this.shortLink(lastLink.code) ? "" : newName.replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
@@ -634,7 +638,7 @@ class DefaultExtension extends MProvider {
         if (links.length) {
             var last = links[links.length - 1];
             prefs.push({
-                key: this.renameKey(),
+                key: this.renameKey(links),
                 editTextPreference: {
                     title: "✏️ Nome dell'ultimo link",
                     summary: "Per: " + (last.name ? last.name + " — " : "") + this.shortLink(last.code) + (last.name ? "" : " (senza nome)"),
