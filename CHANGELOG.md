@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.11.0
+
+- **Copertine Bunkr come quelle di Gofile:** anche gli album Bunkr hanno la copertina da 4, 2 o 1 video, secondo l'impostazione «Copertina». Il collage delle raccolte miste ora usa anche le miniature di Bunkr. Le immagini di Bunkr non si possono rielaborare da un'altra pagina, ma la WebView apre direttamente l'indirizzo di una miniatura, cioè lo stesso server, e lì si possono comporre. Le copertine degli album salvati con la 1.10 vengono rifatte una volta.
+
 ## Gofile 1.10.0
 
 - **Anche Bunkr:** in «➕ Salva un link» puoi mettere anche link Bunkr, sia album (`bunkr…/a/…`) sia singoli video (`/f/…`, `/v/…`), su qualsiasi dominio bunkr. Un album diventa una scheda con i suoi video come episodi. Funzionano anche le raccolte: link Gofile e Bunkr con lo stesso nome finiscono nella stessa scheda.
