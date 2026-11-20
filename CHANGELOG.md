@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.14.2
+
+- **Link incapsulati che portano a un altro sito:** alcuni link (es. capistock) non contengono un file Gofile ma un sito di streaming (es. hgcloud) con il video protetto. Prima non si salvavano, senza spiegazione. Ora la scheda si salva e dice chiaro che quel link non porta a Gofile e non si può aprire. L'estensione apre i file Gofile e gli album Bunkr, non lo streaming protetto di altri siti.
+
 ## Gofile 1.14.1
 
 - **Link incapsulati tagliati nell'incollare:** sull'iPhone un link lungo (capistock) a volte si taglia quando lo incolli. Prima restava una scheda che non apriva nessun video (titolo tipo «di»). Ora l'estensione lo riconosce: la scheda si chiama «Link incompleto» e dice di toglierlo e reincollarlo per intero.
