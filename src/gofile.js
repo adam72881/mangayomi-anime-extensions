@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.13.0",
+        "version": "1.13.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -674,13 +674,12 @@ class DefaultExtension extends MProvider {
         return [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
     }
 
-    // Il file risponde solo alle richieste che arrivano dalla pagina che lo incapsula
-    // (altrimenti «Access denied from this domain»): si fa come il suo lettore, con
-    // quel Referer. La scadenza t= della pagina si rispetta.
+    // Il file Gofile risponde solo se la richiesta sembra arrivare dalla pagina che lo
+    // incapsula (altrimenti «Access denied from this domain»): si fa come il suo lettore,
+    // con quel Referer. Il parametro t= è la scadenza della PAGINA, non del file: il link
+    // Gofile interno risponde lo stesso dopo che t= è passato, finché il file esiste.
     embedVideo(code) {
         var page = this.linkUrl(code);
-        var t = parseInt((page.match(/[?&]t=(\d{9,})/) || [])[1], 10);
-        if (t && Date.now() > t * 1000) throw new Error("Questo link è scaduto: prendine uno nuovo dal sito e salvalo di nuovo.");
         var target = this.embedTarget(page);
         if (!target) throw new Error("Link non riconosciuto.");
         var origin = page.match(/^https?:\/\/[^/]+/)[0];
