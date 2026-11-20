@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.12.4",
+        "version": "1.12.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -27,6 +27,8 @@ const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const STORE_FILES = "gofile_folder_files";
 const STORE_BK_HOST = "gofile_bunkr_host";
+const STORE_BK_BAD = "gofile_bunkr_bad";
+const BAD_TTL = 24 * 3600000;
 const STORE_FIX = "gofile_fix_1_12";
 // Domini di Bunkr: alcuni operatori italiani ne bloccano qualcuno, si prova il successivo.
 const BUNKR_HOSTS = ["bunkr.cr", "bunkr.si", "bunkr.fi", "bunkr.ph", "bunkr.ws", "bunkr.site", "bunkr.pk"];
@@ -362,8 +364,13 @@ class DefaultExtension extends MProvider {
 
     // Pagina di Bunkr dal primo dominio che risponde davvero (prima quello che ha
     // funzionato l'ultima volta). Una pagina di blocco dell'operatore non è Bunkr.
+    // Un dominio bloccato può far aspettare il telefono finché non rinuncia: chi non ha
+    // risposto (o ha dato una pagina di blocco) si salta per 24 ore e si prova per ultimo.
     async bunkrPage(path, host) {
+        var bad = this.readJson(STORE_BK_BAD, {}), now = Date.now();
         var order = [this.readStore(STORE_BK_HOST), host].concat(BUNKR_HOSTS).filter(function (h, i, a) { return h && a.indexOf(h) === i; });
+        var fresh = order.filter(function (h) { return !(bad[h] && now - bad[h] < BAD_TTL); });
+        order = fresh.concat(order.filter(function (h) { return fresh.indexOf(h) === -1; }));
         var tried = [];
         for (var i = 0; i < order.length; i++) {
             var res = null;
@@ -373,9 +380,12 @@ class DefaultExtension extends MProvider {
             var isBunkr = /\|\s*Bunkr\s*<\/title>|theItem|bunkr/i.test(html.slice(0, 20000)) && /<title>/i.test(html);
             if (status === 200 && isBunkr) {
                 this.writeStore(STORE_BK_HOST, order[i]);
+                if (bad[order[i]]) { delete bad[order[i]]; this.writeStore(STORE_BK_BAD, JSON.stringify(bad)); }
                 return { html: html, host: order[i], status: 200 };
             }
             if (status === 404 && isBunkr) return { html: html, host: order[i], status: 404 };
+            bad[order[i]] = Date.now();
+            this.writeStore(STORE_BK_BAD, JSON.stringify(bad));
             tried.push(order[i] + " " + (status || "nessuna risposta"));
         }
         return { html: "", host: host, status: 0, tried: tried };

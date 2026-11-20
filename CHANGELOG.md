@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.12.5
+
+- **Video Bunkr più rapidi ad aprirsi:** un dominio Bunkr bloccato dall'operatore può far aspettare il telefono a lungo prima di arrendersi. Ora un dominio che non risponde, o che dà una pagina di blocco, viene saltato per 24 ore: l'estensione va subito su quello che funziona, anche per gli episodi salvati con l'indirizzo `bunkr.cr`.
+
 ## Gofile 1.12.4
 
 - **Più link con un nome solo:** in «➕ Salva un link» puoi incollare più link e alla fine `| Nome` (es. `link link link | Asuna`): prendono tutti quel nome e finiscono nella stessa raccolta.
