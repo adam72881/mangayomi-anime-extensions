@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.5.0",
+        "version": "1.6.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -16,9 +16,9 @@ const mangayomiSources = [
 ];
 
 // Come in Link universale: «Salva un link» aggiunge, «Togli i link» toglie.
-// I link stanno nell'archivio dell'estensione (getString/setString). get() non si
-// chiama mai dentro getSourcePreferences: Mangayomi, per leggere una preferenza,
-// richiama getSourcePreferences, e sarebbe un ciclo.
+// I link stanno nell'archivio dell'estensione (getString/setString). Mangayomi, per
+// leggere una preferenza non ancora salvata, richiama getSourcePreferences: lì
+// dentro le letture passano da un blocco (_syncing) che ferma il giro.
 const STORE_LINKS = "gofile_saved_links";
 const STORE_ADD_N = "gofile_add_n";
 const STORE_MIGRATED = "gofile_migrated";
@@ -87,34 +87,10 @@ class DefaultExtension extends MProvider {
         return "gofile_add_" + (parseInt(this.readStore(STORE_ADD_N), 10) || 0);
     }
 
-    // «Rinomina link»: anche questa casella ha una chiave nuova dopo ogni uso.
+    // «Nome dell'ultimo link»: vale per il link salvato per ultimo. La chiave cambia
+    // dopo ogni uso, così la casella torna vuota.
     renameKey() {
-        return "gofile_ren_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0);
-    }
-
-    // «2 | Vacanze», «2 Vacanze», «link | nome»; solo il numero toglie il nome.
-    // I numeri sono quelli dell'elenco mostrato, dal più nuovo.
-    applyRename(text, links) {
-        var t = String(text || "").trim();
-        if (!t) return false;
-        var target = -1, name = "";
-        var m = t.match(/^(\d+)\s*[|:.\-–—]?\s*(.*)$/);
-        if (m) {
-            var n = parseInt(m[1], 10);
-            if (n >= 1 && n <= links.length) target = links.length - n;
-            name = m[2];
-        } else {
-            var p = this.parseLinks(t);
-            if (p.length) {
-                for (var i = 0; i < links.length; i++) if (links[i].code === p[0].code) target = i;
-                name = p[0].name;
-            }
-        }
-        if (target < 0) return false;
-        name = String(name || "").replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
-        if (name === this.shortLink(links[target].code)) name = "";
-        links[target].name = name;
-        return true;
+        return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0);
     }
 
     shortLink(code) {
@@ -155,6 +131,14 @@ class DefaultExtension extends MProvider {
     savedLinks() {
         var memo = this._linksMemo;
         if (memo && Date.now() - memo.at < 1500) return memo.list.slice();
+        // Leggere una voce non ancora salvata fa richiamare getSourcePreferences, che
+        // a sua volta aggiornerebbe i link: durante l'aggiornamento si usa l'elenco salvato.
+        if (this._syncing) return this.readJson(STORE_LINKS, []);
+        this._syncing = true;
+        try { return this.syncLinks(); } finally { this._syncing = false; }
+    }
+
+    syncLinks() {
         var links = this.readJson(STORE_LINKS, []);
         var changed = false;
         var self = this;
@@ -178,14 +162,10 @@ class DefaultExtension extends MProvider {
             }
             this.writeStore(STORE_MIGRATED, "1");
         }
-        // Le liste mostrate erano quelle di prima di questa lettura: prima la scelta
-        // in «Togli i link» (la chiave dipende dai nomi), poi la rinomina con i numeri
-        // dell'elenco mostrato, poi si toglie, e per ultimi i link nuovi.
+        // Prima si legge la scelta in «Togli i link» (la chiave dipende dai nomi di
+        // prima), poi si toglie, si aggiunge, e il nome va all'ultimo link salvato,
+        // anche se è appena stato aggiunto.
         var remove = links.length ? this.setting(this.removeKey(links)) : null;
-        if (links.length && this.applyRename(this.setting(this.renameKey()), links)) {
-            changed = true;
-            this.writeStore(STORE_REN_N, String((parseInt(this.readStore(STORE_REN_N), 10) || 0) + 1));
-        }
         if (remove && remove.length) {
             links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
             changed = true;
@@ -194,6 +174,13 @@ class DefaultExtension extends MProvider {
         if (added.length) {
             added.forEach(push);
             this.writeStore(STORE_ADD_N, String((parseInt(this.readStore(STORE_ADD_N), 10) || 0) + 1));
+        }
+        var newName = links.length ? String(this.setting(this.renameKey()) || "").trim() : "";
+        if (newName) {
+            var lastLink = links[links.length - 1];
+            lastLink.name = newName === "-" || newName === this.shortLink(lastLink.code) ? "" : newName.replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
+            changed = true;
+            this.writeStore(STORE_REN_N, String((parseInt(this.readStore(STORE_REN_N), 10) || 0) + 1));
         }
         if (changed) this.writeStore(STORE_LINKS, JSON.stringify(links));
         this._linksMemo = { at: Date.now(), list: links };
@@ -350,6 +337,13 @@ class DefaultExtension extends MProvider {
 
     getSourcePreferences() {
         var self = this;
+        // Applica subito quello che hai scritto l'ultima volta. Un get() qui dentro, per
+        // una voce non ancora salvata, fa richiamare questo metodo a Mangayomi: la
+        // seconda chiamata salta l'aggiornamento e il giro si ferma.
+        if (!this._syncing) {
+            this._linksMemo = null;
+            try { this.savedLinks(); } catch (e) {}
+        }
         var links = this.readJson(STORE_LINKS, []);
         var newest = links.slice().reverse();
         var label = function (l) { return l.name || self.shortLink(l.code); };
@@ -364,17 +358,15 @@ class DefaultExtension extends MProvider {
             },
         }];
         if (links.length) {
-            var lines = newest.map(function (l, i) {
-                return (i + 1) + ". " + (l.name ? l.name + " — " + self.shortLink(l.code) : self.shortLink(l.code) + " (senza nome)");
-            });
+            var last = links[links.length - 1];
             prefs.push({
                 key: this.renameKey(),
                 editTextPreference: {
-                    title: "✏️ Rinomina link",
-                    summary: links.length + " link, dal più nuovo: " + newest.map(label).join(", "),
+                    title: "✏️ Nome dell'ultimo link",
+                    summary: "Per: " + (last.name ? last.name + " — " : "") + this.shortLink(last.code) + (last.name ? "" : " (senza nome)"),
                     value: "",
-                    dialogTitle: "Rinomina link",
-                    dialogMessage: "Scrivi il numero e il nuovo nome, es. 2 | Vacanze. Solo il numero toglie il nome.\n\n" + lines.join("\n"),
+                    dialogTitle: "Nome dell'ultimo link",
+                    dialogMessage: "Nome della scheda per " + this.shortLink(last.code) + ". Scrivi - per togliere il nome e vedere il link.",
                 },
             });
         }
@@ -383,7 +375,7 @@ class DefaultExtension extends MProvider {
                 key: this.removeKey(links),
                 multiSelectListPreference: {
                     title: "Togli i link",
-                    summary: "Spunta i link da togliere. Spariscono la prossima volta che apri la sorgente.",
+                    summary: "Spunta i link da togliere. Spariscono quando riapri questa pagina o la sorgente.",
                     entries: newest.map(label),
                     entryValues: newest.map(function (l) { return l.code; }),
                     values: [],

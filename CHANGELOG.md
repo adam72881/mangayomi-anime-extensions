@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.6.0
+
+- **«✏️ Nome dell'ultimo link»** al posto di «Rinomina link». Sotto il titolo c'è scritto a quale link si riferisce («Per: …»); scrivi solo il nome e premi OK. Vale anche se hai appena salvato il link nella stessa visita. Il trattino `-` toglie il nome. Per gli altri link: rimettili in «Salva un link» con `link | nome nuovo`.
+- Riaprendo le impostazioni, quello che hai scritto (link nuovi, nomi, link da togliere) è già applicato: non serve passare da Popolari.
+
 ## Gofile 1.5.0
 
 - **«✏️ Rinomina link»**, una voce a parte nelle impostazioni. Toccandola si vede l'elenco di tutti i link, numerati dal più nuovo. I link senza nome si vedono come link («gofile.io/d/… (senza nome)»). Scrivi il numero e il nome (`2 | Vacanze`) e premi OK; il solo numero toglie il nome. Va bene anche `link | nome`. Riaprendo, la casella è vuota.
