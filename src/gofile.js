@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.14.0",
+        "version": "1.14.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -136,11 +136,18 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
-    // Indirizzo del file dentro em=, solo se è un download di Gofile.
+    // Indirizzo del file dentro em=, solo se è un download di Gofile (anche incompleto,
+    // così un link tagliato nell'incollare si salva lo stesso e la scheda lo segnala).
     embedTarget(url) {
         var em = (String(url).match(/[?&]em=([^&#\s]+)/) || [])[1];
         var target = em ? this.b64(decodeURIComponent(em)) : "";
-        return /^https:\/\/[a-z0-9-]+\.gofile\.io\/download\//i.test(target) ? target : "";
+        return /^https?:\/\/[a-z0-9-]+\.gofile\.io\/download\//i.test(target) ? target : "";
+    }
+
+    // Vero solo se l'indirizzo è completo: cartella/tipo, id e nome del file con estensione.
+    // Un link tagliato (es. finisce in «/download/di») non lo è.
+    embedComplete(target) {
+        return /\/download\/(?:direct|web)\/[0-9a-f]{6,}[0-9a-f-]*\/[^\/?]+\.[a-z0-9]{2,5}(?:\?|$)/i.test(String(target || ""));
     }
 
     linkCode(text) {
@@ -493,15 +500,20 @@ class DefaultExtension extends MProvider {
     // Link incapsulato: un video solo, senza letture (nome dal file).
     readEmbed(code) {
         var target = this.embedTarget(this.linkUrl(code));
+        var complete = this.embedComplete(target);
         var name = "";
         try { name = decodeURIComponent(target.split("?")[0].split("/").pop()); } catch (e) { name = target.split("?")[0].split("/").pop(); }
         var fm = this.filesMap();
-        fm[code] = { title: this.episodeName(name) || this.shortLink(code), files: target ? [{ n: name || "video.mp4", img: "", em: code }] : [], folders: 0, at: Date.now() };
+        fm[code] = {
+            title: complete ? (this.episodeName(name) || this.shortLink(code)) : "Link incompleto",
+            files: complete ? [{ n: name || "video.mp4", img: "", em: code }] : [],
+            folders: 0, at: Date.now(), cut: !complete,
+        };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: fm[code].title, image: "" };
         this.writeStore(STORE_INFO, JSON.stringify(map));
-        return { rows: fm[code].files, text: "" };
+        return { rows: fm[code].files, text: complete ? "" : "embed-cut" };
     }
 
     // Tre cartelle alla volta.
@@ -617,17 +629,19 @@ class DefaultExtension extends MProvider {
                     if (/^bunkr-blocked/.test(why)) problem = "Bunkr non risponde dal tuo telefono: forse i suoi domini sono bloccati dal tuo operatore. Provati: " + why.replace(/^bunkr-blocked\s*/, "") + ". Se si sblocca, trascina in basso la scheda.";
                     else if (/unreachable/i.test(why)) problem = "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
                     else if (/password/i.test(why)) problem = "Una cartella è protetta da password: aprila nel browser.";
+                    else if (/embed-cut/.test(why)) problem = "Il link si è tagliato quando l'hai incollato: toglilo da «Togli i link» e reincollalo per intero (tutto fino alla fine).";
                 });
             }
             fm = this.filesMap();
             info = this.infoMap();
         }
 
-        var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0;
+        var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0, cut = 0;
         for (var i = 0; i < codes.length; i++) {
             var f = fm[codes[i]];
             if (!f) continue;
             if (/non trovata/.test(f.title || "")) gone++;
+            if (f.cut) cut++;
             folders += f.folders || 0;
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
@@ -657,7 +671,9 @@ class DefaultExtension extends MProvider {
         if (missingThumb) lines.push(missingThumb + " video senza anteprima non si possono aprire da qui.");
         if (folders) lines.push(folders + " sottocartelle: aggiungile come link a parte.");
         if (gone) lines.push(codes.length > 1 ? gone + " link non esistono più su Gofile." : "Questa cartella non esiste più su Gofile.");
-        if (problem && !videos) lines = [problem];
+        if (cut && !videos) lines = ["Link incompleto: si è tagliato quando l'hai incollato. Toglilo da «Togli i link» e reincollalo per intero, fino alla fine."];
+        else if (cut) lines.push(cut + " link si sono tagliati nell'incollare: reincollali per intero.");
+        if (problem && !videos && !cut) lines = [problem];
         else if (problem) lines.push(problem);
         if (!videos && !problem && !gone && !Object.keys(fm).some(function (c) { return codes.indexOf(c) !== -1; })) {
             lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
@@ -702,13 +718,25 @@ class DefaultExtension extends MProvider {
     // incapsula (altrimenti «Access denied from this domain»): si fa come il suo lettore,
     // con quel Referer. Il parametro t= è la scadenza della PAGINA, non del file: il link
     // Gofile interno risponde lo stesso dopo che t= è passato, finché il file esiste.
-    embedVideo(code) {
+    async embedVideo(code) {
         var page = this.linkUrl(code);
         var target = this.embedTarget(page);
-        if (!target) throw new Error("Link non riconosciuto.");
+        if (!target || !this.embedComplete(target)) {
+            throw new Error("Questo link si è tagliato quando l'hai incollato. Toglilo e reincollalo per intero, fino alla fine.");
+        }
         var origin = page.match(/^https?:\/\/[^/]+/)[0];
+        var headers = { "Referer": origin + "/", "User-Agent": UA };
+        // Il link Gofile «direct» rimbalza (302) verso un server CDN che vuole anche lui
+        // il Referer. Alcuni lettori lo perdono nel rimbalzo e restano a caricare: si
+        // risolve qui l'indirizzo finale, così il lettore fa una sola richiesta col Referer.
+        var finalUrl = target;
+        try {
+            var res = await this.client.head(target, headers);
+            var u = res && res.request && res.request.url;
+            if (u && /\.gofile\.io\/download\//i.test(u)) finalUrl = u;
+        } catch (e) {}
         var ext = ((target.split("?")[0].match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
-        return [{ url: target, originalUrl: target, quality: "Gofile · " + ext, headers: { "Referer": origin + "/", "User-Agent": UA } }];
+        return [{ url: finalUrl, originalUrl: finalUrl, quality: "Gofile · " + ext, headers: headers }];
     }
 
     async getVideoList(url) {
