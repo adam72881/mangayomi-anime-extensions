@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.12.2
+
+- Se salvi di nuovo un link che c'era già, diventa l'ultimo: «✏️ Nome dell'ultimo link» vale per lui. Il nome che aveva resta, se non ne scrivi uno nuovo.
+- Lo stesso album Bunkr con domini diversi (bunkr.cr, bunkr.si…) ora è un link solo: i doppioni già salvati vengono uniti. L'indirizzo mostrato usa il dominio che funziona.
+
 ## Gofile 1.12.1
 
 - Il messaggio per Bunkr non raggiungibile non consiglia più VPN o DNS: dice solo quali domini sono stati provati.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.12.1",
+        "version": "1.12.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -89,11 +89,16 @@ class DefaultExtension extends MProvider {
     }
 
     // Bunkr: album /a/<id> o singolo file /f/<id> (anche /v/, /i/), su qualsiasi
-    // dominio bunkr.*. Il codice interno è «bk~tipo~id~dominio».
+    // dominio bunkr.*. Il codice interno è «bk~tipo~id», senza dominio: lo stesso
+    // album con domini diversi è lo stesso link (fino alla 1.12.1 c'era anche il dominio).
     bunkrCode(text) {
         var m = String(text || "").match(/(bunkr+\.[a-z]{2,})\/([afvi])\/([A-Za-z0-9]+)/i);
         if (!m) return "";
-        return "bk~" + (m[2].toLowerCase() === "a" ? "a" : "f") + "~" + m[3] + "~" + m[1].toLowerCase();
+        return "bk~" + (m[2].toLowerCase() === "a" ? "a" : "f") + "~" + m[3];
+    }
+
+    normCode(code) {
+        return this.isBunkr(code) ? String(code).split("~").slice(0, 3).join("~") : code;
     }
 
     linkCode(text) {
@@ -106,7 +111,7 @@ class DefaultExtension extends MProvider {
 
     bunkrParts(code) {
         var p = String(code).split("~");
-        return { kind: p[1], id: p[2], host: p[3] };
+        return { kind: p[1], id: p[2], host: p[3] || this.readStore(STORE_BK_HOST) || "bunkr.si" };
     }
 
     linkUrl(code) {
@@ -182,14 +187,18 @@ class DefaultExtension extends MProvider {
 
     syncLinks() {
         var links = this.readJson(STORE_LINKS, []);
+        if (links.some(function (l) { return /^bk~[^~]+~[^~]+~/.test(l.code); })) links = this.dropBunkrHosts(links);
         var changed = false;
         var self = this;
+        // Un link salvato di nuovo diventa l'ultimo (per «Nome dell'ultimo link»),
+        // tenendo il suo nome se non ne scrivi uno nuovo.
         var push = function (l) {
             if (!l.code) return;
             for (var i = 0; i < links.length; i++) {
                 if (links[i].code === l.code) {
-                    if (l.name && links[i].name !== l.name) { links[i].name = l.name; changed = true; }
-                    return;
+                    var old = links.splice(i, 1)[0];
+                    l.name = l.name || old.name;
+                    break;
                 }
             }
             links.push(l);
@@ -227,6 +236,24 @@ class DefaultExtension extends MProvider {
         if (changed) this.writeStore(STORE_LINKS, JSON.stringify(links));
         this._linksMemo = { at: Date.now(), list: links };
         return links.slice();
+    }
+
+    // 1.12.2: i codici Bunkr perdono il dominio; doppioni uniti, liste e copertine spostate.
+    dropBunkrHosts(links) {
+        var self = this, out = [], seen = {};
+        for (var i = links.length - 1; i >= 0; i--) {
+            var c = this.normCode(links[i].code);
+            if (seen[c]) { if (!seen[c].name && links[i].name) seen[c].name = links[i].name; continue; }
+            seen[c] = { code: c, name: links[i].name };
+            out.unshift(seen[c]);
+        }
+        ["gofile_folder_files", "gofile_folder_info"].forEach(function (key) {
+            var m = self.readJson(key, {}), n = {};
+            Object.keys(m).forEach(function (k) { if (k.indexOf("g:") !== 0) n[self.normCode(k)] = m[k]; });
+            self.writeStore(key, JSON.stringify(n));
+        });
+        this.writeStore(STORE_LINKS, JSON.stringify(out));
+        return out;
     }
 
     customName(code) {
@@ -466,7 +493,7 @@ class DefaultExtension extends MProvider {
             codes = g.codes;
         } else {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
-            var code = bk ? decodeURIComponent(bk[1]) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var code = bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
