@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.12.3
+
+- La scritta «Per: …» sotto «✏️ Nome dell'ultimo link» ora segue davvero l'ultimo link salvato. Prima Mangayomi mostrava quella della prima volta. Il nome andava comunque al link giusto.
+
 ## Gofile 1.12.2
 
 - Se salvi di nuovo un link che c'era già, diventa l'ultimo: «✏️ Nome dell'ultimo link» vale per lui. Il nome che aveva resta, se non ne scrivi uno nuovo.
