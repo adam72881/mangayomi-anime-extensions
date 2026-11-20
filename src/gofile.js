@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.2.0",
+        "version": "1.3.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -235,14 +235,21 @@ class DefaultExtension extends MProvider {
         ];
     }
 
+    // Si vedono le coppie già usate più una vuota: compilata quella, riaprendo
+    // le impostazioni compare la coppia successiva.
     getSourcePreferences() {
         var prefs = [];
-        for (var i = 1; i <= SLOTS; i++) {
+        var last = 0;
+        for (var n = 1; n <= SLOTS; n++) {
+            if (String(this.getPreference(PREF_LINK + n) || "").trim()) last = n;
+        }
+        var shown = Math.min(last + 1, SLOTS);
+        for (var i = 1; i <= shown; i++) {
             prefs.push({
                 key: PREF_LINK + i,
                 editTextPreference: {
                     title: "Link " + i,
-                    summary: i === 1 ? "Incolla un link Gofile (https://gofile.io/d/…). Ogni link è una scheda in Popolari, con i video come episodi." : "",
+                    summary: i === shown && i > 1 ? "Nuovo link. Dopo averlo salvato, esci e rientra qui per aggiungerne un altro." : (i === 1 ? "Incolla un link Gofile (https://gofile.io/d/…). Ogni link è una scheda in Popolari, con i video come episodi." : ""),
                     value: "",
                     dialogTitle: "Link " + i,
                     dialogMessage: "Link Gofile, per esempio https://gofile.io/d/XXXX",
