@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/all/gofile.js",
@@ -31,7 +31,9 @@ const LIST_SCRIPT = `(function () {
         var rows = document.querySelectorAll('.fm-row[data-type]');
         if (rows.length && rows.length === last) same++; else same = 0;
         last = rows.length;
-        if (!(same >= 3 || ticks > 50)) return;
+        var body = document.body ? document.body.innerText : '';
+        var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
+        if (!(same >= 3 || stop || ticks > 50)) return;
         clearInterval(timer);
         var out = { title: document.title, cookie: document.cookie, text: document.body ? document.body.innerText.slice(0, 300) : '', rows: [] };
         for (var i = 0; i < rows.length; i++) {
@@ -68,31 +70,78 @@ class DefaultExtension extends MProvider {
         return /^[A-Za-z0-9]{4,}$/.test(s) ? s : "";
     }
 
-    savedCodes() {
+    // Una riga per link: «https://gofile.io/d/XXXX Nome scelto». Il nome è facoltativo;
+    // con più link sulla stessa riga i nomi non si possono attribuire e si ignorano.
+    savedLinks() {
         var raw = String(this.getPreference(PREF_LINKS) || "");
         var out = [];
-        var parts = raw.split(/[\s,]+/);
-        for (var i = 0; i < parts.length; i++) {
-            var c = this.codeOf(parts[i]);
-            if (c && out.indexOf(c) === -1) out.push(c);
+        var seen = {};
+        var lines = raw.split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            var links = line.match(/(?:https?:\/\/)?(?:www\.)?gofile\.io\/d\/[A-Za-z0-9]+/gi) || [];
+            var code, name = "";
+            if (links.length > 1) {
+                for (var j = 0; j < links.length; j++) {
+                    var c = this.codeOf(links[j]);
+                    if (c && !seen[c]) { seen[c] = 1; out.push({ code: c, name: "" }); }
+                }
+                continue;
+            }
+            if (links.length === 1) {
+                code = this.codeOf(links[0]);
+                name = line.replace(links[0], " ");
+            } else {
+                var first = line.split(/\s+/)[0];
+                code = this.codeOf(first);
+                name = line.slice(first.length);
+            }
+            name = name.replace(/^[\s|:\-–—]+|[\s|:\-–—]+$/g, "");
+            if (code && !seen[code]) { seen[code] = 1; out.push({ code: code, name: name }); }
         }
         return out;
+    }
+
+    customName(code) {
+        var links = this.savedLinks();
+        for (var i = 0; i < links.length; i++) if (links[i].code === code) return links[i].name;
+        return "";
     }
 
     infoMap() {
         try { return JSON.parse(this.readStore(STORE_INFO) || "{}") || {}; } catch (e) { return {}; }
     }
 
-    card(code) {
+    card(code, name) {
         var info = this.infoMap()[code] || {};
-        return { name: info.name || "Gofile " + code, imageUrl: info.image || "", link: "/d/" + code };
+        return { name: name || this.customName(code) || info.name || "Gofile " + code, imageUrl: info.image || "", link: "/d/" + code };
+    }
+
+    // Copertina e titolo si leggono una volta sola, la prima volta che il link
+    // compare in elenco (una cartella alla volta), poi restano salvati.
+    async remember(code) {
+        try {
+            var data = await this.readFolder(code);
+            // Server non raggiungibili o pagina non caricata: si riprova la prossima volta.
+            if (!(data.rows || []).length && !/not found/i.test(String(data.text || ""))) return;
+            var files = (data.rows || []).filter(function (r) { return r.type === "file" && r.img; });
+            var title = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim();
+            if (!(data.rows || []).length) title = "Gofile " + code + " (non trovata)";
+            var map = this.infoMap();
+            map[code] = { name: title || code, image: files.length ? files[0].img : "" };
+            this.writeStore(STORE_INFO, JSON.stringify(map));
+        } catch (e) {}
     }
 
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
-        var codes = this.savedCodes();
+        var links = this.savedLinks();
+        var known = this.infoMap();
+        var missing = links.filter(function (l) { return !known[l.code]; }).map(function (l) { return l.code; });
+        for (var k = 0; k < missing.length; k++) await this.remember(missing[k]);
         var list = [];
-        for (var i = 0; i < codes.length; i++) list.push(this.card(codes[i]));
+        for (var i = 0; i < links.length; i++) list.push(this.card(links[i].code, links[i].name));
         return { list: list, hasNextPage: false };
     }
 
@@ -136,7 +185,8 @@ class DefaultExtension extends MProvider {
         var code = this.codeOf(url) || this.codeOf(String(url).replace(/^\/d\//, ""));
         if (!code) throw new Error("Gofile: link non valido.");
         var data = await this.readFolder(code);
-        var title = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
+        var folderTitle = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
+        var title = this.customName(code) || folderTitle;
 
         var files = (data.rows || []).filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); });
         var folders = (data.rows || []).filter(function (r) { return r.type === "folder"; }).length;
@@ -153,15 +203,23 @@ class DefaultExtension extends MProvider {
         chapters.reverse();
 
         var image = files.length && files[0].img ? files[0].img : "";
-        var map = this.infoMap();
-        map[code] = { name: title, image: image };
-        this.writeStore(STORE_INFO, JSON.stringify(map));
+        if ((data.rows || []).length) {
+            var map = this.infoMap();
+            map[code] = { name: folderTitle, image: image };
+            this.writeStore(STORE_INFO, JSON.stringify(map));
+        }
 
         var lines = [files.length + " video"];
         var skipped = files.length - chapters.length;
         if (skipped > 0) lines.push(skipped + " video senza anteprima non si possono aprire da qui.");
         if (folders) lines.push(folders + " sottocartelle: aggiungile come link a parte.");
-        if (!(data.rows || []).length) lines = ["Nessun file trovato. La cartella può essere vuota, scaduta o protetta da password.\n\n" + String(data.text || "").trim()];
+        if (!(data.rows || []).length) {
+            var why = String(data.text || "");
+            if (/unreachable/i.test(why)) lines = ["Gofile non risponde in questo momento. Riprova tra qualche minuto (trascina in basso la scheda)."];
+            else if (/not found/i.test(why)) lines = ["Questa cartella non esiste più su Gofile."];
+            else if (/password/i.test(why)) lines = ["Questa cartella è protetta da password: aprila nel browser."];
+            else lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
+        }
 
         return {
             name: title,
@@ -199,10 +257,10 @@ class DefaultExtension extends MProvider {
                 key: PREF_LINKS,
                 editTextPreference: {
                     title: "Link Gofile",
-                    summary: "Un link per riga (https://gofile.io/d/…). Ogni link è una scheda, i video della cartella sono gli episodi.",
+                    summary: "Un link per riga, con il nome dopo il link se vuoi (https://gofile.io/d/XXXX Il mio nome). Ogni link è una scheda, i video della cartella sono gli episodi. La copertina si carica da sola la prima volta.",
                     value: "",
                     dialogTitle: "Link Gofile",
-                    dialogMessage: "Un link per riga, o separati da spazi",
+                    dialogMessage: "Un link per riga. Dopo il link puoi scrivere il nome della scheda.",
                 },
             },
         ];
