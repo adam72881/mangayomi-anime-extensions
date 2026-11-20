@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.12.0
+
+- **Copertine di nuovo visibili:** quelle composte (ritaglio delle bande e collage della 1.7–1.11) erano immagini «data:», e Mangayomi, salvando la scheda, ci mette davanti l'indirizzo del sito: sul telefono la copertina risultava rotta. Ora la copertina è di nuovo la miniatura del primo video, con un indirizzo http. L'impostazione «Copertina» è stata tolta, e le copertine rotte già salvate vengono sistemate da sole.
+- **Bunkr sul telefono:** se un dominio Bunkr non risponde o è bloccato dall'operatore (arriva un'altra pagina al posto di Bunkr), l'estensione prova da sola gli altri (bunkr.si, .fi, .ph, .ws, .site, .pk) e ricorda quello che funziona. Album e video si aprono dal dominio che risponde. «Non trovata» compare solo se Bunkr dice davvero che l'album non c'è. Se tutti i domini sono bloccati, la scheda lo spiega e consiglia VPN o un altro DNS. Gli album segnati per errore «non trovata» vengono riletti.
+- Più veloce: la WebView di Gofile non prepara più copertine.
+
 ## Gofile 1.11.0
 
 - **Copertine Bunkr come quelle di Gofile:** anche gli album Bunkr hanno la copertina da 4, 2 o 1 video, secondo l'impostazione «Copertina». Il collage delle raccolte miste ora usa anche le miniature di Bunkr. Le immagini di Bunkr non si possono rielaborare da un'altra pagina, ma la WebView apre direttamente l'indirizzo di una miniatura, cioè lo stesso server, e lì si possono comporre. Le copertine degli album salvati con la 1.10 vengono rifatte una volta.
