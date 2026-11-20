@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.8.0",
+        "version": "1.9.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -26,17 +26,57 @@ const STORE_REN_N = "gofile_ren_n";
 const PREF_COVER = "gofile_cover";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
+const STORE_FILES = "gofile_folder_files";
+const FILES_TTL = 6 * 3600000;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 
+// Copertina 400x600 da 1, 2 o 4 miniature: a ognuna si tolgono le bande nere di
+// Gofile e la si allarga fino a riempire il suo riquadro (le miniature hanno CORS *).
+const COVER_FN = `
+function makeCover(srcs, n, done) {
+  var W = 400, H = 600, cells = n >= 4 ? [[0, 0, 200, 300], [200, 0, 200, 300], [0, 300, 200, 300], [200, 300, 200, 300]] : n >= 2 ? [[0, 0, 400, 300], [0, 300, 400, 300]] : [[0, 0, 400, 600]];
+  srcs = srcs.slice(0, cells.length);
+  if (!srcs.length) return done('');
+  while (srcs.length < cells.length) srcs.push(srcs[srcs.length % Math.max(1, srcs.length)]);
+  var out = document.createElement('canvas'); out.width = W; out.height = H;
+  var ctx = out.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  var left = srcs.length, okAny = false;
+  var finish = function () { if (--left === 0) done(okAny ? out.toDataURL('image/jpeg', 0.82) : ''); };
+  srcs.forEach(function (src, k) {
+    var img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas');
+        c.width = w; c.height = h; var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+        var d = x.getImageData(0, 0, w, h).data;
+        var dark = function (p0, horiz) { var len = horiz ? w : h, s = 0; for (var i = 0; i < len; i += 2) { var p = horiz ? (p0 * w + i) * 4 : (i * w + p0) * 4; s += d[p] + d[p + 1] + d[p + 2]; } return s / (len / 2) / 3 < 24; };
+        var t = 0, b = h - 1, l = 0, r = w - 1;
+        while (t < h / 3 && dark(t, true)) t++;
+        while (b > h * 2 / 3 && dark(b, true)) b--;
+        while (l < w / 3 && dark(l, false)) l++;
+        while (r > w * 2 / 3 && dark(r, false)) r--;
+        var cw = r - l + 1, ch = b - t + 1, cell = cells[k];
+        var sc = Math.max(cell[2] / cw, cell[3] / ch), sw = cell[2] / sc, sh = cell[3] / sc;
+        ctx.drawImage(img, l + (cw - sw) / 2, t + (ch - sh) / 2, sw, sh, cell[0], cell[1], cell[2], cell[3]);
+        okAny = true;
+      } catch (e) {}
+      finish();
+    };
+    img.onerror = finish;
+    img.src = src;
+  });
+}
+`;
+
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
-// nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe
-// quando smettono di aumentare. Il link del file è la cartella della miniatura più
-// il nome del file; per scaricarlo serve il cookie accountToken della stessa visita.
-// Copertina 400x600 da 1, 2 o 4 miniature prese sparse nella cartella: a ognuna si
-// tolgono le bande nere di Gofile e la si allarga fino a riempire il suo riquadro.
-function listScript(n) {
+// nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
+// Si ferma appena ci sono tutte («N items» della pagina) o quando smettono di
+// aumentare. Il link del file è la cartella della miniatura più il nome del file;
+// per scaricarlo serve il cookie accountToken della stessa visita.
+// coverN 0 = senza copertina (basta la lista).
+function listScript(coverN) {
     return `(function () {
-    var COVER_N = ${n};
+    var COVER_N = ${coverN};
     var last = -1, same = 0, ticks = 0;
     var timer = setInterval(function () {
         ticks++;
@@ -44,19 +84,17 @@ function listScript(n) {
         if (rows.length && rows.length === last) same++; else same = 0;
         last = rows.length;
         var body = document.body ? document.body.innerText : '';
+        var count = parseInt((body.match(/(\\d+)\\s+items?\\b/i) || [])[1], 10);
+        var complete = rows.length && count > 0 && rows.length >= count;
         var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
-        if (!(same >= 3 || stop || ticks > 50)) return;
+        if (!(complete || same >= 3 || stop || ticks > 50)) return;
         clearInterval(timer);
-        var out = { title: document.title, cookie: document.cookie, text: document.body ? document.body.innerText.slice(0, 300) : '', rows: [], cover: '' };
+        var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [], cover: '' };
         var thumbs = [];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
             out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
             if (img && r.getAttribute('data-type') === 'file') thumbs.push(img.src);
-        }
-        var picks = [];
-        for (var q = 0; q < COVER_N && q < thumbs.length; q++) {
-            picks.push(thumbs[COVER_N > 1 ? Math.round(q * (thumbs.length - 1) / (COVER_N - 1)) : 0]);
         }
         var sent = false;
         var send = function (cover) {
@@ -65,43 +103,26 @@ function listScript(n) {
             out.cover = cover || '';
             window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
         };
-        if (!picks.length) return send('');
+        if (!COVER_N || !thumbs.length) return send('');
+        var picks = [];
+        for (var q = 0; q < COVER_N && q < thumbs.length; q++) {
+            picks.push(thumbs[COVER_N > 1 ? Math.round(q * (thumbs.length - 1) / (COVER_N - 1)) : 0]);
+        }
         setTimeout(function () { send(''); }, 8000);
         makeCover(picks, COVER_N, send);
     }, 500);
-    function makeCover(srcs, n, done) {
-      var W = 400, H = 600, cells = n >= 4 ? [[0, 0, 200, 300], [200, 0, 200, 300], [0, 300, 200, 300], [200, 300, 200, 300]] : n >= 2 ? [[0, 0, 400, 300], [0, 300, 400, 300]] : [[0, 0, 400, 600]];
-      srcs = srcs.slice(0, cells.length);
-      if (!srcs.length) return done('');
-      while (srcs.length < cells.length) srcs.push(srcs[srcs.length % Math.max(1, srcs.length)]);
-      var out = document.createElement('canvas'); out.width = W; out.height = H;
-      var ctx = out.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-      var left = srcs.length, okAny = false;
-      var finish = function () { if (--left === 0) done(okAny ? out.toDataURL('image/jpeg', 0.82) : ''); };
-      srcs.forEach(function (src, k) {
-        var img = new Image(); img.crossOrigin = 'anonymous';
-        img.onload = function () {
-          try {
-            var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas');
-            c.width = w; c.height = h; var x = c.getContext('2d'); x.drawImage(img, 0, 0);
-            var d = x.getImageData(0, 0, w, h).data;
-            var dark = function (p0, horiz) { var len = horiz ? w : h, s = 0; for (var i = 0; i < len; i += 2) { var p = horiz ? (p0 * w + i) * 4 : (i * w + p0) * 4; s += d[p] + d[p + 1] + d[p + 2]; } return s / (len / 2) / 3 < 24; };
-            var t = 0, b = h - 1, l = 0, r = w - 1;
-            while (t < h / 3 && dark(t, true)) t++;
-            while (b > h * 2 / 3 && dark(b, true)) b--;
-            while (l < w / 3 && dark(l, false)) l++;
-            while (r > w * 2 / 3 && dark(r, false)) r--;
-            var cw = r - l + 1, ch = b - t + 1, cell = cells[k];
-            var sc = Math.max(cell[2] / cw, cell[3] / ch), sw = cell[2] / sc, sh = cell[3] / sc;
-            ctx.drawImage(img, l + (cw - sw) / 2, t + (ch - sh) / 2, sw, sh, cell[0], cell[1], cell[2], cell[3]);
-            okAny = true;
-          } catch (e) {}
-          finish();
-        };
-        img.onerror = finish;
-        img.src = src;
-      });
-    }
+    ${COVER_FN}
+})();`;
+}
+
+// Copertina di una raccolta da miniature già note (di link diversi).
+function coverScript(thumbs, n) {
+    return `(function () {
+    var done = false;
+    var send = function (c) { if (done) return; done = true; window.flutter_inappwebview.callHandler('setResponse', c || ''); };
+    setTimeout(function () { send(''); }, 8000);
+    ${COVER_FN}
+    makeCover(${JSON.stringify(thumbs)}, ${n}, send);
 })();`;
 }
 
@@ -261,38 +282,117 @@ class DefaultExtension extends MProvider {
         try { return JSON.parse(this.readStore(STORE_INFO) || "{}") || {}; } catch (e) { return {}; }
     }
 
+    // Link con lo stesso nome (maiuscole e spazi non contano) sono una scheda sola,
+    // «/g/<nome>», con i video di tutti i link. Senza nome: una scheda per link, «/d/<codice>».
+    groupKey(name) {
+        return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    }
+
+    groups() {
+        var links = this.savedLinks();
+        var byKey = {}, order = [];
+        for (var i = 0; i < links.length; i++) {
+            var key = links[i].name ? this.groupKey(links[i].name) : "#" + links[i].code;
+            if (!byKey[key]) { byKey[key] = { key: key, name: links[i].name, codes: [], last: i }; order.push(key); }
+            byKey[key].codes.push(links[i].code);
+            byKey[key].last = i;
+        }
+        var out = order.map(function (k) { return byKey[k]; });
+        out.sort(function (x, y) { return y.last - x.last; });
+        return out;
+    }
+
+    groupOf(key) {
+        var all = this.groups();
+        for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
+        return null;
+    }
+
+    filesMap() {
+        return this.readJson(STORE_FILES, {});
+    }
+
     card(code, name) {
         var info = this.infoMap()[code] || {};
         return { name: name || this.customName(code) || info.name || "Gofile " + code, imageUrl: info.image || "", link: "/d/" + code };
     }
 
-    // Copertina e titolo si leggono una volta sola, la prima volta che il link
-    // compare in elenco (una cartella alla volta), poi restano salvati.
-    async remember(code) {
-        try {
-            var data = await this.readFolder(code);
-            // Server non raggiungibili o pagina non caricata: si riprova la prossima volta.
-            if (!(data.rows || []).length && !/not found/i.test(String(data.text || ""))) return;
-            var files = (data.rows || []).filter(function (r) { return r.type === "file" && r.img; });
-            var title = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim();
-            if (!(data.rows || []).length) title = "Gofile " + code + " (non trovata)";
-            var map = this.infoMap();
-            map[code] = { name: title || code, image: data.cover || (files.length ? files[0].img : ""), cv: this.coverMark() };
-            this.writeStore(STORE_INFO, JSON.stringify(map));
-        } catch (e) {}
+    groupCard(g) {
+        if (g.key.charAt(0) === "#") return this.card(g.codes[0], "");
+        var info = this.infoMap();
+        var cover = g.codes.length > 1 && info["g:" + g.key] ? info["g:" + g.key].image : (info[g.codes[0]] || {}).image;
+        return { name: g.name, imageUrl: cover || "", link: "/g/" + encodeURIComponent(g.key) };
     }
 
+    // Legge una cartella e ricorda lista dei video, titolo e (se chiesta) copertina.
+    // Se Gofile non risponde non salva niente: si riprova la volta dopo.
+    async readOne(code, withCover) {
+        var data;
+        try { data = await this.readFolder(code, withCover ? this.coverN() : 0); } catch (e) { return null; }
+        var rows = data.rows || [];
+        var notFound = !rows.length && /not found/i.test(String(data.text || ""));
+        if (!rows.length && !notFound) return data;
+        var title = notFound ? "Gofile " + code + " (non trovata)" : String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
+        var files = rows.filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); })
+            .map(function (r) { return { n: r.name, img: r.img }; });
+        var fm = this.filesMap();
+        fm[code] = { title: title, files: files, folders: rows.filter(function (r) { return r.type === "folder"; }).length, at: Date.now() };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        var old = map[code] || {};
+        var thumb = files.length && files[0].img ? files[0].img : "";
+        map[code] = { name: title, image: data.cover || old.image || thumb, cv: data.cover ? this.coverMark() : (withCover ? this.coverMark() : old.cv || "") };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return data;
+    }
+
+    // Tre cartelle alla volta.
+    async readMany(codes, withCover) {
+        for (var k = 0; k < codes.length; k += 3) {
+            await Promise.all(codes.slice(k, k + 3).map(function (c) { return this.readOne(c, withCover); }.bind(this)));
+        }
+    }
+
+    // Copertina di una raccolta: miniature prese sparse tra i video di tutti i suoi link.
+    async groupCover(g) {
+        var n = this.coverN();
+        var mark = this.coverMark() + ":" + g.codes.join(",");
+        var info = this.infoMap();
+        if (info["g:" + g.key] && info["g:" + g.key].cv === mark) return;
+        var fm = this.filesMap(), thumbs = [];
+        for (var i = 0; i < g.codes.length; i++) {
+            var f = fm[g.codes[i]];
+            if (f) f.files.forEach(function (x) { if (x.img) thumbs.push(x.img); });
+        }
+        if (!thumbs.length) return;
+        var picks = [];
+        for (var q = 0; q < n && q < thumbs.length; q++) picks.push(thumbs[n > 1 ? Math.round(q * (thumbs.length - 1) / (n - 1)) : 0]);
+        var cover = "";
+        try { cover = await evaluateJavascriptViaWebview("https://gofile.io/robots.txt", {}, [coverScript(picks, n)], 15); } catch (e) {}
+        info = this.infoMap();
+        info["g:" + g.key] = { image: /^data:image/.test(cover || "") ? cover : picks[0], cv: mark };
+        this.writeStore(STORE_INFO, JSON.stringify(info));
+    }
+
+    // Popolari: legge una volta sola i link nuovi (lista dei video e copertina insieme),
+    // così poi le schede e le raccolte si aprono subito.
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
-        var links = this.savedLinks();
-        var known = this.infoMap();
-        // Copertine fatte con un'altra impostazione «Copertina» (o prima della 1.7): si rifanno, una volta.
-        var mark = this.coverMark();
-        var missing = links.filter(function (l) { var k = known[l.code]; return !k || (k.image && k.cv !== mark && !/non trovata/.test(k.name || "")); }).map(function (l) { return l.code; });
-        for (var k = 0; k < missing.length; k++) await this.remember(missing[k]);
-        var list = [];
-        for (var i = links.length - 1; i >= 0; i--) list.push(this.card(links[i].code, links[i].name));
-        return { list: list, hasNextPage: false };
+        var groups = this.groups();
+        var known = this.infoMap(), fm = this.filesMap(), mark = this.coverMark();
+        var codes = [];
+        groups.forEach(function (g) { codes = codes.concat(g.codes); });
+        var missing = codes.filter(function (c) {
+            var k = known[c];
+            if (k && /non trovata/.test(k.name || "")) return false;
+            return !fm[c] || !k || (k.image && k.cv !== mark);
+        });
+        if (missing.length && typeof evaluateJavascriptViaWebview === "function") await this.readMany(missing, true);
+        for (var i = 0; i < groups.length; i++) {
+            if (groups[i].key.charAt(0) !== "#" && groups[i].codes.length > 1) await this.groupCover(groups[i]);
+        }
+        var self = this;
+        return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
 
     async getLatestUpdates(page) {
@@ -300,7 +400,7 @@ class DefaultExtension extends MProvider {
     }
 
     // Nella ricerca si può incollare un link (o il codice) per aprirlo una volta;
-    // altrimenti filtra i link salvati per nome.
+    // altrimenti filtra le schede salvate per nome.
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
@@ -314,11 +414,11 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: false };
     }
 
-    async readFolder(code) {
+    async readFolder(code, coverN) {
         if (typeof evaluateJavascriptViaWebview !== "function") {
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
-        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [listScript(this.coverN())], 40);
+        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [listScript(coverN)], 40);
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
@@ -331,51 +431,78 @@ class DefaultExtension extends MProvider {
         return String(name || "").replace(/\.[A-Za-z0-9]{2,4}$/, "").trim() || "Video";
     }
 
+    // La scheda usa le liste ricordate. Si rileggono quelle mai lette o vecchie di più
+    // di 6 ore (aggiornamento della libreria), e tutte se la scheda viene richiesta di
+    // nuovo entro 2 minuti: è il «trascina in basso per aggiornare».
     async getDetail(url) {
-        var code = this.codeOf(url) || this.codeOf(String(url).replace(/^\/d\//, ""));
-        if (!code) throw new Error("Gofile: link non valido.");
-        var data = await this.readFolder(code);
-        var folderTitle = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
-        var title = this.customName(code) || folderTitle;
+        var raw = String(url);
+        var g = null, codes;
+        var gm = raw.match(/\/g\/([^?#]+)/);
+        if (gm) {
+            g = this.groupOf(decodeURIComponent(gm[1]));
+            if (!g) throw new Error("Gofile: questa raccolta non c'è più tra i link salvati.");
+            codes = g.codes;
+        } else {
+            var code = this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, ""));
+            if (!code) throw new Error("Gofile: link non valido.");
+            codes = [code];
+        }
+        this._seen = this._seen || {};
+        var again = this._seen[raw] && Date.now() - this._seen[raw] < 120000;
+        this._seen[raw] = Date.now();
+        var fm = this.filesMap(), info = this.infoMap();
+        var need = codes.filter(function (c) { return again || !fm[c] || Date.now() - (fm[c].at || 0) > FILES_TTL; });
+        var problem = "";
+        if (need.length) {
+            for (var k = 0; k < need.length; k += 3) {
+                var got = await Promise.all(need.slice(k, k + 3).map(function (c) { return this.readOne(c, !info[c] || !info[c].image); }.bind(this)));
+                got.forEach(function (d) {
+                    if (!d || (d.rows || []).length) return;
+                    var why = String(d.text || "");
+                    if (/unreachable/i.test(why)) problem = "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
+                    else if (/password/i.test(why)) problem = "Una cartella è protetta da password: aprila nel browser.";
+                });
+            }
+            fm = this.filesMap();
+            info = this.infoMap();
+        }
 
-        var files = (data.rows || []).filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); });
-        var folders = (data.rows || []).filter(function (r) { return r.type === "folder"; }).length;
-        var chapters = [];
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(f.img) ? f.img.replace(/[^/]+$/, "") : "";
-            if (!base) continue;
-            var ch = { name: "Episodio " + (i + 1) + " - " + this.episodeName(f.name), url: base + encodeURIComponent(f.name) };
-            ch.thumbnailUrl = f.img;
-            chapters.push(ch);
+        var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0;
+        for (var i = 0; i < codes.length; i++) {
+            var f = fm[codes[i]];
+            if (!f) continue;
+            if (/non trovata/.test(f.title || "")) gone++;
+            folders += f.folders || 0;
+            for (var j = 0; j < f.files.length; j++) {
+                var v = f.files[j];
+                videos++;
+                var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
+                if (!base) { missingThumb++; continue; }
+                chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: base + encodeURIComponent(v.n), thumbnailUrl: v.img });
+            }
         }
         // Dall'ultimo al primo, come le altre sorgenti: così Mangayomi trova il successivo.
         chapters.reverse();
 
-        var image = data.cover || (files.length && files[0].img ? files[0].img : "");
-        if ((data.rows || []).length) {
-            var map = this.infoMap();
-            map[code] = { name: folderTitle, image: image, cv: data.cover ? this.coverMark() : "" };
-            this.writeStore(STORE_INFO, JSON.stringify(map));
-        }
-
-        var lines = [files.length + " video"];
-        var skipped = files.length - chapters.length;
-        if (skipped > 0) lines.push(skipped + " video senza anteprima non si possono aprire da qui.");
+        var single = codes.length === 1 ? (fm[codes[0]] || {}) : null;
+        var title = g ? g.name : (this.customName(codes[0]) || (single && single.title) || codes[0]);
+        var image = g && codes.length > 1 && info["g:" + g.key] ? info["g:" + g.key].image : (info[codes[0]] || {}).image || "";
+        var lines = [];
+        lines.push(codes.length > 1 ? codes.length + " link · " + videos + " video" : videos + " video");
+        if (missingThumb) lines.push(missingThumb + " video senza anteprima non si possono aprire da qui.");
         if (folders) lines.push(folders + " sottocartelle: aggiungile come link a parte.");
-        if (!(data.rows || []).length) {
-            var why = String(data.text || "");
-            if (/unreachable/i.test(why)) lines = ["Gofile non risponde in questo momento. Riprova tra qualche minuto (trascina in basso la scheda)."];
-            else if (/not found/i.test(why)) lines = ["Questa cartella non esiste più su Gofile."];
-            else if (/password/i.test(why)) lines = ["Questa cartella è protetta da password: aprila nel browser."];
-            else lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
+        if (gone) lines.push(codes.length > 1 ? gone + " link non esistono più su Gofile." : "Questa cartella non esiste più su Gofile.");
+        if (problem && !videos) lines = [problem];
+        else if (problem) lines.push(problem);
+        if (!videos && !problem && !gone && !Object.keys(fm).some(function (c) { return codes.indexOf(c) !== -1; })) {
+            lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
         }
 
         return {
             name: title,
-            link: "/d/" + code,
+            link: g ? "/g/" + encodeURIComponent(g.key) : "/d/" + codes[0],
             imageUrl: image,
-            description: lines.join("\n") + "\n\nhttps://gofile.io/d/" + code,
+            description: lines.join("\n") + "\n\n" + codes.map(function (c) { return "https://gofile.io/d/" + c; }).join("\n"),
             genre: [],
             status: 1,
             chapters: chapters,

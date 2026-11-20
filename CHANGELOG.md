@@ -1,5 +1,15 @@
 # Novità
 
+## Gofile 1.9.0
+
+- **Raccolte:** i link salvati con lo **stesso nome** diventano una scheda sola, con i video di tutti i link come episodi. Maiuscole e spazi non contano. Serve per esempio per tanti link con un video solo della stessa creator o della stessa categoria. La copertina della raccolta prende le miniature dai video di link diversi. Un link senza nome resta una scheda a sé.
+- **Più veloce:**
+  - le liste dei video vengono **ricordate**: Popolari legge una volta sola i link nuovi, lista e copertina insieme, poi schede e raccolte si aprono subito;
+  - la scheda rilegge i link quando la **trascini in basso**, oppure da sola dopo 6 ore, per l'aggiornamento della libreria;
+  - lo script si ferma appena la pagina mostra tutti i file, circa 1 s invece di 2,5;
+  - si leggono 3 link alla volta;
+  - quando si rilegge la scheda, la copertina non viene rifatta.
+
 ## Gofile 1.8.0
 
 - **Copertina con più video:** nuova impostazione **«Copertina»**: 4 video in griglia 2×2 (predefinita), 2 video uno sopra l'altro, oppure 1 video. Le miniature vengono prese sparse nella cartella (la prima, l'ultima e quelle in mezzo), e a ognuna si tolgono le bande nere.
