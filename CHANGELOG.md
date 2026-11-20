@@ -75,6 +75,11 @@
 
 - Preset **Poppers + Blacked / BBC / BNWO**: tutti i video con il tag Poppers e almeno uno fra Blacked, BBC e BNWO, senza doppioni (circa 314 video, prima 102). Funzionano tutti gli ordini, anche Casuale. Resta anche **Poppers + Blacked (solo)**.
 
+## Link universale 1.4.23
+
+- La pagina successiva non è più il primo video il cui titolo contiene «next». Vale il pulsante della paginazione, `rel=next`, `/page/2/`, `/pagina/2/`, `?page=2` e `?paged=2`.
+- Se la miniatura ha solo la durata e il titolo sta nel link accanto, la scheda usa quel titolo.
+
 ## Link universale 1.4.22
 
 - **Raccolta → Gooning** nei filtri: cerca PMV, goon, hypno ed edging insieme su 10 siti (xHamster, Pornhub, xVideos, xnxx, Eporner, Porntrex, PornOne, YouJizz, Xozilla, SunPorno). Mostra tutto in un elenco unico, un sito per volta, con il nome del sito su ogni video.

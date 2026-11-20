@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.4.22",
+        "version": "1.4.23",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/linkuniversale.js",
@@ -1939,7 +1939,7 @@ class DefaultExtension extends MProvider {
     // Riquadri <div class="video-thumb">: il link del titolo e l'immagine sono fratelli.
     divBlocks(html) {
         var out = [];
-        var re = /<div\b[^>]*class=["'][^"']*\b(?:video-thumb|thumb-block|video-item|videobox)\b[^"']*["'][^>]*>/gi;
+        var re = /<div\b[^>]*class=["'][^"']*\b(?:video-thumb|thumb-block|video-item|videobox|thumb|video-card|post-item)\b[^"']*["'][^>]*>/gi;
         var m;
         while ((m = re.exec(html)) !== null && out.length < 80) {
             var i = m.index + m[0].length, depth = 1, start = i;
@@ -1969,23 +1969,25 @@ class DefaultExtension extends MProvider {
             if (box.length > 8000) continue;
             var img = box.match(/<img\b[^>]*>/i);
             if (!img) continue;
-            var a = null, ar = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi, x;
+            var a = null, bestTitle = "", ar = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi, x;
             while ((x = ar.exec(box)) !== null) {
                 var h = x[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i);
                 if (!h) continue;
                 var link = resolveUrl(h[1], pageUrl).split("#")[0];
                 var path = link.replace(/^https?:\/\/[^\/]+/, "");
                 if (!link || siteOf(link) !== site || path.length < 2 || !isContentPath(path)) continue;
-                var cand = { link: link, attrs: x[1], text: decodeEntities(x[2].replace(/<[^>]+>/g, " ")) };
-                if (!a) a = cand;
-                if (!SIDE_PATH.test(path)) { a = cand; break; }
+                var text = decodeEntities(x[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+                var cand = { link: link, attrs: x[1], text: text, path: path };
+                if (!a || (SIDE_PATH.test(a.path) && !SIDE_PATH.test(path))) a = cand;
+                if (!weakTitle(text) && text.length < 200 && text.length > bestTitle.length) bestTitle = text;
             }
             if (!a) continue;
             var src = pickImage(box).src;
             var head = box.match(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i);
             var title = decodeEntities((a.attrs.match(/\btitle\s*=\s*["']([^"']+)/i) || ["", ""])[1]) ||
                 (head ? decodeEntities(head[1].replace(/<[^>]+>/g, " ")) : "") ||
-                decodeEntities((img[0].match(/\balt\s*=\s*["']([^"']+)/i) || ["", ""])[1]) || a.text;
+                decodeEntities((img[0].match(/\balt\s*=\s*["']([^"']+)/i) || ["", ""])[1]) ||
+                bestTitle || a.text;
             title = title.replace(/^(guarda|copertina di|poster di|watch)\s+/i, "");
             if (weakTitle(title)) continue;
             out.push({ name: title, imageUrl: src ? coverUrl(src, pageUrl) : "", link: a.link });
@@ -2029,48 +2031,82 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // Pagina successiva. Non basta la parola «next» nel titolo di un video:
+    // si accettano il link rel=next, i pulsanti di paginazione e gli indirizzi
+    // che dicono il numero ( /page/2/ , /pagina/2/ , ?page=2 , ?paged=2 ).
     nextPageOf(html, pageUrl, page) {
-        var m = html.match(/<link[^>]+rel=["']next["'][^>]*href=["']([^"']+)/i) ||
+        var want = (page || 1) + 1;
+        var site = siteOf(pageUrl);
+        var here = pageUrl.split("#")[0].replace(/\/+$/, "");
+        function abs(href) {
+            // «?page=2» sostituisce la query della pagina, non torna alla home.
+            if (String(href || "").charAt(0) === "?") href = pageUrl.split("#")[0].split("?")[0] + href;
+            var u = resolveUrl(href, pageUrl);
+            if (!u || siteOf(u) !== site) return "";
+            u = u.split("#")[0];
+            if (u.replace(/\/+$/, "") === here) return "";
+            return u;
+        }
+        function pathOf(u) {
+            return String(u || "").replace(/^https?:\/\/[^\/]+/, "");
+        }
+        function listPrefix(u) {
+            var p = pathOf(u).split("?")[0].replace(/\/+$/, "");
+            var cut = p.match(/^(.*)\/(?:page|pagina|p)\/\d+$/i) || p.match(/^(.*)\/\d+$/);
+            return (cut ? cut[1] : p).replace(/\/+$/, "");
+        }
+        function pageNumber(u) {
+            var p = pathOf(u);
+            var q = p.match(/[?&](?:page|paged|pagina|pg|p)=(\d+)(?:&|$)/i);
+            if (q) return parseInt(q[1], 10);
+            var seg = p.split("?")[0].match(/\/(?:page|pagina|p)\/(\d+)\/?$/i);
+            if (seg) return parseInt(seg[1], 10);
+            return 0;
+        }
+        var rel = html.match(/<link[^>]+rel=["']next["'][^>]*href=["']([^"']+)/i) ||
+            html.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["']next["']/i) ||
             html.match(/<a[^>]+rel=["']next["'][^>]*href=["']([^"']+)/i) ||
             html.match(/<a[^>]+href=["']([^"']+)["'][^>]*rel=["']next["']/i);
-        if (!m) {
-            var re = /<a\b([^>]*)>([\s\S]{0,200}?)<\/a>/gi, a;
-            while ((a = re.exec(html)) !== null) {
-                var label = decodeEntities(a[2].replace(/<[^>]+>/g, " ")) + " " + (a[1].match(/(?:title|aria-label|class)=["']([^"']*)/i) || ["", ""])[1];
-                if (/^\s*(›|»|>|next|successiv|avanti|pagina successiva)|\bnext\b|page_next|pagination-next/i.test(label)) {
-                    var h = a[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i);
-                    if (h) { m = [null, h[1]]; break; }
-                }
-            }
+        if (rel) {
+            var relUrl = abs(rel[1]);
+            if (relUrl) return relUrl;
         }
-        if (!m) {
-            // Numeri di pagina: un link a pagina+1 dello stesso percorso.
-            var want = (page || 1) + 1;
-            var base = pageUrl.split("?")[0].replace(/\/(page\/)?\d+\/?$/, "").replace(/\/+$/, "");
-            var basePath = base.replace(/^https?:\/\/[^\/]+/, "");
-            var re2 = /\bhref\s*=\s*["']([^"'#]+)["']/gi, l;
-            while ((l = re2.exec(html)) !== null) {
-                var u = resolveUrl(l[1], pageUrl);
-                if (!u || siteOf(u) !== siteOf(pageUrl)) continue;
-                var p = u.replace(/^https?:\/\/[^\/]+/, "");
-                var ok = new RegExp("[?&](page|p|pg|paged)=" + want + "(&|$)").test(p) ||
-                    new RegExp("\\/(page\\/)?" + want + "\\/?(\\?|$)").test(p);
-                if (ok && p.indexOf(basePath) === 0) { m = [null, l[1]]; break; }
-            }
+        var prefix = listPrefix(pageUrl);
+        var bestNext = "";
+        var bestNumber = "";
+        var re = /<a\b([^>]*)>([\s\S]{0,240}?)<\/a>/gi, a;
+        while ((a = re.exec(html)) !== null) {
+            var hrefM = a[1].match(/\bhref\s*=\s*["']([^"'#][^"']*)["']/i);
+            if (!hrefM) continue;
+            var u = abs(hrefM[1]);
+            if (!u) continue;
+            var attrs = (a[1].match(/(?:title|aria-label|class|rel)=["']([^"']*)/i) || ["", ""])[1];
+            var text = decodeEntities(a[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+            var pager = /pagination|page-numbers|page-link|page-item|pager|nav-links|paginate/i.test(attrs);
+            var nextControl = (/(^|[\s_-])next([\s_-]|$)|pagination-next|page-next|nav-next|page_next/i.test(attrs) ||
+                /^(?:›|»|>|next|next page|successiv\w*|seguent\w*|avanti|pagina successiva|weiter|suivant|older posts?)$/i.test(text)) &&
+                text.length < 40;
+            var n = pageNumber(u);
+            if (!n && /^\d{1,5}$/.test(text)) n = parseInt(text, 10);
+            var trail = pathOf(u).split("?")[0].match(/^(.*)\/(\d+)\/?$/);
+            var series = !!(trail && parseInt(trail[2], 10) === want && trail[1].replace(/\/+$/, "") === prefix);
+            if (!bestNext && nextControl && (n === want || n === 0 || series)) bestNext = u;
+            if (!bestNumber && (pager || nextControl) && (n === want || series)) bestNumber = u;
+            if (!bestNumber && n === want && /\/(?:page|pagina|p)\/\d+\/?$/i.test(pathOf(u).split("?")[0])) bestNumber = u;
+            if (!bestNumber && n === want && /[?&](?:page|paged|pagina|pg|p)=\d+(?:&|$)/i.test(pathOf(u))) bestNumber = u;
         }
-        if (!m && new RegExp('"(?:next|nextPage|next_page)"\\s*:\\s*"?' + ((page || 1) + 1) + '\\b').test(html)) {
+        if (bestNext) return bestNext;
+        if (bestNumber) return bestNumber;
+        if (new RegExp('"(?:next|nextPage|next_page)"\\s*:\\s*"?' + want + '\\b').test(html)) {
             var bare = pageUrl.replace(/([?&])page=\d+&?/, "$1").replace(/[?&]$/, "");
-            m = [null, bare + (bare.indexOf("?") === -1 ? "?" : "&") + "page=" + ((page || 1) + 1)];
+            return bare + (bare.indexOf("?") === -1 ? "?" : "&") + "page=" + want;
         }
-        if (!m) {
-            var tpl = html.match(/"pageLinkTemplate"\s*:\s*"((?:\\.|[^"\\])+)"/);
-            if (tpl && /\{#\}|\{page\}|%page%/i.test(tpl[1])) {
-                m = [null, tpl[1].replace(/\\\//g, "/").replace(/\{#\}|\{page\}|%page%/gi, String((page || 1) + 1))];
-            }
+        var tpl = html.match(/"pageLinkTemplate"\s*:\s*"((?:\\.|[^"\\])+)"/);
+        if (tpl && /\{#\}|\{page\}|%page%/i.test(tpl[1])) {
+            var built = resolveUrl(tpl[1].replace(/\\\//g, "/").replace(/\{#\}|\{page\}|%page%/gi, String(want)), pageUrl);
+            if (built && built.replace(/\/+$/, "") !== here) return built;
         }
-        if (!m) return "";
-        var next = resolveUrl(m[1], pageUrl);
-        return next && next !== pageUrl ? next : "";
+        return "";
     }
 
     // ---------- Scheda ----------
