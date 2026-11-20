@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.14.1
+
+- **Link incapsulati tagliati nell'incollare:** sull'iPhone un link lungo (capistock) a volte si taglia quando lo incolli. Prima restava una scheda che non apriva nessun video (titolo tipo «di»). Ora l'estensione lo riconosce: la scheda si chiama «Link incompleto» e dice di toglierlo e reincollarlo per intero.
+- **Video incapsulati che restano a caricare:** il link Gofile «direct» rimbalza verso un altro server, e alcuni lettori perdevano il permesso nel rimbalzo. Ora l'estensione risolve da sola l'indirizzo finale, così il lettore fa una sola richiesta e il video parte.
+
 ## Gofile 1.14.0
 
 - **Rinominare insieme i link aggiunti insieme:** se incolli più link in «➕ Salva un link» (per esempio 5 link della stessa creator), la voce qui sotto diventa **«✏️ Nome dei link aggiunti insieme»** e il nome che scrivi va a **tutti**, così finiscono in un'unica raccolta. Se hai aggiunto un solo link, resta «Nome dell'ultimo link» come prima.
