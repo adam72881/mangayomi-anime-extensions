@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.3.0
+
+- Nelle impostazioni si vedono solo le coppie «Link / Nome» già usate più **una vuota**. Compili Link 1 (e se vuoi Nome 1), salvi, esci e rientri: compaiono Link 2 e Nome 2, e così via fino a 15.
+
 ## Gofile 1.2.0
 
 - Nelle impostazioni ora ci sono **riquadri separati e in ordine**: «Link 1» e «Nome 1», «Link 2» e «Nome 2»… fino a 15. Il nome è facoltativo; se manca si usa il nome della cartella. Il vecchio campo unico, dove non si poteva andare a capo, è stato tolto: i link vanno rimessi nei riquadri nuovi.
