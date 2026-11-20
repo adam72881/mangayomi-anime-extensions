@@ -111,7 +111,7 @@ Tutte le versioni: [CHANGELOG](CHANGELOG.md) · Stato tecnico e come continuare:
 | **AnimeWorld** | 1.5.0 | animeworld.ac | IT | Anime sub/dub ITA: ordine, stato, lingua, 45 generi |
 | **AnimeSaturn** | 1.0.0 | animesaturn.net | IT | Anime sub/dub ITA: generi, anno, stato, tipo, stagione, audio, studio, trama intera |
 | **HentaiSaturn** (18+) | 1.0.0 | hentaisaturn.tv | IT | Hentai sub/dub ITA: generi, anno, stato, tipo, audio, studio, ordine; serie Loli/Shota bloccate |
-| **Gofile** | 1.0.0 | gofile.io | tutte | I tuoi link Gofile: ogni cartella è una scheda, i video sono gli episodi (serve Mangayomi 0.9.96, usa la WebView) |
+| **Gofile** | 1.10.0 | gofile.io, bunkr | IT | I tuoi link Gofile e Bunkr: ogni cartella o album è una scheda, i video sono gli episodi; stesso nome = una raccolta (Gofile usa la WebView, serve Mangayomi 0.9.96) |
 | **HentaiWorld** | 2.8.0 | hentaiworld.me | IT | Hentai 18+: Sub ITA / Sub ENG / Dub ITA, generi, stato, trama |
 | **HypnoTube** | 1.4.1 | hypnotube.com | EN | Video 18+: categorie, ordini, ricerca, playlist, profili |
 | **PMVHaven** | 1.7.0 | pmvhaven.com | EN | PMV 18+: qualità a scelta, ordini, categorie, Asiatiche (titoli CJK), ricerca, playlist, profili, «Mai visti» |

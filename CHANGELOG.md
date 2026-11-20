@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.10.0
+
+- **Anche Bunkr:** in «➕ Salva un link» puoi mettere anche link Bunkr, sia album (`bunkr…/a/…`) sia singoli video (`/f/…`, `/v/…`), su qualsiasi dominio bunkr. Un album diventa una scheda con i suoi video come episodi. Funzionano anche le raccolte: link Gofile e Bunkr con lo stesso nome finiscono nella stessa scheda.
+- Per Bunkr non serve la WebView: la pagina dell'album ha già nomi, miniature e link dei file, e un album da 72 video si legge in meno di mezzo secondo. Il video si apre con la firma che dà lo stesso Bunkr al suo lettore (`glb-apisign.cdn.cr/sign`); niente Referer né cookie.
+- La copertina degli album Bunkr è la miniatura del primo video così com'è: Bunkr non permette di rielaborarla per ritagliarla o farne un collage. Nelle raccolte miste il collage usa le miniature di Gofile.
+
 ## Gofile 1.9.0
 
 - **Raccolte:** i link salvati con lo **stesso nome** diventano una scheda sola, con i video di tutti i link come episodi. Maiuscole e spazi non contano. Serve per esempio per tanti link con un video solo della stessa creator o della stessa categoria. La copertina della raccolta prende le miniature dai video di link diversi. Un link senza nome resta una scheda a sé.
