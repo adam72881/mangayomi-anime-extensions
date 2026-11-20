@@ -1,17 +1,17 @@
 const mangayomiSources = [
     {
         "name": "Gofile",
-        "lang": "all",
+        "lang": "it",
         "baseUrl": "https://gofile.io",
         "apiUrl": "",
         "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=gofile.io",
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.1.0",
+        "version": "1.1.1",
         "dateFormat": "",
         "dateFormatLocale": "",
-        "pkgPath": "anime/src/all/gofile.js",
+        "pkgPath": "anime/src/it/gofile.js",
     },
 ];
 

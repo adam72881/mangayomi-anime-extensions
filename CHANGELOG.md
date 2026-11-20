@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.1.1
+
+- Ora compare nella lista delle estensioni anche se il filtro lingue mostra solo l'italiano (prima era «Tutte»), e anche su versioni di Mangayomi precedenti alla 0.9.96. Lì, aprendo una scheda, l'estensione dice che serve la 0.9.96.
+
 ## Gofile 1.1.0
 
 - **Nome della scheda:** nelle impostazioni, dopo il link, puoi scrivere il nome (`https://gofile.io/d/XXXX Il mio pack`). La scheda si chiama subito così.
