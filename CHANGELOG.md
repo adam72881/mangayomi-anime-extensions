@@ -1,5 +1,13 @@
 # Novità
 
+## Gofile 1.4.0
+
+- **Impostazioni come in Link universale, due voci sole:**
+  - **«➕ Salva un link»:** scrivi `link | nome` (il nome è facoltativo) e premi OK. Sotto il titolo c'è l'elenco dei tuoi link. Riaprendo le impostazioni la casella è di nuovo vuota per il link dopo. Se rimetti un link già salvato con un altro nome, cambia solo il nome;
+  - **«Togli i link»:** spunta i link da togliere e premi OK. Spariscono la prossima volta che apri la sorgente.
+- I link messi con le versioni 1.1–1.3 vengono recuperati da soli.
+- Corretto un problema della 1.3.0: per mostrare le impostazioni l'estensione leggeva le preferenze, e Mangayomi per rispondere richiamava le impostazioni. Il risultato poteva essere un ciclo e una pagina vuota.
+
 ## Gofile 1.3.0
 
 - Nelle impostazioni si vedono solo le coppie «Link / Nome» già usate più **una vuota**. Compili Link 1 (e se vuoi Nome 1), salvi, esci e rientri: compaiono Link 2 e Nome 2, e così via fino a 15.

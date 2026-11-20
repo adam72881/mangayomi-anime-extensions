@@ -8,17 +8,20 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.3.0",
+        "version": "1.4.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
     },
 ];
 
-// Un riquadro per il link e uno per il nome, in ordine: Link 1 / Nome 1, Link 2 / Nome 2…
-const SLOTS = 15;
-const PREF_LINK = "gofile_link_";
-const PREF_NAME = "gofile_name_";
+// Come in Link universale: «Salva un link» aggiunge, «Togli i link» toglie.
+// I link stanno nell'archivio dell'estensione (getString/setString). get() non si
+// chiama mai dentro getSourcePreferences: Mangayomi, per leggere una preferenza,
+// richiama getSourcePreferences, e sarebbe un ciclo.
+const STORE_LINKS = "gofile_saved_links";
+const STORE_ADD_N = "gofile_add_n";
+const STORE_MIGRATED = "gofile_migrated";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
@@ -53,10 +56,6 @@ class DefaultExtension extends MProvider {
         this.client = new Client();
     }
 
-    getPreference(key) {
-        return new SharedPreferences().get(key);
-    }
-
     readStore(key) {
         try { return String(new SharedPreferences().getString(key, "") || ""); } catch (e) { return ""; }
     }
@@ -73,18 +72,92 @@ class DefaultExtension extends MProvider {
         return /^[A-Za-z0-9]{4,}$/.test(s) ? s : "";
     }
 
-    savedLinks() {
+    readJson(key, fallback) {
+        try { var v = this.readStore(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+    }
+
+    setting(key) {
+        try { return new SharedPreferences().get(key); } catch (e) { return null; }
+    }
+
+    // La casella «Salva un link» ha una chiave nuova dopo ogni aggiunta: così,
+    // riaprendo le impostazioni, è di nuovo vuota.
+    addKey() {
+        return "gofile_add_" + (parseInt(this.readStore(STORE_ADD_N), 10) || 0);
+    }
+
+    removeKey(links) {
+        var h = 0, str = links.map(function (l) { return l.code + "=" + l.name; }).join("|");
+        for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+        return "gofile_remove_" + (h >>> 0).toString(36);
+    }
+
+    // «link | nome», «link nome» o solo il link; più link separati da spazio, senza nome.
+    parseLinks(text) {
         var out = [];
-        var seen = {};
-        for (var i = 1; i <= SLOTS; i++) {
-            var raw = String(this.getPreference(PREF_LINK + i) || "").trim();
-            var found = raw.match(/gofile\.io\/d\/[A-Za-z0-9]+/i);
-            var code = this.codeOf(found ? found[0] : raw);
-            if (!code || seen[code]) continue;
-            seen[code] = 1;
-            out.push({ code: code, name: String(this.getPreference(PREF_NAME + i) || "").trim() });
+        var line = String(text || "").trim();
+        if (!line) return out;
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?gofile\.io\/d\/[A-Za-z0-9]+/gi) || [];
+        if (links.length > 1) {
+            for (var i = 0; i < links.length; i++) out.push({ code: this.codeOf(links[i]), name: "" });
+            return out;
         }
+        var code, rest;
+        if (links.length === 1) {
+            code = this.codeOf(links[0]);
+            rest = line.replace(links[0], " ");
+        } else {
+            var first = line.split(/[\s|]+/)[0];
+            code = this.codeOf(first);
+            rest = line.slice(first.length);
+        }
+        if (code) out.push({ code: code, name: rest.replace(/^[\s|:\-–—]+|[\s|:\-–—]+$/g, "").slice(0, 60) });
         return out;
+    }
+
+    // Legge «Salva un link» e «Togli i link» e aggiorna l'elenco. Si chiama da
+    // Popolari, ricerca e scheda, mai da getSourcePreferences.
+    savedLinks() {
+        var memo = this._linksMemo;
+        if (memo && Date.now() - memo.at < 1500) return memo.list.slice();
+        var links = this.readJson(STORE_LINKS, []);
+        var changed = false;
+        var self = this;
+        var push = function (l) {
+            if (!l.code) return;
+            for (var i = 0; i < links.length; i++) {
+                if (links[i].code === l.code) {
+                    if (l.name && links[i].name !== l.name) { links[i].name = l.name; changed = true; }
+                    return;
+                }
+            }
+            links.push(l);
+            changed = true;
+        };
+        // Link messi con le versioni 1.1–1.3 (campo unico o riquadri Link N / Nome N).
+        if (!this.readStore(STORE_MIGRATED)) {
+            this.parseLinks(String(this.setting("gofile_links") || "").split(/\r?\n/)[0]).forEach(push);
+            for (var n = 1; n <= 15; n++) {
+                var old = this.parseLinks(this.setting("gofile_link_" + n));
+                if (old.length) { old[0].name = String(this.setting("gofile_name_" + n) || "").trim(); push(old[0]); }
+            }
+            this.writeStore(STORE_MIGRATED, "1");
+        }
+        var added = this.parseLinks(this.setting(this.addKey()));
+        if (added.length) {
+            added.forEach(push);
+            this.writeStore(STORE_ADD_N, String((parseInt(this.readStore(STORE_ADD_N), 10) || 0) + 1));
+        }
+        if (links.length) {
+            var remove = this.setting(this.removeKey(links));
+            if (remove && remove.length) {
+                links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
+                changed = true;
+            }
+        }
+        if (changed) this.writeStore(STORE_LINKS, JSON.stringify(links));
+        this._linksMemo = { at: Date.now(), list: links };
+        return links.slice();
     }
 
     customName(code) {
@@ -231,38 +304,36 @@ class DefaultExtension extends MProvider {
 
     getFilterList() {
         return [
-            { type_name: "HeaderFilter", name: "Incolla nella ricerca un link Gofile (https://gofile.io/d/…) per aprirlo. Per tenerlo in elenco, mettilo in un riquadro «Link» nelle impostazioni dell'estensione." },
+            { type_name: "HeaderFilter", name: "Incolla nella ricerca un link Gofile (https://gofile.io/d/…) per aprirlo. Per tenerlo in elenco, salvalo in «➕ Salva un link» nelle impostazioni dell'estensione." },
         ];
     }
 
-    // Si vedono le coppie già usate più una vuota: compilata quella, riaprendo
-    // le impostazioni compare la coppia successiva.
     getSourcePreferences() {
-        var prefs = [];
-        var last = 0;
-        for (var n = 1; n <= SLOTS; n++) {
-            if (String(this.getPreference(PREF_LINK + n) || "").trim()) last = n;
-        }
-        var shown = Math.min(last + 1, SLOTS);
-        for (var i = 1; i <= shown; i++) {
+        var self = this;
+        var links = this.readJson(STORE_LINKS, []);
+        var info = this.infoMap();
+        var label = function (l) { return l.name || (info[l.code] && info[l.code].name) || l.code; };
+        var prefs = [{
+            key: this.addKey(),
+            editTextPreference: {
+                title: "➕ Salva un link",
+                summary: links.length ?
+                    "I tuoi link: " + links.map(label).join(", ") + ". Scrivi un altro link Gofile per aggiungerlo." :
+                    "Scrivi un link Gofile (https://gofile.io/d/…). Ogni link diventa una scheda in Popolari, con i video come episodi.",
+                value: "",
+                dialogTitle: "Salva un link",
+                dialogMessage: "Link Gofile, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
+            },
+        }];
+        if (links.length) {
             prefs.push({
-                key: PREF_LINK + i,
-                editTextPreference: {
-                    title: "Link " + i,
-                    summary: i === shown && i > 1 ? "Nuovo link. Dopo averlo salvato, esci e rientra qui per aggiungerne un altro." : (i === 1 ? "Incolla un link Gofile (https://gofile.io/d/…). Ogni link è una scheda in Popolari, con i video come episodi." : ""),
-                    value: "",
-                    dialogTitle: "Link " + i,
-                    dialogMessage: "Link Gofile, per esempio https://gofile.io/d/XXXX",
-                },
-            });
-            prefs.push({
-                key: PREF_NAME + i,
-                editTextPreference: {
-                    title: "Nome " + i,
-                    summary: i === 1 ? "Facoltativo: il nome della scheda del Link " + i + ". Se è vuoto si usa il nome della cartella." : "",
-                    value: "",
-                    dialogTitle: "Nome " + i,
-                    dialogMessage: "Nome della scheda per il Link " + i,
+                key: this.removeKey(links),
+                multiSelectListPreference: {
+                    title: "Togli i link",
+                    summary: "Spunta i link da togliere. Spariscono la prossima volta che apri la sorgente.",
+                    entries: links.map(label),
+                    entryValues: links.map(function (l) { return l.code; }),
+                    values: [],
                 },
             });
         }
