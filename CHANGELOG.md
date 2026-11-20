@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.2.0
+
+- Nelle impostazioni ora ci sono **riquadri separati e in ordine**: «Link 1» e «Nome 1», «Link 2» e «Nome 2»… fino a 15. Il nome è facoltativo; se manca si usa il nome della cartella. Il vecchio campo unico, dove non si poteva andare a capo, è stato tolto: i link vanno rimessi nei riquadri nuovi.
+- Le schede in Popolari seguono l'ordine dei riquadri. Un riquadro vuoto o un link ripetuto vengono saltati.
+
 ## Gofile 1.1.1
 
 - Ora compare nella lista delle estensioni anche se il filtro lingue mostra solo l'italiano (prima era «Tutte»), e anche su versioni di Mangayomi precedenti alla 0.9.96. Lì, aprendo una scheda, l'estensione dice che serve la 0.9.96.
