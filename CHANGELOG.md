@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.5.0
+
+- **«✏️ Rinomina link»**, una voce a parte nelle impostazioni. Toccandola si vede l'elenco di tutti i link, numerati dal più nuovo. I link senza nome si vedono come link («gofile.io/d/… (senza nome)»). Scrivi il numero e il nome (`2 | Vacanze`) e premi OK; il solo numero toglie il nome. Va bene anche `link | nome`. Riaprendo, la casella è vuota.
+- In Popolari e in «Togli i link» i link più nuovi sono in cima.
+
 ## Gofile 1.4.0
 
 - **Impostazioni come in Link universale, due voci sole:**

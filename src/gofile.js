@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.4.0",
+        "version": "1.5.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -22,6 +22,7 @@ const mangayomiSources = [
 const STORE_LINKS = "gofile_saved_links";
 const STORE_ADD_N = "gofile_add_n";
 const STORE_MIGRATED = "gofile_migrated";
+const STORE_REN_N = "gofile_ren_n";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
@@ -86,6 +87,40 @@ class DefaultExtension extends MProvider {
         return "gofile_add_" + (parseInt(this.readStore(STORE_ADD_N), 10) || 0);
     }
 
+    // «Rinomina link»: anche questa casella ha una chiave nuova dopo ogni uso.
+    renameKey() {
+        return "gofile_ren_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0);
+    }
+
+    // «2 | Vacanze», «2 Vacanze», «link | nome»; solo il numero toglie il nome.
+    // I numeri sono quelli dell'elenco mostrato, dal più nuovo.
+    applyRename(text, links) {
+        var t = String(text || "").trim();
+        if (!t) return false;
+        var target = -1, name = "";
+        var m = t.match(/^(\d+)\s*[|:.\-–—]?\s*(.*)$/);
+        if (m) {
+            var n = parseInt(m[1], 10);
+            if (n >= 1 && n <= links.length) target = links.length - n;
+            name = m[2];
+        } else {
+            var p = this.parseLinks(t);
+            if (p.length) {
+                for (var i = 0; i < links.length; i++) if (links[i].code === p[0].code) target = i;
+                name = p[0].name;
+            }
+        }
+        if (target < 0) return false;
+        name = String(name || "").replace(/^[\s|]+|[\s|]+$/g, "").slice(0, 60);
+        if (name === this.shortLink(links[target].code)) name = "";
+        links[target].name = name;
+        return true;
+    }
+
+    shortLink(code) {
+        return "gofile.io/d/" + code;
+    }
+
     removeKey(links) {
         var h = 0, str = links.map(function (l) { return l.code + "=" + l.name; }).join("|");
         for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
@@ -143,17 +178,22 @@ class DefaultExtension extends MProvider {
             }
             this.writeStore(STORE_MIGRATED, "1");
         }
+        // Le liste mostrate erano quelle di prima di questa lettura: prima la scelta
+        // in «Togli i link» (la chiave dipende dai nomi), poi la rinomina con i numeri
+        // dell'elenco mostrato, poi si toglie, e per ultimi i link nuovi.
+        var remove = links.length ? this.setting(this.removeKey(links)) : null;
+        if (links.length && this.applyRename(this.setting(this.renameKey()), links)) {
+            changed = true;
+            this.writeStore(STORE_REN_N, String((parseInt(this.readStore(STORE_REN_N), 10) || 0) + 1));
+        }
+        if (remove && remove.length) {
+            links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
+            changed = true;
+        }
         var added = this.parseLinks(this.setting(this.addKey()));
         if (added.length) {
             added.forEach(push);
             this.writeStore(STORE_ADD_N, String((parseInt(this.readStore(STORE_ADD_N), 10) || 0) + 1));
-        }
-        if (links.length) {
-            var remove = this.setting(this.removeKey(links));
-            if (remove && remove.length) {
-                links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
-                changed = true;
-            }
         }
         if (changed) this.writeStore(STORE_LINKS, JSON.stringify(links));
         this._linksMemo = { at: Date.now(), list: links };
@@ -198,7 +238,7 @@ class DefaultExtension extends MProvider {
         var missing = links.filter(function (l) { return !known[l.code]; }).map(function (l) { return l.code; });
         for (var k = 0; k < missing.length; k++) await this.remember(missing[k]);
         var list = [];
-        for (var i = 0; i < links.length; i++) list.push(this.card(links[i].code, links[i].name));
+        for (var i = links.length - 1; i >= 0; i--) list.push(this.card(links[i].code, links[i].name));
         return { list: list, hasNextPage: false };
     }
 
@@ -311,28 +351,41 @@ class DefaultExtension extends MProvider {
     getSourcePreferences() {
         var self = this;
         var links = this.readJson(STORE_LINKS, []);
-        var info = this.infoMap();
-        var label = function (l) { return l.name || (info[l.code] && info[l.code].name) || l.code; };
+        var newest = links.slice().reverse();
+        var label = function (l) { return l.name || self.shortLink(l.code); };
         var prefs = [{
             key: this.addKey(),
             editTextPreference: {
                 title: "➕ Salva un link",
-                summary: links.length ?
-                    "I tuoi link: " + links.map(label).join(", ") + ". Scrivi un altro link Gofile per aggiungerlo." :
-                    "Scrivi un link Gofile (https://gofile.io/d/…). Ogni link diventa una scheda in Popolari, con i video come episodi.",
+                summary: "Scrivi un link Gofile (https://gofile.io/d/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
                 value: "",
                 dialogTitle: "Salva un link",
                 dialogMessage: "Link Gofile, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
             },
         }];
         if (links.length) {
+            var lines = newest.map(function (l, i) {
+                return (i + 1) + ". " + (l.name ? l.name + " — " + self.shortLink(l.code) : self.shortLink(l.code) + " (senza nome)");
+            });
+            prefs.push({
+                key: this.renameKey(),
+                editTextPreference: {
+                    title: "✏️ Rinomina link",
+                    summary: links.length + " link, dal più nuovo: " + newest.map(label).join(", "),
+                    value: "",
+                    dialogTitle: "Rinomina link",
+                    dialogMessage: "Scrivi il numero e il nuovo nome, es. 2 | Vacanze. Solo il numero toglie il nome.\n\n" + lines.join("\n"),
+                },
+            });
+        }
+        if (links.length) {
             prefs.push({
                 key: this.removeKey(links),
                 multiSelectListPreference: {
                     title: "Togli i link",
                     summary: "Spunta i link da togliere. Spariscono la prossima volta che apri la sorgente.",
-                    entries: links.map(label),
-                    entryValues: links.map(function (l) { return l.code; }),
+                    entries: newest.map(label),
+                    entryValues: newest.map(function (l) { return l.code; }),
                     values: [],
                 },
             });
