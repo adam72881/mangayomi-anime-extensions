@@ -8,14 +8,17 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.1.1",
+        "version": "1.2.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
     },
 ];
 
-const PREF_LINKS = "gofile_links";
+// Un riquadro per il link e uno per il nome, in ordine: Link 1 / Nome 1, Link 2 / Nome 2…
+const SLOTS = 15;
+const PREF_LINK = "gofile_link_";
+const PREF_NAME = "gofile_name_";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
@@ -70,35 +73,16 @@ class DefaultExtension extends MProvider {
         return /^[A-Za-z0-9]{4,}$/.test(s) ? s : "";
     }
 
-    // Una riga per link: «https://gofile.io/d/XXXX Nome scelto». Il nome è facoltativo;
-    // con più link sulla stessa riga i nomi non si possono attribuire e si ignorano.
     savedLinks() {
-        var raw = String(this.getPreference(PREF_LINKS) || "");
         var out = [];
         var seen = {};
-        var lines = raw.split(/\r?\n/);
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i].trim();
-            if (!line) continue;
-            var links = line.match(/(?:https?:\/\/)?(?:www\.)?gofile\.io\/d\/[A-Za-z0-9]+/gi) || [];
-            var code, name = "";
-            if (links.length > 1) {
-                for (var j = 0; j < links.length; j++) {
-                    var c = this.codeOf(links[j]);
-                    if (c && !seen[c]) { seen[c] = 1; out.push({ code: c, name: "" }); }
-                }
-                continue;
-            }
-            if (links.length === 1) {
-                code = this.codeOf(links[0]);
-                name = line.replace(links[0], " ");
-            } else {
-                var first = line.split(/\s+/)[0];
-                code = this.codeOf(first);
-                name = line.slice(first.length);
-            }
-            name = name.replace(/^[\s|:\-–—]+|[\s|:\-–—]+$/g, "");
-            if (code && !seen[code]) { seen[code] = 1; out.push({ code: code, name: name }); }
+        for (var i = 1; i <= SLOTS; i++) {
+            var raw = String(this.getPreference(PREF_LINK + i) || "").trim();
+            var found = raw.match(/gofile\.io\/d\/[A-Za-z0-9]+/i);
+            var code = this.codeOf(found ? found[0] : raw);
+            if (!code || seen[code]) continue;
+            seen[code] = 1;
+            out.push({ code: code, name: String(this.getPreference(PREF_NAME + i) || "").trim() });
         }
         return out;
     }
@@ -247,22 +231,34 @@ class DefaultExtension extends MProvider {
 
     getFilterList() {
         return [
-            { type_name: "HeaderFilter", name: "Incolla nella ricerca un link Gofile (https://gofile.io/d/…) per aprirlo. Per tenerlo in elenco, aggiungilo nelle impostazioni dell'estensione." },
+            { type_name: "HeaderFilter", name: "Incolla nella ricerca un link Gofile (https://gofile.io/d/…) per aprirlo. Per tenerlo in elenco, mettilo in un riquadro «Link» nelle impostazioni dell'estensione." },
         ];
     }
 
     getSourcePreferences() {
-        return [
-            {
-                key: PREF_LINKS,
+        var prefs = [];
+        for (var i = 1; i <= SLOTS; i++) {
+            prefs.push({
+                key: PREF_LINK + i,
                 editTextPreference: {
-                    title: "Link Gofile",
-                    summary: "Un link per riga, con il nome dopo il link se vuoi (https://gofile.io/d/XXXX Il mio nome). Ogni link è una scheda, i video della cartella sono gli episodi. La copertina si carica da sola la prima volta.",
+                    title: "Link " + i,
+                    summary: i === 1 ? "Incolla un link Gofile (https://gofile.io/d/…). Ogni link è una scheda in Popolari, con i video come episodi." : "",
                     value: "",
-                    dialogTitle: "Link Gofile",
-                    dialogMessage: "Un link per riga. Dopo il link puoi scrivere il nome della scheda.",
+                    dialogTitle: "Link " + i,
+                    dialogMessage: "Link Gofile, per esempio https://gofile.io/d/XXXX",
                 },
-            },
-        ];
+            });
+            prefs.push({
+                key: PREF_NAME + i,
+                editTextPreference: {
+                    title: "Nome " + i,
+                    summary: i === 1 ? "Facoltativo: il nome della scheda del Link " + i + ". Se è vuoto si usa il nome della cartella." : "",
+                    value: "",
+                    dialogTitle: "Nome " + i,
+                    dialogMessage: "Nome della scheda per il Link " + i,
+                },
+            });
+        }
+        return prefs;
     }
 }
