@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.8.0
+
+- **Copertina con più video:** nuova impostazione **«Copertina»**: 4 video in griglia 2×2 (predefinita), 2 video uno sopra l'altro, oppure 1 video. Le miniature vengono prese sparse nella cartella (la prima, l'ultima e quelle in mezzo), e a ognuna si tolgono le bande nere.
+- Cambiando l'impostazione, le copertine vengono rifatte una volta, la prossima volta che apri Popolari. Le copertine della 1.7 diventano da 4 video.
+
 ## Gofile 1.7.0
 
 - **Copertina piena:** la miniatura di Gofile è un quadrato con bande nere. Ora la WebView toglie le bande e la allarga fino a riempire tutta la copertina verticale (400×600). La copertina viene creata insieme alla lettura della cartella; per i link già salvati viene rifatta una volta sola. Se l'immagine non si riesce a fare, resta la miniatura di prima.

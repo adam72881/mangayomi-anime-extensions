@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.7.0",
+        "version": "1.8.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -23,6 +23,7 @@ const STORE_LINKS = "gofile_saved_links";
 const STORE_ADD_N = "gofile_add_n";
 const STORE_MIGRATED = "gofile_migrated";
 const STORE_REN_N = "gofile_ren_n";
+const PREF_COVER = "gofile_cover";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
@@ -31,7 +32,11 @@ const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe
 // quando smettono di aumentare. Il link del file è la cartella della miniatura più
 // il nome del file; per scaricarlo serve il cookie accountToken della stessa visita.
-const LIST_SCRIPT = `(function () {
+// Copertina 400x600 da 1, 2 o 4 miniature prese sparse nella cartella: a ognuna si
+// tolgono le bande nere di Gofile e la si allarga fino a riempire il suo riquadro.
+function listScript(n) {
+    return `(function () {
+    var COVER_N = ${n};
     var last = -1, same = 0, ticks = 0;
     var timer = setInterval(function () {
         ticks++;
@@ -43,11 +48,15 @@ const LIST_SCRIPT = `(function () {
         if (!(same >= 3 || stop || ticks > 50)) return;
         clearInterval(timer);
         var out = { title: document.title, cookie: document.cookie, text: document.body ? document.body.innerText.slice(0, 300) : '', rows: [], cover: '' };
-        var first = '';
+        var thumbs = [];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
             out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
-            if (!first && img && r.getAttribute('data-type') === 'file') first = img.src;
+            if (img && r.getAttribute('data-type') === 'file') thumbs.push(img.src);
+        }
+        var picks = [];
+        for (var q = 0; q < COVER_N && q < thumbs.length; q++) {
+            picks.push(thumbs[COVER_N > 1 ? Math.round(q * (thumbs.length - 1) / (COVER_N - 1)) : 0]);
         }
         var sent = false;
         var send = function (cover) {
@@ -56,37 +65,45 @@ const LIST_SCRIPT = `(function () {
             out.cover = cover || '';
             window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
         };
-        if (!first) return send('');
-        setTimeout(function () { send(''); }, 6000);
-        makeCover(first, send);
+        if (!picks.length) return send('');
+        setTimeout(function () { send(''); }, 8000);
+        makeCover(picks, COVER_N, send);
     }, 500);
-    // Copertina verticale 400x600: la miniatura di Gofile è un quadrato con bande
-    // nere; si tolgono le bande e la si allarga fino a riempire.
-    function makeCover(src, done) {
-      var img = new Image(); img.crossOrigin = 'anonymous';
-      img.onload = function () {
-        try {
-          var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas');
-          c.width = w; c.height = h; var x = c.getContext('2d'); x.drawImage(img, 0, 0);
-          var d = x.getImageData(0, 0, w, h).data;
-          var dark = function (y0, horiz) { var n = horiz ? w : h, s = 0; for (var i = 0; i < n; i += 2) { var p = horiz ? (y0 * w + i) * 4 : (i * w + y0) * 4; s += d[p] + d[p + 1] + d[p + 2]; } return s / (n / 2) / 3 < 24; };
-          var top = 0, bot = h - 1, left = 0, right = w - 1;
-          while (top < h / 3 && dark(top, true)) top++;
-          while (bot > h * 2 / 3 && dark(bot, true)) bot--;
-          while (left < w / 3 && dark(left, false)) left++;
-          while (right > w * 2 / 3 && dark(right, false)) right--;
-          var cw = right - left + 1, ch = bot - top + 1, W = 400, H = 600;
-          var scale = Math.max(W / cw, H / ch), sw = W / scale, sh = H / scale;
-          var sx = left + (cw - sw) / 2, sy = top + (ch - sh) / 2;
-          var out = document.createElement('canvas'); out.width = W; out.height = H;
-          out.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
-          done(out.toDataURL('image/jpeg', 0.82));
-        } catch (e) { done(''); }
-      };
-      img.onerror = function () { done(''); };
-      img.src = src;
+    function makeCover(srcs, n, done) {
+      var W = 400, H = 600, cells = n >= 4 ? [[0, 0, 200, 300], [200, 0, 200, 300], [0, 300, 200, 300], [200, 300, 200, 300]] : n >= 2 ? [[0, 0, 400, 300], [0, 300, 400, 300]] : [[0, 0, 400, 600]];
+      srcs = srcs.slice(0, cells.length);
+      if (!srcs.length) return done('');
+      while (srcs.length < cells.length) srcs.push(srcs[srcs.length % Math.max(1, srcs.length)]);
+      var out = document.createElement('canvas'); out.width = W; out.height = H;
+      var ctx = out.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+      var left = srcs.length, okAny = false;
+      var finish = function () { if (--left === 0) done(okAny ? out.toDataURL('image/jpeg', 0.82) : ''); };
+      srcs.forEach(function (src, k) {
+        var img = new Image(); img.crossOrigin = 'anonymous';
+        img.onload = function () {
+          try {
+            var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas');
+            c.width = w; c.height = h; var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+            var d = x.getImageData(0, 0, w, h).data;
+            var dark = function (p0, horiz) { var len = horiz ? w : h, s = 0; for (var i = 0; i < len; i += 2) { var p = horiz ? (p0 * w + i) * 4 : (i * w + p0) * 4; s += d[p] + d[p + 1] + d[p + 2]; } return s / (len / 2) / 3 < 24; };
+            var t = 0, b = h - 1, l = 0, r = w - 1;
+            while (t < h / 3 && dark(t, true)) t++;
+            while (b > h * 2 / 3 && dark(b, true)) b--;
+            while (l < w / 3 && dark(l, false)) l++;
+            while (r > w * 2 / 3 && dark(r, false)) r--;
+            var cw = r - l + 1, ch = b - t + 1, cell = cells[k];
+            var sc = Math.max(cell[2] / cw, cell[3] / ch), sw = cell[2] / sc, sh = cell[3] / sc;
+            ctx.drawImage(img, l + (cw - sw) / 2, t + (ch - sh) / 2, sw, sh, cell[0], cell[1], cell[2], cell[3]);
+            okAny = true;
+          } catch (e) {}
+          finish();
+        };
+        img.onerror = finish;
+        img.src = src;
+      });
     }
 })();`;
+}
 
 class DefaultExtension extends MProvider {
     constructor() {
@@ -128,6 +145,16 @@ class DefaultExtension extends MProvider {
     // dopo ogni uso, così la casella torna vuota.
     renameKey() {
         return "gofile_lastname_" + (parseInt(this.readStore(STORE_REN_N), 10) || 0);
+    }
+
+    // Quante miniature nella copertina (impostazione «Copertina»).
+    coverN() {
+        var v = parseInt(this.setting(PREF_COVER), 10);
+        return v === 1 || v === 2 ? v : 4;
+    }
+
+    coverMark() {
+        return "c" + this.coverN();
     }
 
     shortLink(code) {
@@ -250,7 +277,7 @@ class DefaultExtension extends MProvider {
             var title = String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim();
             if (!(data.rows || []).length) title = "Gofile " + code + " (non trovata)";
             var map = this.infoMap();
-            map[code] = { name: title || code, image: data.cover || (files.length ? files[0].img : ""), cv: 2 };
+            map[code] = { name: title || code, image: data.cover || (files.length ? files[0].img : ""), cv: this.coverMark() };
             this.writeStore(STORE_INFO, JSON.stringify(map));
         } catch (e) {}
     }
@@ -259,8 +286,9 @@ class DefaultExtension extends MProvider {
         if (page > 1) return { list: [], hasNextPage: false };
         var links = this.savedLinks();
         var known = this.infoMap();
-        // Anche le copertine fatte prima della 1.7 (miniatura con bande nere) si rifanno, una volta.
-        var missing = links.filter(function (l) { var k = known[l.code]; return !k || (k.image && k.cv !== 2 && !/non trovata/.test(k.name || "")); }).map(function (l) { return l.code; });
+        // Copertine fatte con un'altra impostazione «Copertina» (o prima della 1.7): si rifanno, una volta.
+        var mark = this.coverMark();
+        var missing = links.filter(function (l) { var k = known[l.code]; return !k || (k.image && k.cv !== mark && !/non trovata/.test(k.name || "")); }).map(function (l) { return l.code; });
         for (var k = 0; k < missing.length; k++) await this.remember(missing[k]);
         var list = [];
         for (var i = links.length - 1; i >= 0; i--) list.push(this.card(links[i].code, links[i].name));
@@ -290,7 +318,7 @@ class DefaultExtension extends MProvider {
         if (typeof evaluateJavascriptViaWebview !== "function") {
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
-        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [LIST_SCRIPT], 40);
+        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [listScript(this.coverN())], 40);
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
@@ -327,7 +355,7 @@ class DefaultExtension extends MProvider {
         var image = data.cover || (files.length && files[0].img ? files[0].img : "");
         if ((data.rows || []).length) {
             var map = this.infoMap();
-            map[code] = { name: folderTitle, image: image, cv: data.cover ? 2 : 1 };
+            map[code] = { name: folderTitle, image: image, cv: data.cover ? this.coverMark() : "" };
             this.writeStore(STORE_INFO, JSON.stringify(map));
         }
 
@@ -420,6 +448,16 @@ class DefaultExtension extends MProvider {
                 },
             });
         }
+        prefs.push({
+            key: PREF_COVER,
+            listPreference: {
+                title: "Copertina",
+                summary: "Quante miniature dei video mettere nella copertina di ogni link. Cambiandola, le copertine si rifanno la prossima volta che apri Popolari.",
+                valueIndex: 0,
+                entries: ["4 video (2×2)", "2 video (sopra e sotto)", "1 video"],
+                entryValues: ["4", "2", "1"],
+            },
+        });
         return prefs;
     }
 }
