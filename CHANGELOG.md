@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.13.0
+
+- **Link «incapsulati»:** alcune pagine, per esempio `capistock.com/ember?em=…&t=…`, contengono dentro il parametro `em=` un link diretto a un file Gofile. Ora si possono salvare in «➕ Salva un link» o incollare nella ricerca come gli altri link: diventano una scheda con quel video, e funzionano anche nelle raccolte con lo stesso nome.
+- Quel file risponde solo alle richieste che arrivano da quella pagina, quindi l'estensione fa come il suo lettore. La **scadenza** del link (`t=`) viene rispettata: un link scaduto non si apre, e la scheda chiede di prenderne uno nuovo dal sito.
+
 ## Gofile 1.12.5
 
 - **Video Bunkr più rapidi ad aprirsi:** un dominio Bunkr bloccato dall'operatore può far aspettare il telefono a lungo prima di arrendersi. Ora un dominio che non risponde, o che dà una pagina di blocco, viene saltato per 24 ore: l'estensione va subito su quello che funziona, anche per gli episodi salvati con l'indirizzo `bunkr.cr`.

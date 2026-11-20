@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.12.5",
+        "version": "1.13.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -111,8 +111,39 @@ class DefaultExtension extends MProvider {
         return this.isBunkr(code) ? String(code).split("~").slice(0, 3).join("~") : code;
     }
 
+    // Pagine che incapsulano un link diretto Gofile in base64 nel parametro em=
+    // (es. capistock.com/ember?em=…&t=…). Il codice è «em~» più l'indirizzo intero.
+    embedCode(text) {
+        var m = String(text || "").match(/(?:https?:\/\/)?[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*/i);
+        if (!m) return "";
+        var url = /^https?:/i.test(m[0]) ? m[0] : "https://" + m[0];
+        return this.embedTarget(url) ? "em~" + url : "";
+    }
+
+    isEmbed(code) {
+        return String(code).indexOf("em~") === 0;
+    }
+
+    b64(str) {
+        var t = String(str || "").replace(/%3D/gi, "=").replace(/-/g, "+").replace(/_/g, "/").replace(/[^A-Za-z0-9+\/=]/g, "");
+        var abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", out = "", bits = 0, val = 0;
+        for (var i = 0; i < t.length && t.charAt(i) !== "="; i++) {
+            val = (val << 6) | abc.indexOf(t.charAt(i));
+            bits += 6;
+            if (bits >= 8) { bits -= 8; out += String.fromCharCode((val >> bits) & 255); }
+        }
+        return out;
+    }
+
+    // Indirizzo del file dentro em=, solo se è un download di Gofile.
+    embedTarget(url) {
+        var em = (String(url).match(/[?&]em=([^&#\s]+)/) || [])[1];
+        var target = em ? this.b64(decodeURIComponent(em)) : "";
+        return /^https:\/\/[a-z0-9-]+\.gofile\.io\/download\//i.test(target) ? target : "";
+    }
+
     linkCode(text) {
-        return this.bunkrCode(text) || this.codeOf(text);
+        return this.bunkrCode(text) || this.embedCode(text) || this.codeOf(text);
     }
 
     isBunkr(code) {
@@ -125,6 +156,7 @@ class DefaultExtension extends MProvider {
     }
 
     linkUrl(code) {
+        if (this.isEmbed(code)) return String(code).slice(3);
         if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
         var b = this.bunkrParts(code);
         return "https://" + b.host + "/" + b.kind + "/" + b.id;
@@ -153,6 +185,7 @@ class DefaultExtension extends MProvider {
     }
 
     shortLink(code) {
+        if (this.isEmbed(code)) return this.linkUrl(code).split("/")[2] + " (video)";
         return this.linkUrl(code).replace(/^https:\/\//, "");
     }
 
@@ -167,7 +200,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -314,6 +347,11 @@ class DefaultExtension extends MProvider {
         return this.readJson(STORE_FILES, {});
     }
 
+    cardPath(code) {
+        if (this.isEmbed(code)) return "/em/" + encodeURIComponent(code);
+        return (this.isBunkr(code) ? "/bk/" : "/d/") + code;
+    }
+
     // Copertina: la miniatura del primo video (solo indirizzi http).
     coverOf(code) {
         var info = this.infoMap()[code] || {};
@@ -324,7 +362,7 @@ class DefaultExtension extends MProvider {
 
     card(code, name) {
         var info = this.infoMap()[code] || {};
-        return { name: name || this.customName(code) || info.name || this.shortLink(code), imageUrl: this.coverOf(code), link: (this.isBunkr(code) ? "/bk/" : "/d/") + code };
+        return { name: name || this.customName(code) || info.name || this.shortLink(code), imageUrl: this.coverOf(code), link: this.cardPath(code) };
     }
 
     groupCard(g) {
@@ -338,6 +376,7 @@ class DefaultExtension extends MProvider {
     // Se Gofile non risponde non salva niente: si riprova la volta dopo.
     async readOne(code) {
         if (this.isBunkr(code)) return this.readBunkr(code);
+        if (this.isEmbed(code)) return this.readEmbed(code);
         var data;
         try { data = await this.readFolder(code); } catch (e) { return null; }
         var rows = data.rows || [];
@@ -427,6 +466,20 @@ class DefaultExtension extends MProvider {
         return { rows: files, text: notFound ? "not found" : "" };
     }
 
+    // Link incapsulato: un video solo, senza letture (nome dal file).
+    readEmbed(code) {
+        var target = this.embedTarget(this.linkUrl(code));
+        var name = "";
+        try { name = decodeURIComponent(target.split("?")[0].split("/").pop()); } catch (e) { name = target.split("?")[0].split("/").pop(); }
+        var fm = this.filesMap();
+        fm[code] = { title: this.episodeName(name) || this.shortLink(code), files: target ? [{ n: name || "video.mp4", img: "", em: code }] : [], folders: 0, at: Date.now() };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        map[code] = { name: fm[code].title, image: "" };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: fm[code].files, text: "" };
+    }
+
     // Tre cartelle alla volta.
     async readMany(codes) {
         for (var k = 0; k < codes.length; k += 3) {
@@ -449,7 +502,7 @@ class DefaultExtension extends MProvider {
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
-        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c); });
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isEmbed(c); });
         if (missing.length) await this.readMany(missing);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
@@ -480,7 +533,7 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\./i.test(q) ? this.linkCode(q) : "";
+        var code = /gofile\.io|bunkr+\.|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         var all = (await this.getPopular(1)).list;
         if (!q) return { list: all, hasNextPage: false };
@@ -520,7 +573,8 @@ class DefaultExtension extends MProvider {
             codes = g.codes;
         } else {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
-            var code = bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
+            var code = emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
@@ -554,6 +608,10 @@ class DefaultExtension extends MProvider {
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
                 videos++;
+                if (v.em) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "embed:" + v.em });
+                    continue;
+                }
                 if (v.bf) {
                     chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "bunkr:https://" + v.bh + "/f/" + v.bf, thumbnailUrl: v.img });
                     continue;
@@ -583,7 +641,7 @@ class DefaultExtension extends MProvider {
 
         return {
             name: title,
-            link: g ? "/g/" + encodeURIComponent(g.key) : (this.isBunkr(codes[0]) ? "/bk/" : "/d/") + codes[0],
+            link: g ? "/g/" + encodeURIComponent(g.key) : this.cardPath(codes[0]),
             imageUrl: image,
             description: lines.join("\n") + "\n\n" + codes.map(this.linkUrl.bind(this)).join("\n"),
             genre: [],
@@ -616,9 +674,24 @@ class DefaultExtension extends MProvider {
         return [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
     }
 
+    // Il file risponde solo alle richieste che arrivano dalla pagina che lo incapsula
+    // (altrimenti «Access denied from this domain»): si fa come il suo lettore, con
+    // quel Referer. La scadenza t= della pagina si rispetta.
+    embedVideo(code) {
+        var page = this.linkUrl(code);
+        var t = parseInt((page.match(/[?&]t=(\d{9,})/) || [])[1], 10);
+        if (t && Date.now() > t * 1000) throw new Error("Questo link è scaduto: prendine uno nuovo dal sito e salvalo di nuovo.");
+        var target = this.embedTarget(page);
+        if (!target) throw new Error("Link non riconosciuto.");
+        var origin = page.match(/^https?:\/\/[^/]+/)[0];
+        var ext = ((target.split("?")[0].match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
+        return [{ url: target, originalUrl: target, quality: "Gofile · " + ext, headers: { "Referer": origin + "/", "User-Agent": UA } }];
+    }
+
     async getVideoList(url) {
         var file = String(url);
         if (file.indexOf("bunkr:") === 0) return this.bunkrVideo(file.slice(6));
+        if (file.indexOf("embed:") === 0) return this.embedVideo(file.slice(6));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
