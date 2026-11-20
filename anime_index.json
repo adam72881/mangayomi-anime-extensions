@@ -240,5 +240,27 @@
         "additionalParams": "",
         "sourceCodeLanguage": 1,
         "notes": ""
+    },
+    {
+        "name": "Gofile",
+        "id": 4410982261,
+        "baseUrl": "https://gofile.io",
+        "lang": "all",
+        "typeSource": "single",
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=gofile.io",
+        "dateFormat": "",
+        "dateFormatLocale": "",
+        "isNsfw": false,
+        "hasCloudflare": false,
+        "sourceCodeUrl": "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/src/gofile.js",
+        "apiUrl": "",
+        "version": "1.0.0",
+        "isManga": false,
+        "itemType": 1,
+        "isFullData": false,
+        "appMinVerReq": "0.9.96",
+        "additionalParams": "",
+        "sourceCodeLanguage": 1,
+        "notes": ""
     }
 ]
