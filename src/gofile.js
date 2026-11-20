@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.10.0",
+        "version": "1.11.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -411,8 +411,10 @@ class DefaultExtension extends MProvider {
         var fm = this.filesMap();
         fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now() };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var thumbs = files.map(function (f) { return f.img; }).filter(Boolean);
+        var cover = thumbs.length > 1 ? await this.composeCover(thumbs, this.coverN()) : "";
         var map = this.infoMap();
-        map[code] = { name: fm[code].title, image: files.length ? files[0].img : "", cv: this.coverMark() };
+        map[code] = { name: fm[code].title, image: cover || thumbs[0] || "", cv: this.coverMark() + "b" };
         this.writeStore(STORE_INFO, JSON.stringify(map));
         return { rows: files, text: notFound ? "not found" : "" };
     }
@@ -422,6 +424,22 @@ class DefaultExtension extends MProvider {
         for (var k = 0; k < codes.length; k += 3) {
             await Promise.all(codes.slice(k, k + 3).map(function (c) { return this.readOne(c, withCover); }.bind(this)));
         }
+    }
+
+    // Compone la copertina nella WebView. Le miniature di Gofile si possono usare da
+    // qualsiasi pagina (CORS *); quelle di Bunkr no, ma diventano usabili se la WebView
+    // apre proprio l'indirizzo di una di loro: la pagina è sullo stesso server.
+    async composeCover(thumbs, n) {
+        if (typeof evaluateJavascriptViaWebview !== "function" || !thumbs.length) return "";
+        var picks = [];
+        for (var q = 0; q < n && q < thumbs.length; q++) picks.push(thumbs[n > 1 ? Math.round(q * (thumbs.length - 1) / (n - 1)) : 0]);
+        var bunkrHost = "";
+        for (var i = 0; i < picks.length && !bunkrHost; i++) if (!/\.gofile\.io\//.test(picks[i])) bunkrHost = picks[i].split("/")[2];
+        picks = picks.filter(function (t) { return /\.gofile\.io\//.test(t) || t.split("/")[2] === bunkrHost; });
+        var page = bunkrHost ? picks.filter(function (t) { return t.split("/")[2] === bunkrHost; })[0] : "https://gofile.io/robots.txt";
+        var cover = "";
+        try { cover = await evaluateJavascriptViaWebview(page, {}, [coverScript(picks, n)], 15); } catch (e) {}
+        return /^data:image/.test(cover || "") ? cover : "";
     }
 
     // Copertina di una raccolta: miniature prese sparse tra i video di tutti i suoi link.
@@ -436,21 +454,9 @@ class DefaultExtension extends MProvider {
             if (f) f.files.forEach(function (x) { if (x.img) thumbs.push(x.img); });
         }
         if (!thumbs.length) return;
-        // Le miniature di Bunkr non permettono di essere rielaborate (niente CORS):
-        // il collage usa quelle di Gofile, altrimenti resta la prima miniatura.
-        var go = thumbs.filter(function (t) { return /\.gofile\.io\//.test(t); });
-        if (!go.length) {
-            info["g:" + g.key] = { image: thumbs[0], cv: mark };
-            this.writeStore(STORE_INFO, JSON.stringify(info));
-            return;
-        }
-        thumbs = go;
-        var picks = [];
-        for (var q = 0; q < n && q < thumbs.length; q++) picks.push(thumbs[n > 1 ? Math.round(q * (thumbs.length - 1) / (n - 1)) : 0]);
-        var cover = "";
-        try { cover = await evaluateJavascriptViaWebview("https://gofile.io/robots.txt", {}, [coverScript(picks, n)], 15); } catch (e) {}
+        var cover = await this.composeCover(thumbs, n);
         info = this.infoMap();
-        info["g:" + g.key] = { image: /^data:image/.test(cover || "") ? cover : picks[0], cv: mark };
+        info["g:" + g.key] = { image: cover || thumbs[0], cv: mark };
         this.writeStore(STORE_INFO, JSON.stringify(info));
     }
 
@@ -459,13 +465,13 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         var groups = this.groups();
-        var known = this.infoMap(), fm = this.filesMap(), mark = this.coverMark();
+        var known = this.infoMap(), fm = this.filesMap(), mark = this.coverMark(), self1 = this;
         var codes = [];
         groups.forEach(function (g) { codes = codes.concat(g.codes); });
         var missing = codes.filter(function (c) {
             var k = known[c];
             if (k && /non trovata/.test(k.name || "")) return false;
-            return !fm[c] || !k || (k.image && k.cv !== mark);
+            return !fm[c] || !k || (k.image && k.cv !== (self1.isBunkr(c) ? mark + "b" : mark));
         });
         var self0 = this;
         if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self0.isBunkr(c); });
