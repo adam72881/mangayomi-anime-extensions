@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.1.0
+
+- **Nome della scheda:** nelle impostazioni, dopo il link, puoi scrivere il nome (`https://gofile.io/d/XXXX Il mio pack`). La scheda si chiama subito così.
+- **Copertine da sole:** la prima volta che apri Popolari, l'estensione carica titolo e copertina di ogni link nuovo, una cartella alla volta, e li salva. Le volte dopo l'elenco è immediato. Se Gofile in quel momento non risponde, riprova la volta dopo.
+- Se Gofile non risponde, se la cartella non esiste più o se ha la password, la scheda lo dice subito invece di aspettare.
+
 ## Gofile 1.0.0 (nuova)
 
 - Per guardare le **tue cartelle Gofile** dentro Mangayomi. Nelle impostazioni dell'estensione metti i link `https://gofile.io/d/…`, uno per riga: ogni link diventa una scheda in Popolari, e i video della cartella sono gli episodi, con miniatura. Per aprire un link al volo, incollalo nella ricerca.
