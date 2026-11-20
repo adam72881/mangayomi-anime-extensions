@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.9.0",
+        "version": "1.10.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -29,6 +29,7 @@ const STORE_TOKEN = "gofile_token";
 const STORE_FILES = "gofile_folder_files";
 const FILES_TTL = 6 * 3600000;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
+const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 // Copertina 400x600 da 1, 2 o 4 miniature: a ognuna si tolgono le bande nere di
 // Gofile e la si allarga fino a riempire il suo riquadro (le miniature hanno CORS *).
@@ -148,6 +149,33 @@ class DefaultExtension extends MProvider {
         return /^[A-Za-z0-9]{4,}$/.test(s) ? s : "";
     }
 
+    // Bunkr: album /a/<id> o singolo file /f/<id> (anche /v/, /i/), su qualsiasi
+    // dominio bunkr.*. Il codice interno è «bk~tipo~id~dominio».
+    bunkrCode(text) {
+        var m = String(text || "").match(/(bunkr+\.[a-z]{2,})\/([afvi])\/([A-Za-z0-9]+)/i);
+        if (!m) return "";
+        return "bk~" + (m[2].toLowerCase() === "a" ? "a" : "f") + "~" + m[3] + "~" + m[1].toLowerCase();
+    }
+
+    linkCode(text) {
+        return this.bunkrCode(text) || this.codeOf(text);
+    }
+
+    isBunkr(code) {
+        return String(code).indexOf("bk~") === 0;
+    }
+
+    bunkrParts(code) {
+        var p = String(code).split("~");
+        return { kind: p[1], id: p[2], host: p[3] };
+    }
+
+    linkUrl(code) {
+        if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
+        var b = this.bunkrParts(code);
+        return "https://" + b.host + "/" + b.kind + "/" + b.id;
+    }
+
     readJson(key, fallback) {
         try { var v = this.readStore(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
     }
@@ -179,7 +207,7 @@ class DefaultExtension extends MProvider {
     }
 
     shortLink(code) {
-        return "gofile.io/d/" + code;
+        return this.linkUrl(code).replace(/^https:\/\//, "");
     }
 
     removeKey(links) {
@@ -193,14 +221,14 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?gofile\.io\/d\/[A-Za-z0-9]+/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+)/gi) || [];
         if (links.length > 1) {
-            for (var i = 0; i < links.length; i++) out.push({ code: this.codeOf(links[i]), name: "" });
+            for (var i = 0; i < links.length; i++) out.push({ code: this.linkCode(links[i]), name: "" });
             return out;
         }
         var code, rest;
         if (links.length === 1) {
-            code = this.codeOf(links[0]);
+            code = this.linkCode(links[0]);
             rest = line.replace(links[0], " ");
         } else {
             var first = line.split(/[\s|]+/)[0];
@@ -314,7 +342,7 @@ class DefaultExtension extends MProvider {
 
     card(code, name) {
         var info = this.infoMap()[code] || {};
-        return { name: name || this.customName(code) || info.name || "Gofile " + code, imageUrl: info.image || "", link: "/d/" + code };
+        return { name: name || this.customName(code) || info.name || this.shortLink(code), imageUrl: info.image || "", link: (this.isBunkr(code) ? "/bk/" : "/d/") + code };
     }
 
     groupCard(g) {
@@ -327,6 +355,7 @@ class DefaultExtension extends MProvider {
     // Legge una cartella e ricorda lista dei video, titolo e (se chiesta) copertina.
     // Se Gofile non risponde non salva niente: si riprova la volta dopo.
     async readOne(code, withCover) {
+        if (this.isBunkr(code)) return this.readBunkr(code);
         var data;
         try { data = await this.readFolder(code, withCover ? this.coverN() : 0); } catch (e) { return null; }
         var rows = data.rows || [];
@@ -344,6 +373,48 @@ class DefaultExtension extends MProvider {
         map[code] = { name: title, image: data.cover || old.image || thumb, cv: data.cover ? this.coverMark() : (withCover ? this.coverMark() : old.cv || "") };
         this.writeStore(STORE_INFO, JSON.stringify(map));
         return data;
+    }
+
+    decodeHtml(t) {
+        return String(t || "").replace(/&quot;/g, '"').replace(/&#0*39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+    }
+
+    // Bunkr non ha bisogno della WebView: la pagina dell'album ha già nome,
+    // miniatura e link /f/<id> di ogni file; quella di un file ha la miniatura.
+    async readBunkr(code) {
+        var b = this.bunkrParts(code);
+        var res;
+        try { res = await this.client.get(this.linkUrl(code), { "User-Agent": UA }); } catch (e) { return null; }
+        var html = String((res && res.body) || "");
+        var status = res ? res.statusCode : 0;
+        if (status >= 500 || (!html && status !== 404)) return null;
+        var files = [];
+        var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
+        if (b.kind === "a") {
+            var parts = html.split(/class="relative group\/item theItem"/).slice(1);
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts[i];
+                var slug = (p.match(/href="\/f\/([A-Za-z0-9]+)"/) || [])[1];
+                var name = this.decodeHtml((p.match(/class="truncate theName[^"]*">([^<]+)</) || [])[1] || (p.match(/title="([^"]+)"/) || [])[1] || "");
+                if (!slug || !VIDEO_EXT.test(name)) continue;
+                files.push({ n: name, img: (p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || "", bf: slug, bh: b.host });
+            }
+        } else {
+            var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
+            if (VIDEO_EXT.test(title)) {
+                files.push({ n: title, img: og, bf: b.id, bh: b.host });
+                title = this.episodeName(title);
+            }
+        }
+        var notFound = status === 404 || (!files.length && !/theItem|og:type" content="video/.test(html));
+        if (notFound) title = this.shortLink(code) + " (non trovata)";
+        var fm = this.filesMap();
+        fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now() };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        map[code] = { name: fm[code].title, image: files.length ? files[0].img : "", cv: this.coverMark() };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: files, text: notFound ? "not found" : "" };
     }
 
     // Tre cartelle alla volta.
@@ -365,6 +436,15 @@ class DefaultExtension extends MProvider {
             if (f) f.files.forEach(function (x) { if (x.img) thumbs.push(x.img); });
         }
         if (!thumbs.length) return;
+        // Le miniature di Bunkr non permettono di essere rielaborate (niente CORS):
+        // il collage usa quelle di Gofile, altrimenti resta la prima miniatura.
+        var go = thumbs.filter(function (t) { return /\.gofile\.io\//.test(t); });
+        if (!go.length) {
+            info["g:" + g.key] = { image: thumbs[0], cv: mark };
+            this.writeStore(STORE_INFO, JSON.stringify(info));
+            return;
+        }
+        thumbs = go;
         var picks = [];
         for (var q = 0; q < n && q < thumbs.length; q++) picks.push(thumbs[n > 1 ? Math.round(q * (thumbs.length - 1) / (n - 1)) : 0]);
         var cover = "";
@@ -387,7 +467,9 @@ class DefaultExtension extends MProvider {
             if (k && /non trovata/.test(k.name || "")) return false;
             return !fm[c] || !k || (k.image && k.cv !== mark);
         });
-        if (missing.length && typeof evaluateJavascriptViaWebview === "function") await this.readMany(missing, true);
+        var self0 = this;
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self0.isBunkr(c); });
+        if (missing.length) await this.readMany(missing, true);
         for (var i = 0; i < groups.length; i++) {
             if (groups[i].key.charAt(0) !== "#" && groups[i].codes.length > 1) await this.groupCover(groups[i]);
         }
@@ -404,7 +486,7 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
-        var code = /gofile\.io/i.test(q) ? this.codeOf(q) : "";
+        var code = /gofile\.io|bunkr+\./i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         var all = (await this.getPopular(1)).list;
         if (!q) return { list: all, hasNextPage: false };
@@ -443,7 +525,8 @@ class DefaultExtension extends MProvider {
             if (!g) throw new Error("Gofile: questa raccolta non c'è più tra i link salvati.");
             codes = g.codes;
         } else {
-            var code = this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, ""));
+            var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
+            var code = bk ? decodeURIComponent(bk[1]) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
@@ -476,6 +559,10 @@ class DefaultExtension extends MProvider {
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
                 videos++;
+                if (v.bf) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "bunkr:https://" + v.bh + "/f/" + v.bf, thumbnailUrl: v.img });
+                    continue;
+                }
                 var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
                 if (!base) { missingThumb++; continue; }
                 chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: base + encodeURIComponent(v.n), thumbnailUrl: v.img });
@@ -500,17 +587,40 @@ class DefaultExtension extends MProvider {
 
         return {
             name: title,
-            link: g ? "/g/" + encodeURIComponent(g.key) : "/d/" + codes[0],
+            link: g ? "/g/" + encodeURIComponent(g.key) : (this.isBunkr(codes[0]) ? "/bk/" : "/d/") + codes[0],
             imageUrl: image,
-            description: lines.join("\n") + "\n\n" + codes.map(function (c) { return "https://gofile.io/d/" + c; }).join("\n"),
+            description: lines.join("\n") + "\n\n" + codes.map(this.linkUrl.bind(this)).join("\n"),
             genre: [],
             status: 1,
             chapters: chapters,
         };
     }
 
+    // Bunkr: la pagina del file ha l'indirizzo del mp4 (jsCDN) e quello che lo firma
+    // (signUrl); il loro lettore chiede la firma e la aggiunge al link, come qui.
+    async bunkrVideo(page) {
+        var res = await this.client.get(page, { "User-Agent": UA });
+        var html = String((res && res.body) || "");
+        var unq = function (v) { return String(v || "").replace(/\\\//g, "/"); };
+        var cdn = unq((html.match(/var\s+jsCDN\s*=\s*"([^"]+)"/) || [])[1]);
+        var signer = unq((html.match(/var\s+signUrl\s*=\s*"([^"]+)"/) || [])[1]);
+        if (!cdn) throw new Error("Bunkr: il file non è più disponibile.");
+        var out = cdn;
+        if (signer) {
+            var path = decodeURIComponent(cdn.replace(/^https?:\/\/[^/]+/, "").split("?")[0]);
+            var sres = await this.client.get(signer + "?path=" + encodeURIComponent(path), { "User-Agent": UA });
+            var sig = null;
+            try { sig = JSON.parse(sres.body); } catch (e) {}
+            if (!sig || !sig.token) throw new Error("Bunkr: non è stato possibile avere il permesso per il video. Riprova.");
+            out = cdn + (cdn.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(sig.token) + "&ex=" + encodeURIComponent(sig.ex);
+        }
+        var ext = ((cdn.split("?")[0].match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
+        return [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
+    }
+
     async getVideoList(url) {
         var file = String(url);
+        if (file.indexOf("bunkr:") === 0) return this.bunkrVideo(file.slice(6));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
@@ -544,10 +654,10 @@ class DefaultExtension extends MProvider {
             key: this.addKey(),
             editTextPreference: {
                 title: "➕ Salva un link",
-                summary: "Scrivi un link Gofile (https://gofile.io/d/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
+                summary: "Scrivi un link Gofile (https://gofile.io/d/…) o Bunkr (album /a/… o video /f/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
                 value: "",
                 dialogTitle: "Salva un link",
-                dialogMessage: "Link Gofile, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
+                dialogMessage: "Link Gofile o Bunkr, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
             },
         }];
         if (links.length) {
