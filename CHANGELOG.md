@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.20.0
+
+- **Lettura album Bunkr finalizzata.** Tolta la riga di diagnostica temporanea. Il metodo in uso è quello più veloce che funziona sul telefono: la WebView apre l'album e scarica dall'interno la lista completa dei file (modalità avanzata); l'HTTP paginato resta come ripiego. I video si aprono prendendo il link firmato dalla pagina del singolo file solo al momento della riproduzione.
+
 ## Gofile 1.19.3
 
 - **Le schede vecchie ora si rileggono dopo un aggiornamento:** una scheda già salvata restava in cache e non veniva più riletta, quindi i miglioramenti (es. album Bunkr completi) non avevano effetto finché non toglievi e rimettevi il link — e a volte nemmeno così. Ora, dopo un aggiornamento che cambia il modo di leggere, le schede vengono rilette una volta da sole. È il motivo per cui l'album Bunkr restava bloccato a 100.
