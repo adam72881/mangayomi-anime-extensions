@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.19.2
+
+- **Diagnostica temporanea per gli album Bunkr:** nella descrizione della scheda compare una riga «diag ▸ …» che mostra cosa riesce a leggere la WebView (se vede la lista, se la richiesta parte, lo stato della risposta, quanti file estrae). Serve a capire perché su alcuni telefoni l'album grande resta a 100. Verrà tolta una volta risolto.
+
 ## Gofile 1.19.1
 
 - **Album Bunkr grandi: lettura ancora più affidabile.** Anche la WebView poteva perdere la query della modalità avanzata. Ora la WebView apre la pagina normale dell'album (superando l'eventuale verifica Cloudflare) e scarica la lista completa dei file dall'interno della pagina con una fetch del browser (che manda davvero la query e i cookie). Così gli album grandi mostrano tutti i video anche sul telefono.
