@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.16.2",
+        "version": "1.17.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -505,6 +505,20 @@ class DefaultExtension extends MProvider {
         return { html: "", host: host, status: 0, tried: tried };
     }
 
+    // Estrae i file video da una pagina album Bunkr (nome, miniatura, slug /f/),
+    // saltando i doppioni tra pagine diverse.
+    collectBunkrFiles(html, host, files, seen) {
+        var parts = String(html).split(/class="relative group\/item theItem"/).slice(1);
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            var slug = (p.match(/href="\/f\/([A-Za-z0-9]+)"/) || [])[1];
+            var name = this.decodeHtml((p.match(/class="truncate theName[^"]*">([^<]+)</) || [])[1] || (p.match(/title="([^"]+)"/) || [])[1] || "");
+            if (!slug || seen[slug] || !VIDEO_EXT.test(name)) continue;
+            seen[slug] = 1;
+            files.push({ n: name, img: (p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || "", bf: slug, bh: host });
+        }
+    }
+
     // Bunkr non ha bisogno della WebView: la pagina dell'album ha già nome,
     // miniatura e link /f/<id> di ogni file; quella di un file ha la miniatura.
     async readBunkr(code) {
@@ -515,13 +529,22 @@ class DefaultExtension extends MProvider {
         var files = [];
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
         if (b.kind === "a") {
-            var parts = html.split(/class="relative group\/item theItem"/).slice(1);
-            for (var i = 0; i < parts.length; i++) {
-                var p = parts[i];
-                var slug = (p.match(/href="\/f\/([A-Za-z0-9]+)"/) || [])[1];
-                var name = this.decodeHtml((p.match(/class="truncate theName[^"]*">([^<]+)</) || [])[1] || (p.match(/title="([^"]+)"/) || [])[1] || "");
-                if (!slug || !VIDEO_EXT.test(name)) continue;
-                files.push({ n: name, img: (p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || "", bf: slug, bh: page.host });
+            // Gli album Bunkr sono paginati a 100 file per pagina (?page=N). La prima
+            // pagina elenca anche l'ultima (?page=<max>): leggiamo tutte le pagine.
+            var seen = {};
+            this.collectBunkrFiles(html, page.host, files, seen);
+            var maxPage = 1, pm = html.match(/[?&]page=(\d+)/g) || [];
+            for (var pi = 0; pi < pm.length; pi++) { var n = parseInt(pm[pi].replace(/\D/g, ""), 10) || 1; if (n > maxPage) maxPage = n; }
+            if (maxPage > 60) maxPage = 60; // tetto di sicurezza (fino a ~6000 file)
+            var rest = [];
+            for (var pg = 2; pg <= maxPage; pg++) rest.push(pg);
+            for (var k = 0; k < rest.length; k += 3) {
+                var got = await Promise.all(rest.slice(k, k + 3).map(function (num) {
+                    return this.bunkrPage("/a/" + b.id + "?page=" + num, page.host);
+                }.bind(this)));
+                for (var gi = 0; gi < got.length; gi++) {
+                    if (got[gi] && got[gi].status === 200) this.collectBunkrFiles(got[gi].html, got[gi].host, files, seen);
+                }
             }
         } else {
             var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
