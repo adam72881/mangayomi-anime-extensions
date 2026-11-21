@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.15.0",
+        "version": "1.15.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -112,9 +112,10 @@ class DefaultExtension extends MProvider {
         return this.isBunkr(code) ? String(code).split("~").slice(0, 3).join("~") : code;
     }
 
-    // filester.me/d/<slug>: host di file con API pubblica. Codice «fl~<slug>».
+    // filester.me/d/<slug> (mirror: filester.gg): host di file con API pubblica.
+    // I due domini condividono slug e API; normalizziamo su .me. Codice «fl~<slug>».
     filesterCode(text) {
-        var m = String(text || "").match(/filester\.me\/d\/([A-Za-z0-9]+)/i);
+        var m = String(text || "").match(/filester\.(?:me|gg)\/d\/([A-Za-z0-9]+)/i);
         return m ? "fl~" + m[1] : "";
     }
 
@@ -247,7 +248,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.me\/d\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.(?:me|gg)\/d\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -619,7 +620,7 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\.|filester\.me|[?&]em=/i.test(q) ? this.linkCode(q) : "";
+        var code = /gofile\.io|bunkr+\.|filester\.(?:me|gg)|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         var all = (await this.getPopular(1)).list;
         if (!q) return { list: all, hasNextPage: false };

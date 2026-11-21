@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.15.1
+
+- **Anche i link `filester.gg`:** `filester.gg` è un mirror di `filester.me` (stessi file e stessa API). Prima i link `.gg` non venivano riconosciuti e restavano tra i salvati senza aprirsi. Ora funzionano come i `.me`.
+
 ## Gofile 1.15.0
 
 - **Anche filester.me:** in «➕ Salva un link» puoi mettere anche link `filester.me/d/…`. Diventano una scheda con il video, con titolo e copertina dalla pagina, e funzionano nelle raccolte con lo stesso nome. filester ha un'API pubblica in chiaro (come Gofile), quindi non serve WebView e niente da aggirare: il permesso del video si prende fresco a ogni apertura.
