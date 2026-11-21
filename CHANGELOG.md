@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.17.1
+
+- **Album Bunkr grandi, lettura più affidabile sul telefono:** la 1.17.0 leggeva le pagine dell'album in parallelo riusando la logica di fallback dei domini, che su Android poteva far saltare le pagine dopo la prima (restavano 100 video). Ora le pagine successive si leggono una alla volta, sullo stesso dominio, fermandosi quando non c'è più nulla di nuovo.
+
 ## Gofile 1.17.0
 
 - **Album Bunkr grandi, tutti i video:** gli album Bunkr sono paginati a 100 file per pagina. Prima l'estensione leggeva solo la prima pagina (massimo 100 video). Ora legge tutte le pagine dell'album, così un album con 1077 file mostra tutti i suoi video, non solo 100.

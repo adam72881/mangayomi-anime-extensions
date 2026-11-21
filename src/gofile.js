@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.17.0",
+        "version": "1.17.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -529,22 +529,19 @@ class DefaultExtension extends MProvider {
         var files = [];
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
         if (b.kind === "a") {
-            // Gli album Bunkr sono paginati a 100 file per pagina (?page=N). La prima
-            // pagina elenca anche l'ultima (?page=<max>): leggiamo tutte le pagine.
+            // Gli album Bunkr sono paginati a 100 file per pagina (?page=N). Leggiamo le
+            // pagine successive una alla volta, sullo stesso dominio che ha già risposto
+            // (non bunkrPage: eviterebbe fallback/marcature che su un intoppo farebbero
+            // saltare le altre pagine). Ci si ferma quando una pagina non aggiunge nulla.
             var seen = {};
             this.collectBunkrFiles(html, page.host, files, seen);
-            var maxPage = 1, pm = html.match(/[?&]page=(\d+)/g) || [];
-            for (var pi = 0; pi < pm.length; pi++) { var n = parseInt(pm[pi].replace(/\D/g, ""), 10) || 1; if (n > maxPage) maxPage = n; }
-            if (maxPage > 60) maxPage = 60; // tetto di sicurezza (fino a ~6000 file)
-            var rest = [];
-            for (var pg = 2; pg <= maxPage; pg++) rest.push(pg);
-            for (var k = 0; k < rest.length; k += 3) {
-                var got = await Promise.all(rest.slice(k, k + 3).map(function (num) {
-                    return this.bunkrPage("/a/" + b.id + "?page=" + num, page.host);
-                }.bind(this)));
-                for (var gi = 0; gi < got.length; gi++) {
-                    if (got[gi] && got[gi].status === 200) this.collectBunkrFiles(got[gi].html, got[gi].host, files, seen);
-                }
+            for (var pg = 2; pg <= 60; pg++) {
+                var before = files.length;
+                var pres = null;
+                try { pres = await this.client.get("https://" + page.host + "/a/" + b.id + "?page=" + pg, { "User-Agent": UA }); } catch (e) {}
+                if (!pres || pres.statusCode !== 200) break;
+                this.collectBunkrFiles(String(pres.body || ""), page.host, files, seen);
+                if (files.length === before) break;
             }
         } else {
             var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
