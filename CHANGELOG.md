@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.18.1
+
+- **Il link non sparisce più dopo averlo tolto e rimesso:** se toglievi un link e poi rimettevi lo stesso identico link, ricompariva la vecchia spunta «da togliere» e il link rimesso spariva di nuovo all'uscita. Ora la casella «Togli i link» cambia chiave dopo ogni rimozione, quindi una vecchia spunta non può più ritornare.
+
 ## Gofile 1.18.0
 
 - **Album Bunkr: tutti i video in una richiesta (modalità avanzata):** invece di leggere l'album pagina per pagina (che sul telefono spesso si fermava a 100), l'estensione usa la «modalità avanzata» di Bunkr (`?advanced=1`), che carica tutti i file in una sola pagina. Un album da 1077 file ora apre tutti i 1077 video in meno di un secondo. La vecchia lettura paginata resta come ripiego. (Grazie all'idea di usare la vista avanzata invece della paginazione.)

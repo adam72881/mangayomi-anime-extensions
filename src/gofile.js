@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.18.0",
+        "version": "1.18.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -23,6 +23,7 @@ const STORE_LINKS = "gofile_saved_links";
 const STORE_ADD_N = "gofile_add_n";
 const STORE_MIGRATED = "gofile_migrated";
 const STORE_REN_N = "gofile_ren_n";
+const STORE_REM_N = "gofile_rem_n";
 const STORE_BATCH = "gofile_last_batch";
 const STORE_INFO = "gofile_folder_info";
 const STORE_TOKEN = "gofile_token";
@@ -256,10 +257,14 @@ class DefaultExtension extends MProvider {
         return this.linkUrl(code).replace(/^https:\/\//, "");
     }
 
+    // La chiave di «Togli i link» cambia dopo ogni rimozione (contatore rotante), oltre
+    // a dipendere dai link correnti. Senza il contatore, togliere e poi rimettere lo
+    // stesso link ricreava lo stesso stato → stessa chiave → Mangayomi riproponeva la
+    // vecchia spunta «da togliere» e il link rimesso spariva di nuovo.
     removeKey(links) {
         var h = 0, str = links.map(function (l) { return l.code + "=" + l.name; }).join("|");
         for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
-        return "gofile_remove_" + (h >>> 0).toString(36);
+        return "gofile_remove_" + (parseInt(this.readStore(STORE_REM_N), 10) || 0) + "_" + (h >>> 0).toString(36);
     }
 
     // «link | nome», «link nome» o solo il link; più link separati da spazio, senza nome.
@@ -338,6 +343,7 @@ class DefaultExtension extends MProvider {
         if (remove && remove.length) {
             links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
             changed = true;
+            this.writeStore(STORE_REM_N, String((parseInt(this.readStore(STORE_REM_N), 10) || 0) + 1));
         }
         var added = this.parseLinks(this.setting(this.addKey()));
         if (added.length) {
