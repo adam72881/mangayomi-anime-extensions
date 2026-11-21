@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.17.2
+
+- **Album Bunkr: ripiego sugli altri domini e messaggio chiaro:** se le pagine successive di un album grande non arrivano dal dominio principale, ora l'estensione le riprova sugli altri domini Bunkr. Se proprio non si riescono a leggere (blocco o limite di rete), invece di fermarsi in silenzio a 100 lo dice chiaramente e suggerisce di cambiare rete.
+
 ## Gofile 1.17.1
 
 - **Album Bunkr grandi, lettura più affidabile sul telefono:** la 1.17.0 leggeva le pagine dell'album in parallelo riusando la logica di fallback dei domini, che su Android poteva far saltare le pagine dopo la prima (restavano 100 video). Ora le pagine successive si leggono una alla volta, sullo stesso dominio, fermandosi quando non c'è più nulla di nuovo.
