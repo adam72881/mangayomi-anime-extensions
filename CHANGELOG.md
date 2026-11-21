@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.15.2
+
+- **Tutti i domini di filester:** oltre a `.me` e `.gg` ora vanno anche `filester.si` e qualsiasi altro mirror futuro (stesso file, stessa API). Non serve più aggiungerli uno a uno.
+
 ## Gofile 1.15.1
 
 - **Anche i link `filester.gg`:** `filester.gg` è un mirror di `filester.me` (stessi file e stessa API). Prima i link `.gg` non venivano riconosciuti e restavano tra i salvati senza aprirsi. Ora funzionano come i `.me`.
