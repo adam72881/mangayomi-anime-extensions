@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.15.0",
+        "version": "1.16.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -112,14 +112,33 @@ class DefaultExtension extends MProvider {
         return this.isBunkr(code) ? String(code).split("~").slice(0, 3).join("~") : code;
     }
 
-    // filester.me/d/<slug>: host di file con API pubblica. Codice «fl~<slug>».
+    // filester.me/d/<slug> e i suoi mirror (filester.gg, .si, …): stesso servizio,
+    // slug e API condivisi. Accettiamo qualsiasi TLD e normalizziamo su .me.
+    // Codice «fl~<slug>».
     filesterCode(text) {
-        var m = String(text || "").match(/filester\.me\/d\/([A-Za-z0-9]+)/i);
+        var m = String(text || "").match(/filester\.[a-z]{2,}\/d\/([A-Za-z0-9]+)/i);
         return m ? "fl~" + m[1] : "";
     }
 
     isFilester(code) {
         return String(code).indexOf("fl~") === 0;
+    }
+
+    // pixeldrain.com: file singolo /u/<id> o lista /l/<id>, API pubblica in chiaro.
+    // Codice «pd~f~<id>» (file) o «pd~l~<id>» (lista).
+    pixeldrainCode(text) {
+        var m = String(text || "").match(/pixeldrain\.com\/([ul])\/([A-Za-z0-9]+)/i);
+        if (!m) return "";
+        return "pd~" + (m[1].toLowerCase() === "l" ? "l" : "f") + "~" + m[2];
+    }
+
+    isPixeldrain(code) {
+        return String(code).indexOf("pd~") === 0;
+    }
+
+    pdParts(code) {
+        var p = String(code).split("~");
+        return { kind: p[1], id: p[2] };
     }
 
     // Pagine che incapsulano un link diretto Gofile in base64 nel parametro em=
@@ -170,7 +189,7 @@ class DefaultExtension extends MProvider {
     }
 
     linkCode(text) {
-        return this.bunkrCode(text) || this.filesterCode(text) || this.embedCode(text) || this.codeOf(text);
+        return this.bunkrCode(text) || this.filesterCode(text) || this.pixeldrainCode(text) || this.embedCode(text) || this.codeOf(text);
     }
 
     isBunkr(code) {
@@ -185,6 +204,7 @@ class DefaultExtension extends MProvider {
     linkUrl(code) {
         if (this.isEmbed(code)) return String(code).slice(3);
         if (this.isFilester(code)) return "https://filester.me/d/" + String(code).slice(3);
+        if (this.isPixeldrain(code)) { var p = this.pdParts(code); return "https://pixeldrain.com/" + (p.kind === "l" ? "l" : "u") + "/" + p.id; }
         if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
         var b = this.bunkrParts(code);
         return "https://" + b.host + "/" + b.kind + "/" + b.id;
@@ -247,7 +267,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.me\/d\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.[a-z]{2,}\/d\/[A-Za-z0-9]+|pixeldrain\.com\/[ul]\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -401,6 +421,7 @@ class DefaultExtension extends MProvider {
     cardPath(code) {
         if (this.isEmbed(code)) return "/em/" + encodeURIComponent(code);
         if (this.isFilester(code)) return "/fl/" + code;
+        if (this.isPixeldrain(code)) return "/pd/" + code;
         return (this.isBunkr(code) ? "/bk/" : "/d/") + code;
     }
 
@@ -429,6 +450,7 @@ class DefaultExtension extends MProvider {
     async readOne(code) {
         if (this.isBunkr(code)) return this.readBunkr(code);
         if (this.isFilester(code)) return this.readFilester(code);
+        if (this.isPixeldrain(code)) return this.readPixeldrain(code);
         if (this.isEmbed(code)) return this.readEmbed(code);
         var data;
         try { data = await this.readFolder(code); } catch (e) { return null; }
@@ -541,6 +563,42 @@ class DefaultExtension extends MProvider {
         return { rows: fm[code].files, text: notFound ? "not found" : "" };
     }
 
+    // pixeldrain: API pubblica in chiaro. Un file (/u/) è un video; una lista (/l/) è
+    // una cartella di video. Titolo e miniatura dall'API; il video è l'URL diretto
+    // /api/file/<id>, senza Referer né permessi a tempo.
+    async readPixeldrain(code) {
+        var p = this.pdParts(code);
+        var api = p.kind === "l"
+            ? "https://pixeldrain.com/api/list/" + p.id
+            : "https://pixeldrain.com/api/file/" + p.id + "/info";
+        var res;
+        try { res = await this.client.get(api, { "User-Agent": UA }); } catch (e) { return null; }
+        if (res && res.statusCode >= 500) return null;
+        var data = null;
+        try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
+        var notFound = !data || !data.success;
+        var files = [], title = "";
+        if (!notFound && p.kind === "l") {
+            title = this.episodeName(data.title || "") || p.id;
+            var arr = data.files || [];
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i].mime_type && arr[i].mime_type.indexOf("video/") !== 0) continue;
+                files.push({ n: arr[i].name || "video.mp4", img: "https://pixeldrain.com/api/file/" + arr[i].id + "/thumbnail", pd: arr[i].id });
+            }
+        } else if (!notFound) {
+            title = this.episodeName(data.name || "") || p.id;
+            files.push({ n: data.name || "video.mp4", img: "https://pixeldrain.com/api/file/" + p.id + "/thumbnail", pd: p.id });
+        }
+        if (notFound) title = this.shortLink(code) + " (non trovata)";
+        var fm = this.filesMap();
+        fm[code] = { title: title, files: files, folders: 0, at: Date.now() };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        map[code] = { name: title, image: files.length ? files[0].img : "" };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: files, text: notFound ? "not found" : "" };
+    }
+
     // Link incapsulato. Se dentro em= c'è un file Gofile → un video. Se c'è un altro
     // sito (es. uno streaming con video protetto) → non si può aprire, e si dice perché.
     readEmbed(code) {
@@ -588,7 +646,7 @@ class DefaultExtension extends MProvider {
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
-        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isFilester(c) || self.isEmbed(c); });
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isFilester(c) || self.isPixeldrain(c) || self.isEmbed(c); });
         if (missing.length) await this.readMany(missing);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
@@ -619,7 +677,7 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\.|filester\.me|[?&]em=/i.test(q) ? this.linkCode(q) : "";
+        var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         var all = (await this.getPopular(1)).list;
         if (!q) return { list: all, hasNextPage: false };
@@ -710,6 +768,10 @@ class DefaultExtension extends MProvider {
                     chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "filester:" + v.fl, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
                     continue;
                 }
+                if (v.pd) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "pixeldrain:" + v.pd, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
+                    continue;
+                }
                 var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
                 if (!base) { missingThumb++; continue; }
                 chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: base + encodeURIComponent(v.n), thumbnailUrl: v.img });
@@ -791,6 +853,13 @@ class DefaultExtension extends MProvider {
         return [{ url: url, originalUrl: url, quality: "filester · " + ext, headers: { "User-Agent": UA } }];
     }
 
+    // pixeldrain: il file si scarica direttamente da /api/file/<id> (supporta i range,
+    // nessun Referer). Niente permessi a tempo: l'URL è stabile.
+    pixeldrainVideo(id) {
+        var url = "https://pixeldrain.com/api/file/" + id;
+        return [{ url: url, originalUrl: url, quality: "Pixeldrain", headers: { "User-Agent": UA } }];
+    }
+
     // Il file Gofile risponde solo se la richiesta sembra arrivare dalla pagina che lo
     // incapsula (altrimenti «Access denied from this domain»): si fa come il suo lettore,
     // con quel Referer. Il parametro t= è la scadenza della PAGINA, non del file: il link
@@ -826,6 +895,7 @@ class DefaultExtension extends MProvider {
         if (file.indexOf("bunkr:") === 0) return this.bunkrVideo(file.slice(6));
         if (file.indexOf("embed:") === 0) return this.embedVideo(file.slice(6));
         if (file.indexOf("filester:") === 0) return this.filesterVideo(file.slice(9));
+        if (file.indexOf("pixeldrain:") === 0) return this.pixeldrainVideo(file.slice(11));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
@@ -859,10 +929,10 @@ class DefaultExtension extends MProvider {
             key: this.addKey(),
             editTextPreference: {
                 title: "➕ Salva un link",
-                summary: "Scrivi un link Gofile, Bunkr (album /a/… o video /f/…) o filester.me, e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
+                summary: "Scrivi un link Gofile, Bunkr (album /a/… o video /f/…), filester o pixeldrain (/u/… o lista /l/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
                 value: "",
                 dialogTitle: "Salva un link",
-                dialogMessage: "Link Gofile o Bunkr, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
+                dialogMessage: "Link Gofile, Bunkr, filester o pixeldrain, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",
             },
         }];
         if (links.length) {
