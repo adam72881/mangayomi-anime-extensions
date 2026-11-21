@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.19.3",
+        "version": "1.20.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -91,8 +91,8 @@ function listScript() {
 // cookie (compreso il via libera di Cloudflare) accompagnano la richiesta.
 function bunkrAlbumScript() {
     return `(function () {
-    var done = false, diag = { url: location.href.slice(0, 60), list0: 0, fetched: 0, status: 0, len: 0 };
-    function send(out) { if (done) return; done = true; out.diag = diag; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out)); } catch (e) {} }
+    var done = false;
+    function send(out) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out)); } catch (e) {} }
     function fromList(f) { var o = { title: document.title, files: [] }; for (var i = 0; i < f.length; i++) { var x = f[i] || {}; o.files.push({ original: x.original, slug: x.slug, type: x.type, thumbnail: x.thumbnail }); } return o; }
     function fromHtml(html) {
         var o = { title: (html.match(/<title>([^<]*)<\\/title>/i) || [])[1] || document.title, files: [] };
@@ -104,17 +104,18 @@ function bunkrAlbumScript() {
     var tries = 0;
     var timer = setInterval(function () {
         tries++;
-        if (window.albumFiles && window.albumFiles.length) { diag.list0 = window.albumFiles.length; clearInterval(timer); send(fromList(window.albumFiles)); return; }
+        // Se la pagina caricata è già quella avanzata, i file sono in window.albumFiles.
+        if (window.albumFiles && window.albumFiles.length) { clearInterval(timer); send(fromList(window.albumFiles)); return; }
         var body = document.body ? document.body.innerText : '';
         var ready = /\\/f\\//.test(document.documentElement.innerHTML) || /been deleted|been removed|does not exist|not found/i.test(body);
-        if (!(ready || tries > 20)) return;  // aspetta che la pagina (o la verifica) sia pronta
+        if (!(ready || tries > 20)) return;  // aspetta che la pagina (o la verifica Cloudflare) sia pronta
         clearInterval(timer);
-        var path = location.pathname + '?advanced=1';
-        diag.fetched = 1;
-        fetch(path, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { diag.status = r.status; return r.text(); })
-            .then(function (html) { diag.len = html.length; send(fromHtml(html)); })
-            .catch(function (e) { diag.status = -1; send({ title: document.title, files: [] }); });
+        // Scarica la modalità avanzata dalla stessa origine, con i cookie (query e via
+        // libera di Cloudflare inclusi): così arriva la lista completa dei file.
+        fetch(location.pathname + '?advanced=1', { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.text(); })
+            .then(function (html) { send(fromHtml(html)); })
+            .catch(function () { send({ title: document.title, files: [] }); });
     }, 500);
 })();`;
 }
@@ -569,15 +570,13 @@ class DefaultExtension extends MProvider {
     // Album Bunkr dalla WebView: carica ?advanced=1 (tutti i file in window.albumFiles),
     // superando le query e l'eventuale verifica Cloudflare che bloccano l'HTTP diretto.
     async readBunkrAlbumWebview(b, host) {
-        if (typeof evaluateJavascriptViaWebview !== "function") { this._bkDiag = "no-webview"; return null; }
+        if (typeof evaluateJavascriptViaWebview !== "function") return null;
         var h = host || this.readStore(STORE_BK_HOST) || "bunkr.si";
         var raw;
-        try { raw = await evaluateJavascriptViaWebview("https://" + h + "/a/" + b.id, {}, [bunkrAlbumScript()], 45); } catch (e) { this._bkDiag = "wv-errore"; return null; }
+        try { raw = await evaluateJavascriptViaWebview("https://" + h + "/a/" + b.id, {}, [bunkrAlbumScript()], 45); } catch (e) { return null; }
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
-        if (!data) { this._bkDiag = "wv-vuota (" + String(raw || "").slice(0, 30) + ")"; return null; }
-        var dg = data.diag || {};
-        this._bkDiag = "lista0=" + (dg.list0 || 0) + " fetch=" + (dg.fetched || 0) + " stato=" + (dg.status || 0) + " len=" + (dg.len || 0) + " file=" + (data.files || []).length;
+        if (!data) return null;
         var out = [], seen = {}, arr = data.files || [];
         for (var i = 0; i < arr.length; i++) {
             var x = arr[i] || {};
@@ -600,13 +599,10 @@ class DefaultExtension extends MProvider {
         var files = [];
         var partial = false;
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
-        var diag = "";
         if (b.kind === "a") {
             // Prima la WebView (modalità avanzata = tutti i file in una volta). Se non
             // c'è la WebView o non dà nulla, ripiego sulla lettura paginata via HTTP.
-            this._bkDiag = "";
             var wv = await this.readBunkrAlbumWebview(b, page.host);
-            diag = this._bkDiag || "";
             if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
             if (!files.length) {
                 var seen = {}, expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
@@ -630,7 +626,7 @@ class DefaultExtension extends MProvider {
         var notFound = page.status === 404;
         if (notFound) title = this.shortLink(code) + " (non trovata)";
         var fm = this.filesMap();
-        fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now(), partial: !!partial, diag: diag, v: READ_V };
+        fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now(), partial: !!partial, v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: fm[code].title, image: files.length ? files[0].img : "" };
@@ -907,7 +903,6 @@ class DefaultExtension extends MProvider {
         lines.push(codes.length > 1 ? codes.length + " link · " + videos + " video" : videos + " video");
         var bunkrPartial = false;
         for (var qp = 0; qp < codes.length; qp++) if (fm[codes[qp]] && fm[codes[qp]].partial) bunkrPartial = true;
-        if (codes.length === 1 && fm[codes[0]] && fm[codes[0]].diag) lines.push("diag ▸ " + fm[codes[0]].diag);
         if (bunkrPartial) lines.push("Album grande: sono riuscito a leggere solo questi " + videos + " video. Le pagine successive dell'album non si scaricano dal tuo telefono (possibile blocco o limite di rete su Bunkr). Prova a cambiare rete, o trascina in basso per riprovare.");
         if (missingThumb) lines.push(missingThumb + " video senza anteprima non si possono aprire da qui.");
         if (folders) lines.push(folders + " sottocartelle: aggiungile come link a parte.");
