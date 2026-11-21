@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.18.0
+
+- **Album Bunkr: tutti i video in una richiesta (modalità avanzata):** invece di leggere l'album pagina per pagina (che sul telefono spesso si fermava a 100), l'estensione usa la «modalità avanzata» di Bunkr (`?advanced=1`), che carica tutti i file in una sola pagina. Un album da 1077 file ora apre tutti i 1077 video in meno di un secondo. La vecchia lettura paginata resta come ripiego. (Grazie all'idea di usare la vista avanzata invece della paginazione.)
+
 ## Gofile 1.17.2
 
 - **Album Bunkr: ripiego sugli altri domini e messaggio chiaro:** se le pagine successive di un album grande non arrivano dal dominio principale, ora l'estensione le riprova sugli altri domini Bunkr. Se proprio non si riescono a leggere (blocco o limite di rete), invece di fermarsi in silenzio a 100 lo dice chiaramente e suggerisce di cambiare rete.

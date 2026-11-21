@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.17.2",
+        "version": "1.18.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -519,32 +519,53 @@ class DefaultExtension extends MProvider {
         }
     }
 
+    // Modalità avanzata di un album Bunkr (?advanced=1): i file sono in una variabile
+    // JS «Files = [ { …, original, slug, type, thumbnail }, … ]». Ne estraiamo i video.
+    parseBunkrAdvanced(html, host) {
+        var out = [], seen = {};
+        var re = /original:\s*"((?:[^"\\]|\\.)*)"\s*,\s*slug:\s*"([^"]+)"\s*,\s*type:\s*"([^"]+)"[\s\S]*?thumbnail:\s*"([^"]+)"/g;
+        var m;
+        while ((m = re.exec(html))) {
+            if (m[3].indexOf("video/") !== 0 || seen[m[2]]) continue;
+            seen[m[2]] = 1;
+            out.push({ n: this.decodeHtml(m[1]) || "video.mp4", img: m[4] || "", bf: m[2], bh: host });
+        }
+        return out;
+    }
+
     // Bunkr non ha bisogno della WebView: la pagina dell'album ha già nome,
     // miniatura e link /f/<id> di ogni file; quella di un file ha la miniatura.
     async readBunkr(code) {
         var b = this.bunkrParts(code);
-        var page = await this.bunkrPage("/" + b.kind + "/" + b.id, b.host);
+        // Per gli album chiediamo la «modalità avanzata» (?advanced=1): carica tutti i
+        // file in una pagina sola (nessuna paginazione), con slug, nome e miniatura
+        // dentro una variabile JS. Una richiesta invece di una per ogni 100 file.
+        var reqPath = b.kind === "a" ? "/a/" + b.id + "?advanced=1" : "/" + b.kind + "/" + b.id;
+        var page = await this.bunkrPage(reqPath, b.host);
         if (!page.status) return { rows: [], text: "bunkr-blocked " + (page.tried || []).join(", ") };
         var html = page.html;
         var files = [];
+        var partial = false;
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
         if (b.kind === "a") {
-            // Gli album Bunkr sono paginati a 100 file per pagina (?page=N). Leggiamo le
-            // pagine successive una alla volta, sullo stesso dominio che ha già risposto
-            // (non bunkrPage: eviterebbe fallback/marcature che su un intoppo farebbero
-            // saltare le altre pagine). Ci si ferma quando una pagina non aggiunge nulla.
-            var seen = {};
-            this.collectBunkrFiles(html, page.host, files, seen);
-            // Quante pagine aspettarci: dalla paginazione della prima pagina (?page=<max>).
-            var expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
-            for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
-            var partial = false;
-            for (var pg = 2; pg <= 60; pg++) {
-                var before = files.length;
-                var body = await this.bunkrAlbumPage(page.host, b.id, pg);
-                if (body == null) { if (pg <= expMax) partial = true; break; }
-                this.collectBunkrFiles(body, page.host, files, seen);
-                if (files.length === before) { if (pg <= expMax && !/theItem/.test(body)) partial = true; break; }
+            files = this.parseBunkrAdvanced(html, page.host);
+            if (!files.length) {
+                // Ripiego se la modalità avanzata non desse nulla (vecchio mirror):
+                // pagina normale paginata a 100 file, una pagina alla volta.
+                var np = await this.bunkrPage("/a/" + b.id, page.host);
+                if (np.status) {
+                    html = np.html;
+                    var seen = {}, expMax = 1, pmx = np.html.match(/[?&]page=(\d+)/g) || [];
+                    for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
+                    this.collectBunkrFiles(np.html, page.host, files, seen);
+                    for (var pg = 2; pg <= 60; pg++) {
+                        var before = files.length;
+                        var body = await this.bunkrAlbumPage(page.host, b.id, pg);
+                        if (body == null) { if (pg <= expMax) partial = true; break; }
+                        this.collectBunkrFiles(body, page.host, files, seen);
+                        if (files.length === before) { if (pg <= expMax && !/theItem/.test(body)) partial = true; break; }
+                    }
+                }
             }
         } else {
             var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
