@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.16.0
+
+- **Anche pixeldrain:** in «➕ Salva un link» puoi mettere link `pixeldrain.com/u/…` (un file) e `pixeldrain.com/l/…` (una lista, che diventa una scheda con tutti i video come episodi). Titolo e copertina arrivano dall'API; il video si scarica dall'indirizzo diretto, senza permessi a tempo. API pubblica in chiaro come Gofile e filester: niente WebView e niente da aggirare.
+
 ## Gofile 1.15.2
 
 - **Tutti i domini di filester:** oltre a `.me` e `.gg` ora vanno anche `filester.si` e qualsiasi altro mirror futuro (stesso file, stessa API). Non serve più aggiungerli uno a uno.
