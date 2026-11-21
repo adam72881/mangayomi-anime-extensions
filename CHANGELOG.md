@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.16.1
+
+- **Correzione pixeldrain:** nella 1.16.0 la scheda pixeldrain si creava ma all'apertura dava «Gofile: link non valido» e 0 episodi (mancava il riconoscimento del percorso interno `/pd/`). Ora si apre correttamente e mostra il video.
+
 ## Gofile 1.16.0
 
 - **Anche pixeldrain:** in «➕ Salva un link» puoi mettere link `pixeldrain.com/u/…` (un file) e `pixeldrain.com/l/…` (una lista, che diventa una scheda con tutti i video come episodi). Titolo e copertina arrivano dall'API; il video si scarica dall'indirizzo diretto, senza permessi a tempo. API pubblica in chiaro come Gofile e filester: niente WebView e niente da aggirare.
