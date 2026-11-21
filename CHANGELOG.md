@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.19.3
+
+- **Le schede vecchie ora si rileggono dopo un aggiornamento:** una scheda già salvata restava in cache e non veniva più riletta, quindi i miglioramenti (es. album Bunkr completi) non avevano effetto finché non toglievi e rimettevi il link — e a volte nemmeno così. Ora, dopo un aggiornamento che cambia il modo di leggere, le schede vengono rilette una volta da sole. È il motivo per cui l'album Bunkr restava bloccato a 100.
+
 ## Gofile 1.19.2
 
 - **Diagnostica temporanea per gli album Bunkr:** nella descrizione della scheda compare una riga «diag ▸ …» che mostra cosa riesce a leggere la WebView (se vede la lista, se la richiesta parte, lo stato della risposta, quanti file estrae). Serve a capire perché su alcuni telefoni l'album grande resta a 100. Verrà tolta una volta risolto.
