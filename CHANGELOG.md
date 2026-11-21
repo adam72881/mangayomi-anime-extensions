@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.19.0
+
+- **Album Bunkr grandi, ora davvero tutti i video (via WebView):** sul telefono la pagina «avanzata» di Bunkr non si scaricava via HTTP (le richieste con query a volte vengono fermate), così gli album grandi restavano a 100. Ora l'estensione apre l'album nella WebView nascosta (come fa per Gofile), legge la lista completa dei file e prende tutti i video. L'HTTP paginato resta come ripiego dove la WebView non c'è.
+
 ## Gofile 1.18.1
 
 - **Il link non sparisce più dopo averlo tolto e rimesso:** se toglievi un link e poi rimettevi lo stesso identico link, ricompariva la vecchia spunta «da togliere» e il link rimesso spariva di nuovo all'uscita. Ora la casella «Togli i link» cambia chiave dopo ogni rimozione, quindi una vecchia spunta non può più ritornare.

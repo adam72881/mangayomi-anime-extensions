@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.18.1",
+        "version": "1.19.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -72,6 +72,32 @@ function listScript() {
         if (single) {
             var fname = decodeURIComponent(vsrc.split('?')[0].split('/').pop());
             out.rows.push({ id: 'single', type: 'file', name: fname, img: vid.poster || vsrc.replace(/[^\\/]+$/, '') });
+        }
+        window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
+    }, 500);
+})();`;
+}
+
+// Album Bunkr nella WebView: la «modalità avanzata» (?advanced=1) mette tutti i file
+// nella variabile globale window.albumFiles. La WebView carica davvero la pagina
+// (query incluse, eventuale verifica Cloudflare risolta), poi leggiamo quella lista.
+// Via HTTP diretto il telefono a volte non riceve la pagina avanzata (resta a 100).
+function bunkrAlbumScript() {
+    return `(function () {
+    var tries = 0;
+    var timer = setInterval(function () {
+        tries++;
+        var f = window.albumFiles;
+        var body = document.body ? document.body.innerText : '';
+        var notFound = tries >= 4 && /not found|404|does not exist|been deleted|been removed/i.test((document.title || '') + ' ' + body);
+        if (!((f && f.length) || notFound || tries > 80)) return;
+        clearInterval(timer);
+        var out = { title: document.title, files: [] };
+        if (f && f.length) {
+            for (var i = 0; i < f.length; i++) {
+                var x = f[i] || {};
+                out.files.push({ original: x.original, slug: x.slug, type: x.type, thumbnail: x.thumbnail });
+            }
         }
         window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
     }, 500);
@@ -525,28 +551,32 @@ class DefaultExtension extends MProvider {
         }
     }
 
-    // Modalità avanzata di un album Bunkr (?advanced=1): i file sono in una variabile
-    // JS «Files = [ { …, original, slug, type, thumbnail }, … ]». Ne estraiamo i video.
-    parseBunkrAdvanced(html, host) {
-        var out = [], seen = {};
-        var re = /original:\s*"((?:[^"\\]|\\.)*)"\s*,\s*slug:\s*"([^"]+)"\s*,\s*type:\s*"([^"]+)"[\s\S]*?thumbnail:\s*"([^"]+)"/g;
-        var m;
-        while ((m = re.exec(html))) {
-            if (m[3].indexOf("video/") !== 0 || seen[m[2]]) continue;
-            seen[m[2]] = 1;
-            out.push({ n: this.decodeHtml(m[1]) || "video.mp4", img: m[4] || "", bf: m[2], bh: host });
+    // Album Bunkr dalla WebView: carica ?advanced=1 (tutti i file in window.albumFiles),
+    // superando le query e l'eventuale verifica Cloudflare che bloccano l'HTTP diretto.
+    async readBunkrAlbumWebview(b, host) {
+        if (typeof evaluateJavascriptViaWebview !== "function") return null;
+        var h = host || this.readStore(STORE_BK_HOST) || "bunkr.si";
+        var raw;
+        try { raw = await evaluateJavascriptViaWebview("https://" + h + "/a/" + b.id + "?advanced=1", {}, [bunkrAlbumScript()], 45); } catch (e) { return null; }
+        var data = null;
+        try { data = JSON.parse(raw || "null"); } catch (e) {}
+        if (!data) return null;
+        var out = [], seen = {}, arr = data.files || [];
+        for (var i = 0; i < arr.length; i++) {
+            var x = arr[i] || {};
+            if (!x.slug || seen[x.slug] || String(x.type || "").indexOf("video/") !== 0) continue;
+            seen[x.slug] = 1;
+            out.push({ n: this.decodeHtml(x.original || "video.mp4"), img: x.thumbnail || "", bf: x.slug, bh: h });
         }
-        return out;
+        return { title: this.decodeHtml(String(data.title || "").replace(/\s*\|\s*Bunkr\s*$/i, "")), files: out };
     }
 
-    // Bunkr non ha bisogno della WebView: la pagina dell'album ha già nome,
-    // miniatura e link /f/<id> di ogni file; quella di un file ha la miniatura.
+    // La pagina dell'album ha nome, miniatura e link /f/<id> di ogni file; quella di un
+    // file ha la miniatura. Gli album grandi sono paginati a 100 file, quindi per
+    // leggerli tutti si usa la WebView (modalità avanzata); l'HTTP paginato è il ripiego.
     async readBunkr(code) {
         var b = this.bunkrParts(code);
-        // Per gli album chiediamo la «modalità avanzata» (?advanced=1): carica tutti i
-        // file in una pagina sola (nessuna paginazione), con slug, nome e miniatura
-        // dentro una variabile JS. Una richiesta invece di una per ogni 100 file.
-        var reqPath = b.kind === "a" ? "/a/" + b.id + "?advanced=1" : "/" + b.kind + "/" + b.id;
+        var reqPath = "/" + b.kind + "/" + b.id;
         var page = await this.bunkrPage(reqPath, b.host);
         if (!page.status) return { rows: [], text: "bunkr-blocked " + (page.tried || []).join(", ") };
         var html = page.html;
@@ -554,23 +584,20 @@ class DefaultExtension extends MProvider {
         var partial = false;
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
         if (b.kind === "a") {
-            files = this.parseBunkrAdvanced(html, page.host);
+            // Prima la WebView (modalità avanzata = tutti i file in una volta). Se non
+            // c'è la WebView o non dà nulla, ripiego sulla lettura paginata via HTTP.
+            var wv = await this.readBunkrAlbumWebview(b, page.host);
+            if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
             if (!files.length) {
-                // Ripiego se la modalità avanzata non desse nulla (vecchio mirror):
-                // pagina normale paginata a 100 file, una pagina alla volta.
-                var np = await this.bunkrPage("/a/" + b.id, page.host);
-                if (np.status) {
-                    html = np.html;
-                    var seen = {}, expMax = 1, pmx = np.html.match(/[?&]page=(\d+)/g) || [];
-                    for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
-                    this.collectBunkrFiles(np.html, page.host, files, seen);
-                    for (var pg = 2; pg <= 60; pg++) {
-                        var before = files.length;
-                        var body = await this.bunkrAlbumPage(page.host, b.id, pg);
-                        if (body == null) { if (pg <= expMax) partial = true; break; }
-                        this.collectBunkrFiles(body, page.host, files, seen);
-                        if (files.length === before) { if (pg <= expMax && !/theItem/.test(body)) partial = true; break; }
-                    }
+                var seen = {}, expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
+                for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
+                this.collectBunkrFiles(html, page.host, files, seen);
+                for (var pg = 2; pg <= 60; pg++) {
+                    var before = files.length;
+                    var body = await this.bunkrAlbumPage(page.host, b.id, pg);
+                    if (body == null) { if (pg <= expMax) partial = true; break; }
+                    this.collectBunkrFiles(body, page.host, files, seen);
+                    if (files.length === before) { if (pg <= expMax && !/theItem/.test(body)) partial = true; break; }
                 }
             }
         } else {
