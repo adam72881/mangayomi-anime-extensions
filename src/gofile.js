@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.16.1",
+        "version": "1.16.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -576,7 +576,12 @@ class DefaultExtension extends MProvider {
         if (res && res.statusCode >= 500) return null;
         var data = null;
         try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
-        var notFound = !data || !data.success;
+        // L'API risponde sempre in JSON (anche «file assente»: {"success":false}).
+        // Se arriva altro (pagina di blocco dell'operatore, challenge, errore di rete
+        // travestito da 200) pixeldrain non è davvero raggiungibile dal telefono: non è
+        // un file sparito. Non salviamo una scheda «non trovata», così si riprova dopo.
+        if (!data) return { rows: [], text: "pd-unreachable" };
+        var notFound = !data.success;
         var files = [], title = "";
         if (!notFound && p.kind === "l") {
             title = this.episodeName(data.title || "") || p.id;
@@ -737,6 +742,7 @@ class DefaultExtension extends MProvider {
                     if (!d || (d.rows || []).length) return;
                     var why = String(d.text || "");
                     if (/^bunkr-blocked/.test(why)) problem = "Bunkr non risponde dal tuo telefono: forse i suoi domini sono bloccati dal tuo operatore. Provati: " + why.replace(/^bunkr-blocked\s*/, "") + ". Se si sblocca, trascina in basso la scheda.";
+                    else if (/pd-unreachable/.test(why)) problem = "pixeldrain non risponde dal tuo telefono (ha dato una pagina di blocco, non i dati del file). Spesso in Italia pixeldrain.com è bloccato dall'operatore: prova a cambiare rete (dati mobili al posto del Wi-Fi o viceversa), oppure apri il link nel browser per controllare. Se si sblocca, trascina in basso la scheda.";
                     else if (/unreachable/i.test(why)) problem = "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
                     else if (/password/i.test(why)) problem = "Una cartella è protetta da password: aprila nel browser.";
                     else if (/embed-cut/.test(why)) problem = "Il link si è tagliato quando l'hai incollato: toglilo da «Togli i link» e reincollalo per intero (tutto fino alla fine).";
@@ -782,7 +788,7 @@ class DefaultExtension extends MProvider {
         chapters.reverse();
 
         var single = codes.length === 1 ? (fm[codes[0]] || {}) : null;
-        var title = g ? g.name : (this.customName(codes[0]) || (single && single.title) || codes[0]);
+        var title = g ? g.name : (this.customName(codes[0]) || (single && single.title) || this.shortLink(codes[0]));
         var image = "";
         for (var ci = 0; ci < codes.length && !image; ci++) image = this.coverOf(codes[ci]);
         var lines = [];

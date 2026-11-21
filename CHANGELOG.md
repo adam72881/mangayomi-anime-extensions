@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.16.2
+
+- **pixeldrain, messaggio chiaro se è bloccato:** se il telefono riceve una pagina di blocco invece dei dati (in Italia pixeldrain.com è spesso bloccato dall'operatore), prima la scheda diceva «non trovata» come se il file fosse sparito. Ora distingue i due casi e spiega che pixeldrain non risponde dal telefono, suggerendo di cambiare rete o aprirlo nel browser.
+
 ## Gofile 1.16.1
 
 - **Correzione pixeldrain:** nella 1.16.0 la scheda pixeldrain si creava ma all'apertura dava «Gofile: link non valido» e 0 episodi (mancava il riconoscimento del percorso interno `/pd/`). Ora si apre correttamente e mostra il video.
