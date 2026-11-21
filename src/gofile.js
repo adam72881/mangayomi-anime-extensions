@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.19.2",
+        "version": "1.19.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -35,6 +35,11 @@ const STORE_FIX = "gofile_fix_1_12";
 // Domini di Bunkr: alcuni operatori italiani ne bloccano qualcuno, si prova il successivo.
 const BUNKR_HOSTS = ["bunkr.cr", "bunkr.si", "bunkr.fi", "bunkr.ph", "bunkr.ws", "bunkr.site", "bunkr.pk"];
 const FILES_TTL = 6 * 3600000;
+// Versione dello schema della cache (lista file di una scheda). Aumentandola, le schede
+// salvate con una versione precedente vengono rilette una volta, anche se non scadute:
+// così i miglioramenti nella lettura (es. album Bunkr completi) prendono effetto senza
+// dover togliere e rimettere il link.
+const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
@@ -504,7 +509,7 @@ class DefaultExtension extends MProvider {
         var files = rows.filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); })
             .map(function (r) { return { n: r.name, img: r.img }; });
         var fm = this.filesMap();
-        fm[code] = { title: title, files: files, folders: rows.filter(function (r) { return r.type === "folder"; }).length, at: Date.now() };
+        fm[code] = { title: title, files: files, folders: rows.filter(function (r) { return r.type === "folder"; }).length, at: Date.now(), v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         var old = map[code] || {};
@@ -625,7 +630,7 @@ class DefaultExtension extends MProvider {
         var notFound = page.status === 404;
         if (notFound) title = this.shortLink(code) + " (non trovata)";
         var fm = this.filesMap();
-        fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now(), partial: !!partial, diag: diag };
+        fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now(), partial: !!partial, diag: diag, v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: fm[code].title, image: files.length ? files[0].img : "" };
@@ -661,7 +666,7 @@ class DefaultExtension extends MProvider {
         var title = notFound ? this.shortLink(code) + " (non trovata)" : (this.episodeName(raw) || slug);
         var img = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
         var fm = this.filesMap();
-        fm[code] = { title: title, files: notFound ? [] : [{ n: raw || "video.mp4", img: img, fl: slug }], folders: 0, at: Date.now() };
+        fm[code] = { title: title, files: notFound ? [] : [{ n: raw || "video.mp4", img: img, fl: slug }], folders: 0, at: Date.now(), v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: title, image: /^http/.test(img) ? img : "" };
@@ -702,7 +707,7 @@ class DefaultExtension extends MProvider {
         }
         if (notFound) title = this.shortLink(code) + " (non trovata)";
         var fm = this.filesMap();
-        fm[code] = { title: title, files: files, folders: 0, at: Date.now() };
+        fm[code] = { title: title, files: files, folders: 0, at: Date.now(), v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
         map[code] = { name: title, image: files.length ? files[0].img : "" };
@@ -726,7 +731,7 @@ class DefaultExtension extends MProvider {
         fm[code] = {
             title: state === "other" ? (otherHost + " (non Gofile)") : state === "cut" ? "Link incompleto" : (this.episodeName(name) || this.shortLink(code)),
             files: state ? [] : [{ n: name || "video.mp4", img: "", em: code }],
-            folders: 0, at: Date.now(), embState: state, otherHost: otherHost,
+            folders: 0, at: Date.now(), embState: state, otherHost: otherHost, v: READ_V,
         };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
         var map = this.infoMap();
@@ -754,6 +759,7 @@ class DefaultExtension extends MProvider {
         var missing = codes.filter(function (c) {
             var f = fm[c];
             if (!f) return true;
+            if (f.v !== READ_V) return true; // scheda salvata da una versione precedente: rileggi una volta
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
@@ -839,7 +845,7 @@ class DefaultExtension extends MProvider {
         var again = this._seen[raw] && Date.now() - this._seen[raw] < 120000;
         this._seen[raw] = Date.now();
         var fm = this.filesMap(), info = this.infoMap();
-        var need = codes.filter(function (c) { return again || !fm[c] || Date.now() - (fm[c].at || 0) > FILES_TTL; });
+        var need = codes.filter(function (c) { return again || !fm[c] || fm[c].v !== READ_V || Date.now() - (fm[c].at || 0) > FILES_TTL; });
         var problem = "";
         if (need.length) {
             for (var k = 0; k < need.length; k += 3) {
