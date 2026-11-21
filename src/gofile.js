@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.14.2",
+        "version": "1.15.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -112,6 +112,16 @@ class DefaultExtension extends MProvider {
         return this.isBunkr(code) ? String(code).split("~").slice(0, 3).join("~") : code;
     }
 
+    // filester.me/d/<slug>: host di file con API pubblica. Codice «fl~<slug>».
+    filesterCode(text) {
+        var m = String(text || "").match(/filester\.me\/d\/([A-Za-z0-9]+)/i);
+        return m ? "fl~" + m[1] : "";
+    }
+
+    isFilester(code) {
+        return String(code).indexOf("fl~") === 0;
+    }
+
     // Pagine che incapsulano un link diretto Gofile in base64 nel parametro em=
     // (es. capistock.com/ember?em=…&t=…). Il codice è «em~» più l'indirizzo intero.
     embedCode(text) {
@@ -160,7 +170,7 @@ class DefaultExtension extends MProvider {
     }
 
     linkCode(text) {
-        return this.bunkrCode(text) || this.embedCode(text) || this.codeOf(text);
+        return this.bunkrCode(text) || this.filesterCode(text) || this.embedCode(text) || this.codeOf(text);
     }
 
     isBunkr(code) {
@@ -174,6 +184,7 @@ class DefaultExtension extends MProvider {
 
     linkUrl(code) {
         if (this.isEmbed(code)) return String(code).slice(3);
+        if (this.isFilester(code)) return "https://filester.me/d/" + String(code).slice(3);
         if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
         var b = this.bunkrParts(code);
         return "https://" + b.host + "/" + b.kind + "/" + b.id;
@@ -236,7 +247,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.me\/d\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -389,6 +400,7 @@ class DefaultExtension extends MProvider {
 
     cardPath(code) {
         if (this.isEmbed(code)) return "/em/" + encodeURIComponent(code);
+        if (this.isFilester(code)) return "/fl/" + code;
         return (this.isBunkr(code) ? "/bk/" : "/d/") + code;
     }
 
@@ -416,6 +428,7 @@ class DefaultExtension extends MProvider {
     // Se Gofile non risponde non salva niente: si riprova la volta dopo.
     async readOne(code) {
         if (this.isBunkr(code)) return this.readBunkr(code);
+        if (this.isFilester(code)) return this.readFilester(code);
         if (this.isEmbed(code)) return this.readEmbed(code);
         var data;
         try { data = await this.readFolder(code); } catch (e) { return null; }
@@ -506,6 +519,28 @@ class DefaultExtension extends MProvider {
         return { rows: files, text: notFound ? "not found" : "" };
     }
 
+    // filester.me: host di file con API pubblica in chiaro. La pagina /d/<slug> dà
+    // titolo e copertina; il video si ottiene al momento dall'API (permesso a tempo).
+    async readFilester(code) {
+        var slug = String(code).slice(3);
+        var res;
+        try { res = await this.client.get("https://filester.me/d/" + slug, { "User-Agent": UA }); } catch (e) { return null; }
+        var html = String((res && res.body) || "");
+        var status = res ? res.statusCode : 0;
+        if (status >= 500) return null;
+        var raw = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*filester\.me\s*$/i, "");
+        var notFound = status === 404 || (!raw && !/videoPlayer/.test(html));
+        var title = notFound ? this.shortLink(code) + " (non trovata)" : (this.episodeName(raw) || slug);
+        var img = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
+        var fm = this.filesMap();
+        fm[code] = { title: title, files: notFound ? [] : [{ n: raw || "video.mp4", img: img, fl: slug }], folders: 0, at: Date.now() };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        map[code] = { name: title, image: /^http/.test(img) ? img : "" };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: fm[code].files, text: notFound ? "not found" : "" };
+    }
+
     // Link incapsulato. Se dentro em= c'è un file Gofile → un video. Se c'è un altro
     // sito (es. uno streaming con video protetto) → non si può aprire, e si dice perché.
     readEmbed(code) {
@@ -553,7 +588,7 @@ class DefaultExtension extends MProvider {
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
-        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isEmbed(c); });
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isFilester(c) || self.isEmbed(c); });
         if (missing.length) await this.readMany(missing);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
@@ -584,7 +619,7 @@ class DefaultExtension extends MProvider {
     async search(query, page, filters) {
         if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\.|[?&]em=/i.test(q) ? this.linkCode(q) : "";
+        var code = /gofile\.io|bunkr+\.|filester\.me|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         var all = (await this.getPopular(1)).list;
         if (!q) return { list: all, hasNextPage: false };
@@ -625,7 +660,8 @@ class DefaultExtension extends MProvider {
         } else {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
             var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
-            var code = emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var flm = raw.match(/\/fl\/(fl~[A-Za-z0-9]+)/i);
+            var code = flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
@@ -668,6 +704,10 @@ class DefaultExtension extends MProvider {
                 }
                 if (v.bf) {
                     chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "bunkr:https://" + v.bh + "/f/" + v.bf, thumbnailUrl: v.img });
+                    continue;
+                }
+                if (v.fl) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "filester:" + v.fl, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
                     continue;
                 }
                 var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
@@ -732,6 +772,25 @@ class DefaultExtension extends MProvider {
         return [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
     }
 
+    // filester.me: API pubblica. POST /v2/api/public/view con lo slug → permesso a tempo,
+    // poi il video è <server>/v2/<file>?token=…. Il permesso si prende fresco a ogni play.
+    async filesterVideo(slug) {
+        var res;
+        try {
+            res = await this.client.post("https://filester.me/v2/api/public/view",
+                { "Content-Type": "application/json", "User-Agent": UA },
+                { file_slug: slug });
+        } catch (e) { throw new Error("filester non risponde in questo momento. Riprova."); }
+        var data = null;
+        try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
+        if (!data || !data.server || !data.file || !data.token) {
+            throw new Error("filester: il file non è più disponibile.");
+        }
+        var url = data.server + "/v2/" + data.file + "?token=" + encodeURIComponent(data.token);
+        var ext = ((String(data.file).match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
+        return [{ url: url, originalUrl: url, quality: "filester · " + ext, headers: { "User-Agent": UA } }];
+    }
+
     // Il file Gofile risponde solo se la richiesta sembra arrivare dalla pagina che lo
     // incapsula (altrimenti «Access denied from this domain»): si fa come il suo lettore,
     // con quel Referer. Il parametro t= è la scadenza della PAGINA, non del file: il link
@@ -766,6 +825,7 @@ class DefaultExtension extends MProvider {
         var file = String(url);
         if (file.indexOf("bunkr:") === 0) return this.bunkrVideo(file.slice(6));
         if (file.indexOf("embed:") === 0) return this.embedVideo(file.slice(6));
+        if (file.indexOf("filester:") === 0) return this.filesterVideo(file.slice(9));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
@@ -799,7 +859,7 @@ class DefaultExtension extends MProvider {
             key: this.addKey(),
             editTextPreference: {
                 title: "➕ Salva un link",
-                summary: "Scrivi un link Gofile (https://gofile.io/d/…) o Bunkr (album /a/… o video /f/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
+                summary: "Scrivi un link Gofile, Bunkr (album /a/… o video /f/…) o filester.me, e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
                 value: "",
                 dialogTitle: "Salva un link",
                 dialogMessage: "Link Gofile o Bunkr, poi una barra verticale e il nome della scheda (facoltativo). Es. https://gofile.io/d/XXXX | I miei video",

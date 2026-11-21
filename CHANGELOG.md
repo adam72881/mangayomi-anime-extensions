@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.15.0
+
+- **Anche filester.me:** in «➕ Salva un link» puoi mettere anche link `filester.me/d/…`. Diventano una scheda con il video, con titolo e copertina dalla pagina, e funzionano nelle raccolte con lo stesso nome. filester ha un'API pubblica in chiaro (come Gofile), quindi non serve WebView e niente da aggirare: il permesso del video si prende fresco a ogni apertura.
+
 ## Gofile 1.14.2
 
 - **Link incapsulati che portano a un altro sito:** alcuni link (es. capistock) non contengono un file Gofile ma un sito di streaming (es. hgcloud) con il video protetto. Prima non si salvavano, senza spiegazione. Ora la scheda si salva e dice chiaro che quel link non porta a Gofile e non si può aprire. L'estensione apre i file Gofile e gli album Bunkr, non lo streaming protetto di altri siti.
