@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.19.1
+
+- **Album Bunkr grandi: lettura ancora più affidabile.** Anche la WebView poteva perdere la query della modalità avanzata. Ora la WebView apre la pagina normale dell'album (superando l'eventuale verifica Cloudflare) e scarica la lista completa dei file dall'interno della pagina con una fetch del browser (che manda davvero la query e i cookie). Così gli album grandi mostrano tutti i video anche sul telefono.
+
 ## Gofile 1.19.0
 
 - **Album Bunkr grandi, ora davvero tutti i video (via WebView):** sul telefono la pagina «avanzata» di Bunkr non si scaricava via HTTP (le richieste con query a volte vengono fermate), così gli album grandi restavano a 100. Ora l'estensione apre l'album nella WebView nascosta (come fa per Gofile), legge la lista completa dei file e prende tutti i video. L'HTTP paginato resta come ripiego dove la WebView non c'è.

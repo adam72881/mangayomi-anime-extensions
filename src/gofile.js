@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.19.0",
+        "version": "1.19.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -78,28 +78,37 @@ function listScript() {
 })();`;
 }
 
-// Album Bunkr nella WebView: la «modalità avanzata» (?advanced=1) mette tutti i file
-// nella variabile globale window.albumFiles. La WebView carica davvero la pagina
-// (query incluse, eventuale verifica Cloudflare risolta), poi leggiamo quella lista.
-// Via HTTP diretto il telefono a volte non riceve la pagina avanzata (resta a 100).
+// Album Bunkr nella WebView. La «modalità avanzata» (?advanced=1) mette tutti i file
+// nella variabile globale window.albumFiles. Sul telefono però la richiesta HTTP con
+// query a volte non arriva (resta a 100). Qui carichiamo la pagina normale dell'album
+// (che passa l'eventuale verifica Cloudflare e prende i cookie) e, se la lista non c'è
+// già, la scarichiamo con fetch dalla stessa origine: così la query parte davvero e i
+// cookie (compreso il via libera di Cloudflare) accompagnano la richiesta.
 function bunkrAlbumScript() {
     return `(function () {
+    var done = false;
+    function send(out) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out)); } catch (e) {} }
+    function fromList(f) { var o = { title: document.title, files: [] }; for (var i = 0; i < f.length; i++) { var x = f[i] || {}; o.files.push({ original: x.original, slug: x.slug, type: x.type, thumbnail: x.thumbnail }); } return o; }
+    function fromHtml(html) {
+        var o = { title: (html.match(/<title>([^<]*)<\\/title>/i) || [])[1] || document.title, files: [] };
+        var re = /original:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*,\\s*slug:\\s*"([^"]+)"\\s*,\\s*type:\\s*"([^"]+)"[\\s\\S]*?thumbnail:\\s*"([^"]+)"/g, m;
+        while ((m = re.exec(html))) { if (m[3].indexOf('video/') !== 0) continue; o.files.push({ original: m[1], slug: m[2], type: m[3], thumbnail: m[4] }); }
+        return o;
+    }
+    setTimeout(function () { if (!done) send({ title: document.title, files: [] }); }, 42000);
     var tries = 0;
     var timer = setInterval(function () {
         tries++;
-        var f = window.albumFiles;
+        if (window.albumFiles && window.albumFiles.length) { clearInterval(timer); send(fromList(window.albumFiles)); return; }
         var body = document.body ? document.body.innerText : '';
-        var notFound = tries >= 4 && /not found|404|does not exist|been deleted|been removed/i.test((document.title || '') + ' ' + body);
-        if (!((f && f.length) || notFound || tries > 80)) return;
+        var ready = /\\/f\\//.test(document.documentElement.innerHTML) || /been deleted|been removed|does not exist|not found/i.test(body);
+        if (!(ready || tries > 20)) return;  // aspetta che la pagina (o la verifica) sia pronta
         clearInterval(timer);
-        var out = { title: document.title, files: [] };
-        if (f && f.length) {
-            for (var i = 0; i < f.length; i++) {
-                var x = f[i] || {};
-                out.files.push({ original: x.original, slug: x.slug, type: x.type, thumbnail: x.thumbnail });
-            }
-        }
-        window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
+        var path = location.pathname + '?advanced=1';
+        fetch(path, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.text(); })
+            .then(function (html) { send(fromHtml(html)); })
+            .catch(function () { send({ title: document.title, files: [] }); });
     }, 500);
 })();`;
 }
@@ -557,7 +566,7 @@ class DefaultExtension extends MProvider {
         if (typeof evaluateJavascriptViaWebview !== "function") return null;
         var h = host || this.readStore(STORE_BK_HOST) || "bunkr.si";
         var raw;
-        try { raw = await evaluateJavascriptViaWebview("https://" + h + "/a/" + b.id + "?advanced=1", {}, [bunkrAlbumScript()], 45); } catch (e) { return null; }
+        try { raw = await evaluateJavascriptViaWebview("https://" + h + "/a/" + b.id, {}, [bunkrAlbumScript()], 45); } catch (e) { return null; }
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) return null;
