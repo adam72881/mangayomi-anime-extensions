@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.16.0",
+        "version": "1.16.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -719,7 +719,8 @@ class DefaultExtension extends MProvider {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
             var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
             var flm = raw.match(/\/fl\/(fl~[A-Za-z0-9]+)/i);
-            var code = flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var pdm = raw.match(/\/pd\/(pd~[^?#\/]+)/i);
+            var code = pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
