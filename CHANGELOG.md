@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.17.0
+
+- **Album Bunkr grandi, tutti i video:** gli album Bunkr sono paginati a 100 file per pagina. Prima l'estensione leggeva solo la prima pagina (massimo 100 video). Ora legge tutte le pagine dell'album, così un album con 1077 file mostra tutti i suoi video, non solo 100.
+
 ## Gofile 1.16.2
 
 - **pixeldrain, messaggio chiaro se è bloccato:** se il telefono riceve una pagina di blocco invece dei dati (in Italia pixeldrain.com è spesso bloccato dall'operatore), prima la scheda diceva «non trovata» come se il file fosse sparito. Ora distingue i due casi e spiega che pixeldrain non risponde dal telefono, suggerendo di cambiare rete o aprirlo nel browser.
