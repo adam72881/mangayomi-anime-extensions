@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.23.1
+
+- **Token più affidabile al momento di scrivere:** la copia interna del token viene rinfrescata subito prima di aggiungere i link, così un token appena inserito viene usato correttamente. Se qualcosa non va, il messaggio sotto «➕ Aggiungi alla lista condivisa» dice esattamente cosa: «Manca il token», «GitHub ha risposto 401/403» (token sbagliato o senza permesso), oppure «Aggiunti N link. ✓».
+
 ## Gofile 1.23.0
 
 - **Vedi cosa c'è nella lista condivisa:** la voce «📄 Lista condivisa» ora elenca i link presenti nel documento (per nome), così sai se ci sono. Toccandola puoi comunque cambiare l'indirizzo del file. Dopo aver aggiunto dei link, compaiono subito nell'elenco (senza aspettare la cache di GitHub).
