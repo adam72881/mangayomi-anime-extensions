@@ -1,5 +1,12 @@
 # Novità
 
+## Gofile 1.26.1
+
+- **Popolari mostra anche la lista condivisa:** le schede sono i link del telefono più quelli del file (senza doppioni). Si aprono subito dalla copia salvata, come Recenti; il resto si aggiorna in sottofondo.
+- **«Togli i link» vede anche i link 🌐 del file:** si tolgono solo se c'è il token e solo dopo «Conferma rimozione». «Annulla ultima rimozione» li rimette. Senza token restano dov'erano. Un OK a vuoto non cancella nulla.
+- **«Aggiungi alla lista condivisa» elenca tutti i link del telefono:** quelli già nel file sono segnati «✓ già condiviso» e non vengono riscritti. Il titolo dice quanti sono davvero («3 nella lista condivisa · N su questo telefono»), non solo l'ultimo invio.
+- **L'indirizzo del file non è più un'impostazione:** è sempre quello del repository. Se sul telefono c'era un altro indirizzo, si butta e la lista si riscarica.
+
 ## Gofile 1.26.0
 
 - **Il token GitHub non si vede più per intero:** la casella resta vuota per incollarne uno nuovo (o «-» per toglierlo). Nel titolo c'è solo «Token ✓ (…ultime 4)» oppure «Token: non impostato». Quello già salvato sul telefono viene tenuto e continua a servire per aggiornare la lista.
