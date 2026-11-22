@@ -1,5 +1,12 @@
 # Novità
 
+## Gofile 1.26.0
+
+- **Il token GitHub non si vede più per intero:** la casella resta vuota per incollarne uno nuovo (o «-» per toglierlo). Nel titolo c'è solo «Token ✓ (…ultime 4)» oppure «Token: non impostato». Quello già salvato sul telefono viene tenuto e continua a servire per aggiornare la lista.
+- **Togliere un link chiede conferma:** segnare un link non lo cancella. Compare «Conferma rimozione (N)» e solo scrivendo OK si toglie. «Annulla ultima rimozione» rimette l'ultimo elenco tolto. Un OK a vuoto non cancella nulla.
+- **Lo stato si legge dal titolo:** quante voci ha la lista condivisa, se il token c'è, e se l'ultimo invio è andato a buon fine o con quale errore. Sulla TV, che non mostra le spiegazioni sotto la voce, le istruzioni essenziali stanno nel titolo.
+- **L'invio non si perde se GitHub risponde 409:** i link scelti restano in attesa finché la scrittura riesce. Se il file è cambiato nel frattempo, si rilegge e si riprova una volta. L'invio parte anche aprendo Recenti o la ricerca, oltre a Popolari.
+
 ## Gofile 1.25.2
 
 - **Gli episodi Bunkr si aprono di nuovo:** dalla 1.25.1 un limite di 12 secondi sulla pagina Bunkr scattava prima che il telefono ricevesse la risposta (su iPhone quel timer può anche scattare subito, se non è disponibile). L'episodio usciva con «nessuna risposta» da tutti i domini, anche quando Bunkr rispondeva. Ora la pagina usata per il video aspetta la risposta vera, come prima della 1.25.1. Un timer nostro non viene mai contato come «nessuna risposta» e non segna il dominio come bloccato.

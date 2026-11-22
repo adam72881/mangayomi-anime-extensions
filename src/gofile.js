@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.25.2",
+        "version": "1.26.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -36,6 +36,13 @@ const STORE_REMOTE = "gofile_remote_cache";
 const STORE_PUSH_N = "gofile_push_n";
 const STORE_PUSH_STATUS = "gofile_push_status";
 const STORE_PUSH_PENDING = "gofile_push_pending";
+const STORE_UNDO = "gofile_undo_last";
+const STORE_UNDO_N = "gofile_undo_n";
+const STORE_TOK_N = "gofile_tok_n";
+const STORE_CONFIRM_N = "gofile_cfm_n";
+const STORE_PREF_MIG = "gofile_pref_mig_126";
+const STORE_URL_SEEN = "gofile_url_seen_v2";
+const PREF_URL = "gofile_remote_url_v2";
 // Copie interne (readStore) dei valori delle impostazioni URL/token. Leggerle con
 // setting() mentre si costruiscono le preferenze fa richiamare getSourcePreferences in
 // loop (app in crash): le impostazioni si leggono solo dentro syncLinks e si copiano qui.
@@ -391,17 +398,32 @@ class DefaultExtension extends MProvider {
             }
             this.writeStore(STORE_MIGRATED, "1");
         }
-        // Prima si legge la scelta in «Togli i link» (la chiave dipende dai nomi di
-        // prima), poi si toglie, si aggiunge, e il nome va all'ultimo link salvato,
-        // anche se è appena stato aggiunto.
-        var remove = links.length ? this.setting(this.removeKey(links)) : null;
-        // La casella del nome mostrata era quella dell'elenco di prima di questa lettura.
-        var renKey = this.renameKey(links);
-        if (remove && remove.length) {
-            links = links.filter(function (l) { return remove.indexOf(l.code) === -1; });
+        // «Togli i link» segna soltanto. Si cancella solo se, nella stessa lettura,
+        // «Conferma rimozione» contiene OK: un OK a vuoto non toglie nulla.
+        var marked = links.length ? this.setting(this.removeKey(links)) : null;
+        if (!marked || !marked.length) marked = [];
+        this._marked = marked;
+        var confirmText = marked.length ? String(this.setting(this.confirmKey(marked)) || "").trim() : "";
+        if (marked.length && /^ok$/i.test(confirmText)) {
+            var removed = links.filter(function (l) { return marked.indexOf(l.code) !== -1; });
+            links = links.filter(function (l) { return marked.indexOf(l.code) === -1; });
+            this.rememberUndo(removed);
+            this.dropLocalCache(removed.map(function (l) { return l.code; }));
             changed = true;
             this.writeStore(STORE_REM_N, String((parseInt(this.readStore(STORE_REM_N), 10) || 0) + 1));
+            this.writeStore(STORE_CONFIRM_N, String((parseInt(this.readStore(STORE_CONFIRM_N), 10) || 0) + 1));
+            this._marked = [];
         }
+        var undo = this.readJson(STORE_UNDO, null);
+        if (undo && undo.links && undo.links.length && /^ok$/i.test(String(this.setting(this.undoKey(undo)) || "").trim())) {
+            undo.links.forEach(push);
+            this.restoreLocalCache(undo);
+            this.writeStore(STORE_UNDO, "");
+            this.writeStore(STORE_UNDO_N, String((parseInt(this.readStore(STORE_UNDO_N), 10) || 0) + 1));
+            changed = true;
+        }
+        // La casella del nome mostrata era quella dell'elenco di prima di questa lettura.
+        var renKey = this.renameKey(links);
         var added = this.parseLinks(this.setting(this.addKey()));
         if (added.length) {
             added.forEach(push);
@@ -460,14 +482,104 @@ class DefaultExtension extends MProvider {
     }
 
     remoteToken() {
-        return String(this.readStore(MIRROR_TOKEN) || "").trim();
+        var t = String(this.readStore(MIRROR_TOKEN) || "").trim();
+        return t === "-" ? "" : t;
     }
 
-    // Copia i valori delle impostazioni URL/token nelle copie interne. Va chiamata solo
-    // da dentro syncLinks (contesto in cui un re-invoke di getSourcePreferences è sicuro).
+    confirmKey(codes) {
+        return "gofile_cfm_" + (parseInt(this.readStore(STORE_CONFIRM_N), 10) || 0) + "_" + this._hash((codes || []).join(","));
+    }
+
+    undoKey(undo) {
+        var sig = (undo && undo.links || []).map(function (l) { return l.code; }).join(",");
+        return "gofile_undo_" + (parseInt(this.readStore(STORE_UNDO_N), 10) || 0) + "_" + this._hash(sig);
+    }
+
+    tokenKey() {
+        var tail = this.remoteToken();
+        return "gofile_tok_" + (parseInt(this.readStore(STORE_TOK_N), 10) || 0) + "_" + this._hash(tail ? tail.slice(-4) : "-");
+    }
+
+    // Ultimo elenco tolto, con le schede in cache dei codici che non sono nella lista
+    // condivisa (quelle si possono rimettere con «Annulla»).
+    rememberUndo(removed) {
+        var remote = {}, list = this.cachedRemote();
+        for (var i = 0; i < list.length; i++) remote[list[i].code] = 1;
+        var fm = this.filesMap(), info = this.infoMap(), files = {}, infos = {};
+        removed.forEach(function (l) {
+            if (remote[l.code]) return;
+            if (fm[l.code]) files[l.code] = fm[l.code];
+            if (info[l.code]) infos[l.code] = info[l.code];
+        });
+        this.writeStore(STORE_UNDO, JSON.stringify({ links: removed, files: files, info: infos }));
+    }
+
+    dropLocalCache(codes) {
+        var remote = {}, list = this.cachedRemote();
+        for (var i = 0; i < list.length; i++) remote[list[i].code] = 1;
+        var fm = this.filesMap(), info = this.infoMap(), dirty = false;
+        codes.forEach(function (c) {
+            if (remote[c]) return;
+            if (fm[c]) { delete fm[c]; dirty = true; }
+            if (info[c]) { delete info[c]; dirty = true; }
+        });
+        if (!dirty) return;
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        this.writeStore(STORE_INFO, JSON.stringify(info));
+    }
+
+    restoreLocalCache(undo) {
+        var fm = this.filesMap(), info = this.infoMap();
+        var files = (undo && undo.files) || {}, infos = (undo && undo.info) || {};
+        Object.keys(files).forEach(function (c) { fm[c] = files[c]; });
+        Object.keys(infos).forEach(function (c) { info[c] = infos[c]; });
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        this.writeStore(STORE_INFO, JSON.stringify(info));
+    }
+
+    // Copia URL/token nelle copie interne. Va chiamata solo da dentro syncLinks
+    // (un re-invoke di getSourcePreferences è sicuro). Il token non sta più nel valore
+    // della voce: una casella vuota non lo cancella. «-» sì.
     syncSettings() {
-        try { var u = this.setting("gofile_remote_url"); this.writeStore(MIRROR_URL, u == null ? "" : String(u)); } catch (e) {}
-        try { var t = this.setting("gofile_remote_token"); this.writeStore(MIRROR_TOKEN, t == null ? "" : String(t)); } catch (e) {}
+        this.migrateFixedPrefs();
+        try {
+            var typed = this.setting(this.tokenKey());
+            if (typed != null && String(typed).trim()) {
+                var raw = String(typed).trim();
+                this.writeStore(MIRROR_TOKEN, raw === "-" ? "" : raw);
+                this.writeStore(STORE_TOK_N, String((parseInt(this.readStore(STORE_TOK_N), 10) || 0) + 1));
+            }
+        } catch (e) {}
+        try {
+            var u = this.setting(PREF_URL);
+            if (u == null) return;
+            if (String(u).trim()) {
+                this.writeStore(MIRROR_URL, String(u));
+                this.writeStore(STORE_URL_SEEN, "1");
+            } else if (this.readStore(STORE_URL_SEEN) === "1") {
+                this.writeStore(MIRROR_URL, "");
+            }
+        } catch (e2) {}
+    }
+
+    // Chiavi nuove, così il fork non tiene i titoli vecchi della copia salvata.
+    // Il token già presente (voce precedente o copia interna) non si perde.
+    migrateFixedPrefs() {
+        if (this.readStore(STORE_PREF_MIG) === "1") return;
+        var mirror = String(this.readStore(MIRROR_TOKEN) || "").trim();
+        var oldTok = "";
+        try { oldTok = String(this.setting("gofile_remote_token") || "").trim(); } catch (e) {}
+        var real = function (t) { return t && t !== "-" ? t : ""; };
+        var keep = real(mirror) || real(oldTok);
+        if (mirror === "-" || !mirror || keep !== mirror) this.writeStore(MIRROR_TOKEN, keep);
+        var mirrorUrl = String(this.readStore(MIRROR_URL) || "").trim();
+        var oldUrl = null;
+        try { oldUrl = this.setting("gofile_remote_url"); } catch (e2) {}
+        if (!mirrorUrl && oldUrl != null && String(oldUrl).trim()) {
+            this.writeStore(MIRROR_URL, String(oldUrl));
+            this.writeStore(STORE_URL_SEEN, "1");
+        }
+        this.writeStore(STORE_PREF_MIG, "1");
     }
 
     // Link letti dall'ultima volta dalla lista remota (cache locale, lettura sincrona).
@@ -584,21 +696,67 @@ class DefaultExtension extends MProvider {
         return "gofile_push_" + (parseInt(this.readStore(STORE_PUSH_N), 10) || 0) + "_" + (h >>> 0).toString(36);
     }
 
+    // true se l'invio è riuscito (o non c'era nulla da aggiungere). Su 409 si rilegge
+    // lo sha e si riprova una volta. Il chiamante cancella STORE_PUSH_PENDING solo allora.
+    async pushToRemote(codes) {
+        var first = await this.pushAttempt(codes);
+        if (first !== "conflict") return first === true;
+        var second = await this.pushAttempt(codes);
+        if (second === "conflict") {
+            this.setPushStatus("GitHub ha risposto 409 alla scrittura: conflitto, il file è cambiato. Si riprova alla prossima apertura.");
+            return false;
+        }
+        return second === true;
+    }
+
+    async flushPush() {
+        if (this._flushing) return false;
+        var pending = this.readJson(STORE_PUSH_PENDING, null);
+        if (!pending || !pending.length) return false;
+        this._flushing = true;
+        try {
+            var ok = await this.pushToRemote(pending);
+            if (ok) this.writeStore(STORE_PUSH_PENDING, "");
+            return !!ok;
+        } catch (e) { return false; }
+        finally { this._flushing = false; }
+    }
+
+    shortPush() {
+        var s = String(this.pushStatus() || "");
+        if (!s) return "";
+        if (/Aggiunti \d+/.test(s) || /già nella lista/.test(s)) return "ultimo invio OK";
+        if (/Manca il token/.test(s)) return "ultimo invio: manca token";
+        if (/non è un file GitHub/.test(s)) return "ultimo invio: non scrivibile";
+        var sc = s.match(/risposto (\d+)/);
+        if (sc) return "ultimo invio: errore " + sc[1];
+        if (/rete/.test(s)) return "ultimo invio: errore di rete";
+        return "ultimo invio: errore";
+    }
+
+    statusTitle() {
+        var n = this.cachedRemote().length;
+        var head = !this.remoteUrl() ? "ℹ️ Lista condivisa: disattivata" : ("ℹ️ Lista condivisa: " + (n ? n + " link" : "vuota"));
+        var tok = this.remoteToken() ? "token ✓" : "token no";
+        var sp = this.shortPush();
+        return sp ? head + " · " + tok + " · " + sp : head + " · " + tok;
+    }
+
     // Aggiunge i link scelti al file GitHub della lista condivisa. Legge il contenuto
     // attuale (per il suo sha), accoda le righe mancanti e rimanda indietro il file.
-    async pushToRemote(codes) {
+    async pushAttempt(codes) {
         var tok = this.remoteToken();
         var tgt = this.remoteApiTarget();
-        if (!tok) { this.setPushStatus("Manca il token GitHub: mettilo in «Token GitHub»."); return; }
-        if (!tgt) { this.setPushStatus("La lista condivisa non è un file GitHub su cui scrivere."); return; }
+        if (!tok) { this.setPushStatus("Manca il token GitHub: mettilo in «Token GitHub»."); return false; }
+        if (!tgt) { this.setPushStatus("La lista condivisa non è un file GitHub su cui scrivere."); return false; }
         var api = "https://api.github.com/repos/" + tgt.owner + "/" + tgt.repo + "/contents/" + tgt.path;
         var hdr = { "Authorization": "token " + tok, "Accept": "application/vnd.github+json", "Content-Type": "application/json", "User-Agent": UA };
         var cur = "", sha = "";
         try {
             var g = await this.client.get(api + "?ref=" + encodeURIComponent(tgt.branch), hdr);
             if (g && g.statusCode === 200) { var j = JSON.parse(String(g.body || "{}")); sha = j.sha || ""; cur = this.utf8FromBytes(this.b64ToBytes(j.content || "")); }
-            else if (!g || g.statusCode !== 404) { this.setPushStatus("GitHub ha risposto " + (g && g.statusCode) + " alla lettura. Controlla il token."); return; }
-        } catch (e) { this.setPushStatus("Non riesco a leggere il file (rete?)."); return; }
+            else if (!g || g.statusCode !== 404) { this.setPushStatus("GitHub ha risposto " + (g && g.statusCode) + " alla lettura. Controlla il token."); return false; }
+        } catch (e) { this.setPushStatus("Non riesco a leggere il file (rete?)."); return false; }
         var links = this.savedLinks(), byCode = {};
         for (var i = 0; i < links.length; i++) byCode[links[i].code] = links[i];
         var add = [], addedLinks = [];
@@ -609,7 +767,7 @@ class DefaultExtension extends MProvider {
             add.push(url + (l.name ? " | " + l.name : ""));
             addedLinks.push({ code: l.code, name: l.name });
         }
-        if (!add.length) { this.setPushStatus("Niente da aggiungere: erano già nella lista."); return; }
+        if (!add.length) { this.setPushStatus("Niente da aggiungere: erano già nella lista."); return true; }
         var next = cur.replace(/\s*$/, "") + "\n" + add.join("\n") + "\n";
         var body = { message: "Aggiungi " + add.length + " link da Mangayomi", content: this.bytesToB64(this.utf8Bytes(next)), branch: tgt.branch };
         if (sha) body.sha = sha;
@@ -623,16 +781,17 @@ class DefaultExtension extends MProvider {
                 addedLinks.forEach(function (x) { if (!have[x.code]) cached.push(x); });
                 this.writeStore(STORE_REMOTE, JSON.stringify({ url: this.remoteUrl(), at: Date.now(), links: cached }));
                 this.setPushStatus("Aggiunti " + add.length + " link alla lista. ✓");
-            } else {
-                var sc = p && p.statusCode;
-                var why = (sc === 401 || sc === 403) ? "il token è sbagliato o senza permesso Contents: Read and write su quel repo."
-                    : sc === 404 ? "repo o file non trovato (controlla l'URL della lista)."
-                    : sc === 409 ? "conflitto: riprova (il file è cambiato nel frattempo)."
-                    : sc === 422 ? "richiesta rifiutata (file troppo grande o dati non validi)."
-                    : "richiesta non valida; riprova.";
-                this.setPushStatus("GitHub ha risposto " + sc + " alla scrittura: " + why);
+                return true;
             }
-        } catch (e) { this.setPushStatus("Non riesco a scrivere il file (rete?)."); }
+            var sc = p && p.statusCode;
+            if (sc === 409) return "conflict";
+            var why = (sc === 401 || sc === 403) ? "il token è sbagliato o senza permesso Contents: Read and write su quel repo."
+                : sc === 404 ? "repo o file non trovato (controlla l'URL della lista)."
+                : sc === 422 ? "richiesta rifiutata (file troppo grande o dati non validi)."
+                : "richiesta non valida; riprova.";
+            this.setPushStatus("GitHub ha risposto " + sc + " alla scrittura: " + why);
+            return false;
+        } catch (e) { this.setPushStatus("Non riesco a scrivere il file (rete?)."); return false; }
     }
 
     infoMap() {
@@ -999,11 +1158,7 @@ class DefaultExtension extends MProvider {
         this._linksMemo = null;
         this.savedLinks();
         try {
-            var pending = this.readJson(STORE_PUSH_PENDING, null);
-            if (pending && pending.length) {
-                this.writeStore(STORE_PUSH_PENDING, "");
-                await this.pushToRemote(pending);
-            }
+            await this.flushPush();
             await this.refreshRemote(true);
         } catch (e) { /* la lista condivisa non deve mai bloccare Popolari */ }
         // Popolari: solo i link salvati sul telefono.
@@ -1050,6 +1205,8 @@ class DefaultExtension extends MProvider {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
         try { this.savedLinks(); } catch (e) {}
+        // L'invio parte anche da qui, senza far aspettare le schede.
+        try { Promise.resolve(this.flushPush()).catch(function () {}); } catch (e) {}
         // Card subito dalla cache: la lista condivisa si aggiorna in sottofondo (TTL 60 s)
         // e si aspetta solo la prima volta, al massimo 8 s.
         var cached = this.cachedRemote();
@@ -1107,6 +1264,7 @@ class DefaultExtension extends MProvider {
         if (code) return { list: [this.card(code)], hasNextPage: false };
         // La ricerca guarda tutti (locali + documento).
         this.savedLinks();
+        try { Promise.resolve(this.flushPush()).catch(function () {}); } catch (e) {}
         try { await this.refreshRemote(true); } catch (e) {}
         var all = (await this.browseGroups(this.groupsFrom())).list;
         if (!q) return { list: all, hasNextPage: false };
@@ -1371,7 +1529,7 @@ class DefaultExtension extends MProvider {
         var prefs = [{
             key: this.addKey(),
             editTextPreference: {
-                title: "➕ Salva un link",
+                title: "➕ Salva un link: incolla il link, poi | e il nome",
                 summary: "Scrivi un link Gofile, Bunkr (album /a/… o video /f/…), filester o pixeldrain (/u/… o lista /l/…), e se vuoi il nome dopo una barra: link | nome. Ogni link diventa una scheda in Popolari.",
                 value: "",
                 dialogTitle: "Salva un link",
@@ -1388,10 +1546,10 @@ class DefaultExtension extends MProvider {
             prefs.push({
                 key: this.renameKey(links),
                 editTextPreference: {
-                    title: one ? "✏️ Nome dell'ultimo link" : "✏️ Nome dei link aggiunti insieme",
+                    title: (one ? "✏️ Nome scheda dell'ultimo link" : "✏️ Nome scheda dei link appena salvati") + " (- toglie il nome)",
                     summary: "Per: " + forWhat,
                     value: "",
-                    dialogTitle: one ? "Nome dell'ultimo link" : "Nome dei " + batch.length + " link aggiunti insieme",
+                    dialogTitle: one ? "Nome scheda dell'ultimo link" : "Nome scheda dei " + batch.length + " link appena salvati",
                     dialogMessage: (one
                         ? "Nome della scheda per " + this.shortLink(one.code) + "."
                         : "Nome della scheda per i " + batch.length + " link appena salvati insieme (così finiscono in un'unica raccolta).") + " Scrivi - per togliere il nome.",
@@ -1402,11 +1560,37 @@ class DefaultExtension extends MProvider {
             prefs.push({
                 key: this.removeKey(links),
                 multiSelectListPreference: {
-                    title: "Togli i link",
-                    summary: "Spunta i link da togliere. Spariscono quando riapri questa pagina o la sorgente.",
+                    title: "Togli i link: segna, non si cancellano ancora",
+                    summary: "Spunta i link da togliere. Restano finché non scrivi OK in «Conferma rimozione».",
                     entries: newest.map(label),
                     entryValues: newest.map(function (l) { return l.code; }),
                     values: [],
+                },
+            });
+            var markedNow = this._marked || [];
+            if (markedNow.length) {
+                prefs.push({
+                    key: this.confirmKey(markedNow),
+                    editTextPreference: {
+                        title: "Conferma rimozione (" + markedNow.length + "): scrivi OK",
+                        summary: "Solo scrivendo OK i link segnati spariscono. Un OK a vuoto non cancella nulla.",
+                        value: "",
+                        dialogTitle: "Conferma rimozione",
+                        dialogMessage: "Scrivi OK per togliere i " + markedNow.length + " link segnati. Lascia vuoto per non fare nulla.",
+                    },
+                });
+            }
+        }
+        var undo = this.readJson(STORE_UNDO, null);
+        if (undo && undo.links && undo.links.length) {
+            prefs.push({
+                key: this.undoKey(undo),
+                editTextPreference: {
+                    title: "Annulla ultima rimozione (" + undo.links.length + "): scrivi OK",
+                    summary: "Rimette l'ultimo elenco di link tolti. Un OK a vuoto non fa nulla.",
+                    value: "",
+                    dialogTitle: "Annulla ultima rimozione",
+                    dialogMessage: "Scrivi OK per rimettere i link appena tolti.",
                 },
             });
         }
@@ -1423,34 +1607,33 @@ class DefaultExtension extends MProvider {
         prefs.push({
             key: statusKey,
             editTextPreference: {
-                title: "ℹ️ Stato lista condivisa",
+                title: this.statusTitle(),
                 summary: (this.pushStatus() ? this.pushStatus() + "\n\n" : "") +
                     (hasToken ? "Token: impostato ✓.\n" : "Token: non impostato.\n") + inDoc,
                 value: "", dialogTitle: "Stato", dialogMessage: "Solo informativo: mostra se il token è a posto e i link presenti nel documento.",
             },
         });
         prefs.push({
-            key: "gofile_remote_url",
+            key: PREF_URL,
             editTextPreference: {
-                title: "📄 Lista condivisa (indirizzo)",
-                summary: "Tocca per cambiare l'indirizzo del file (vuoto = file predefinito nel repo; «-» per disattivare). Cosa contiene lo vedi in «ℹ️ Stato».",
+                title: "📄 Indirizzo raw della lista (file di testo puro, non la pagina). Vuoto = predefinito, - disattiva",
+                summary: "Raw è l'indirizzo del file di testo, non la pagina di GitHub. Vuoto = file predefinito nel repo; «-» disattiva. Cosa contiene lo vedi nel titolo dello stato.",
                 // Il valore attuale, non "": ridisegnare con "" farebbe azzerare a Mangayomi
                 // il valore salvato (stesso difetto delle preferenze di #1196).
                 value: String(this.readStore(MIRROR_URL) || ""),
-                dialogTitle: "Indirizzo della lista condivisa",
-                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga. Lascia vuoto per il file predefinito, scrivi - per disattivare.",
+                dialogTitle: "Indirizzo raw della lista condivisa",
+                dialogMessage: "Incolla l'indirizzo raw (il file di testo puro, non la pagina). Lascia vuoto per il file predefinito, scrivi - per disattivare.",
             },
         });
+        var tok = this.remoteToken();
         prefs.push({
-            key: "gofile_remote_token",
+            key: this.tokenKey(),
             editTextPreference: {
-                title: "🔑 Token GitHub (per aggiungere link da qui)",
-                summary: "Tocca per inserire o cambiare il token. Se è a posto lo vedi in «ℹ️ Stato». Serve un token «fine-grained» con Contents: Read and write sul repo della lista. I link in un repo pubblico sono pubblici.",
-                // Il valore attuale, non "": altrimenti Mangayomi azzera il token salvato
-                // a ogni ridisegno della pagina (per questo risultava sempre «non impostato»).
-                value: this.remoteToken(),
-                dialogTitle: "Token GitHub",
-                dialogMessage: "Incolla il token (resta solo su questo dispositivo). Scrivi - per toglierlo.",
+                title: (tok ? "🔑 Token ✓ (…" + tok.slice(-4) + ")" : "🔑 Token: non impostato") + " · fine-grained, Contents: Read and write (leggere e scrivere i file). - toglie",
+                summary: "La casella è vuota apposta: il token già salvato non si mostra. Per cambiarlo incolla un token personale fine-grained (limitato a questo repo) con il permesso Contents: Read and write, cioè leggere e scrivere i file. Scrivi - per toglierlo. I link in un repo pubblico restano pubblici.",
+                value: "",
+                dialogTitle: tok ? "Token ✓ (…" + tok.slice(-4) + ")" : "Token: non impostato",
+                dialogMessage: "Incolla un token nuovo, oppure - per togliere quello salvato. Non viene mostrato per intero.",
             },
         });
         if (canWrite) {
@@ -1462,8 +1645,8 @@ class DefaultExtension extends MProvider {
                 prefs.push({
                     key: this.pushKey(links),
                     multiSelectListPreference: {
-                        title: "➕ Aggiungi alla lista condivisa",
-                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + tokenNote + "Spunta i link del telefono da mettere nella lista condivisa. Vengono scritti quando riapri Popolari.",
+                        title: "➕ Aggiungi alla lista condivisa: si inviano riaprendo Popolari, Recenti o la ricerca",
+                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + tokenNote + "Spunta i link del telefono da mettere nella lista condivisa. Vengono scritti quando riapri Popolari, Recenti o la ricerca.",
                         entries: addable.map(label),
                         entryValues: addable.map(function (l) { return l.code; }),
                         values: [],
@@ -1471,9 +1654,9 @@ class DefaultExtension extends MProvider {
                 });
             } else {
                 prefs.push({
-                    key: "gofile_push_info",
+                    key: "gofile_push_info_" + this._hash(this.statusTitle() + "|" + links.length),
                     editTextPreference: {
-                        title: "➕ Aggiungi alla lista condivisa",
+                        title: links.length ? "➕ Tutti i link salvati sono già nella lista condivisa" : "➕ Prima salva un link, poi si può aggiungere alla lista",
                         summary: (this.pushStatus() ? this.pushStatus() + " " : "") + (links.length ? "Tutti i link salvati sono già nella lista condivisa." : "Prima salva qualche link con «➕ Salva un link»."),
                         value: "", dialogTitle: "Lista condivisa", dialogMessage: "Nessun link da aggiungere.",
                     },
