@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.24.0
+
+- **Popolari e Recenti separati:** in «Popolari» ora ci sono solo i link che hai salvato tu sul telefono; in «Recenti» quelli della lista condivisa (il documento). La ricerca guarda comunque in entrambi, e ogni scheda si apre da tutte e due.
+
 ## Gofile 1.23.4
 
 - **Stato della lista condivisa che si aggiorna davvero:** le scritte sotto «Token» e «Lista condivisa» non si aggiornavano (bug noto di Mangayomi #1196 sui riepiloghi a chiave fissa), facendo sembrare il token non impostato anche quando funzionava. Ora c'è una riga «ℹ️ Stato lista condivisa» che si aggiorna sempre (token a posto o no, link presenti nel documento, ultimo esito). Le altre due voci restano solo per inserire token e indirizzo.

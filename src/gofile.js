@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.23.4",
+        "version": "1.24.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -642,8 +642,9 @@ class DefaultExtension extends MProvider {
         return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
     }
 
-    groups() {
-        var links = this.allLinks();
+    // Raggruppa per nome la lista passata (o tutti i link se non specificata).
+    groupsFrom(links) {
+        if (!links) links = this.allLinks();
         var byKey = {}, order = [];
         for (var i = 0; i < links.length; i++) {
             var key = links[i].name ? this.groupKey(links[i].name) : "#" + links[i].code;
@@ -656,8 +657,11 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    groups() { return this.groupsFrom(); }
+
     groupOf(key) {
-        var all = this.groups();
+        // Cerca tra tutti (locali + documento) così sia Popolari sia Recenti aprono.
+        var all = this.groupsFrom();
         for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
         return null;
     }
@@ -962,8 +966,14 @@ class DefaultExtension extends MProvider {
             }
             await this.refreshRemote();
         } catch (e) { /* la lista condivisa non deve mai bloccare Popolari */ }
-        var groups = this.groups();
-        var known = this.infoMap(), fm = this.filesMap(), self = this;
+        // Popolari: solo i link salvati sul telefono.
+        return this.browseGroups(this.groupsFrom(this.savedLinks()));
+    }
+
+    // Legge le schede mancanti dei gruppi e restituisce le loro card. Condiviso da
+    // Popolari (link locali) e Recenti (link della lista condivisa).
+    async browseGroups(groups) {
+        var fm = this.filesMap(), self = this;
         var codes = [];
         groups.forEach(function (g) { codes = codes.concat(g.codes); });
         var missing = codes.filter(function (c) {
@@ -995,8 +1005,12 @@ class DefaultExtension extends MProvider {
         this.writeStore(STORE_FIX, "1");
     }
 
+    // Recenti: i link della lista condivisa (il documento). Popolari resta sui tuoi.
     async getLatestUpdates(page) {
-        return this.getPopular(page);
+        if (page > 1) return { list: [], hasNextPage: false };
+        this.fixOnce();
+        try { this.savedLinks(); await this.refreshRemote(); } catch (e) {}
+        return this.browseGroups(this.groupsFrom(this.cachedRemote()));
     }
 
     // Nella ricerca si può incollare un link (o il codice) per aprirlo una volta;
@@ -1006,7 +1020,10 @@ class DefaultExtension extends MProvider {
         var q = String(query || "").trim();
         var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
-        var all = (await this.getPopular(1)).list;
+        // La ricerca guarda tutti (locali + documento).
+        this.savedLinks();
+        try { await this.refreshRemote(); } catch (e) {}
+        var all = (await this.browseGroups(this.groupsFrom())).list;
         if (!q) return { list: all, hasNextPage: false };
         var low = q.toLowerCase();
         var list = all.filter(function (c) { return c.name.toLowerCase().indexOf(low) !== -1 || c.link.toLowerCase().indexOf(low) !== -1; });
