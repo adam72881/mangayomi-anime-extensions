@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.25.0
+
+- **Estensione segnata +18:** Gofile è ora marcata come NSFW, così compare solo quando è attiva la modalità adulti (prima si vedeva sempre, anche sulla TV). Se vuoi vederla, attiva la modalità contenuti per adulti nelle impostazioni di Mangayomi.
+
 ## Gofile 1.24.2
 
 - **Le impostazioni rileggono il documento:** aprendo le impostazioni ora parte una rilettura della lista condivisa in sottofondo, così riaprendole la voce «ℹ️ Stato» mostra i link presenti nel documento anche senza passare prima da Popolari/Recenti.
