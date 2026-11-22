@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.23.3",
+        "version": "1.23.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1303,30 +1303,40 @@ class DefaultExtension extends MProvider {
         }
         var remoteList = this.cachedRemote();
         var remoteNames = remoteList.map(function (l) { return "• " + (l.name || self.shortLink(l.code)); });
+        var canWrite = !!this.remoteApiTarget();
+        var hasToken = !!this.remoteToken();
         var inDoc = !this.remoteUrl() ? "Lista condivisa disattivata."
             : remoteList.length ? ("Nel documento ci sono " + remoteList.length + " link:\n" + remoteNames.join("\n"))
-            : "Il documento è vuoto (nessun link ancora).";
+            : "Il documento è ancora vuoto (nessun link).";
+        // Riga di stato con chiave che cambia con lo stato: così il riepilogo si aggiorna
+        // davvero (quelli a chiave fissa in Mangayomi restano col primo testo, bug #1196).
+        var statusKey = "gofile_status_" + this._hash((hasToken ? "T" : "F") + "|" + remoteList.length + "|" + remoteNames.join(",") + "|" + this.pushStatus());
+        prefs.push({
+            key: statusKey,
+            editTextPreference: {
+                title: "ℹ️ Stato lista condivisa",
+                summary: (this.pushStatus() ? this.pushStatus() + "\n\n" : "") +
+                    (hasToken ? "Token: impostato ✓.\n" : "Token: non impostato.\n") + inDoc,
+                value: "", dialogTitle: "Stato", dialogMessage: "Solo informativo: mostra se il token è a posto e i link presenti nel documento.",
+            },
+        });
         prefs.push({
             key: "gofile_remote_url",
             editTextPreference: {
-                title: "📄 Lista condivisa",
-                summary: inDoc + "\n\nTocca per cambiare l'indirizzo del file (ora vuoto = file predefinito).",
+                title: "📄 Lista condivisa (indirizzo)",
+                summary: "Tocca per cambiare l'indirizzo del file (vuoto = file predefinito nel repo; «-» per disattivare). Cosa contiene lo vedi in «ℹ️ Stato».",
                 // Il valore attuale, non "": ridisegnare con "" farebbe azzerare a Mangayomi
                 // il valore salvato (stesso difetto delle preferenze di #1196).
                 value: String(this.readStore(MIRROR_URL) || ""),
                 dialogTitle: "Indirizzo della lista condivisa",
-                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga. Lascia vuoto per il file predefinito, scrivi - per disattivare. Per vedere cosa contiene, guarda il riepilogo qui sopra.",
+                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga. Lascia vuoto per il file predefinito, scrivi - per disattivare.",
             },
         });
-        // Aggiungere link alla lista condivisa direttamente da qui (serve un token GitHub).
-        var canWrite = !!this.remoteApiTarget();
-        var hasToken = !!this.remoteToken();
         prefs.push({
             key: "gofile_remote_token",
             editTextPreference: {
                 title: "🔑 Token GitHub (per aggiungere link da qui)",
-                summary: (hasToken ? "Token impostato. " : "Non impostato. ") +
-                    "Serve solo se vuoi aggiungere link alla lista condivisa da dentro Mangayomi. Crea un token «fine-grained» su GitHub con permesso Contents: Read and write sul repo della lista. I link aggiunti a un repo pubblico sono pubblici.",
+                summary: "Tocca per inserire o cambiare il token. Se è a posto lo vedi in «ℹ️ Stato». Serve un token «fine-grained» con Contents: Read and write sul repo della lista. I link in un repo pubblico sono pubblici.",
                 // Il valore attuale, non "": altrimenti Mangayomi azzera il token salvato
                 // a ogni ridisegno della pagina (per questo risultava sempre «non impostato»).
                 value: this.remoteToken(),
