@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.21.0",
+        "version": "1.22.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -33,6 +33,8 @@ const STORE_BK_BAD = "gofile_bunkr_bad";
 const BAD_TTL = 24 * 3600000;
 const STORE_FIX = "gofile_fix_1_12";
 const STORE_REMOTE = "gofile_remote_cache";
+const STORE_PUSH_N = "gofile_push_n";
+const STORE_PUSH_STATUS = "gofile_push_status";
 const REMOTE_TTL = 60000;
 // Lista link condivisa: un file di testo (un link per riga) che l'estensione legge
 // sempre. Modificandolo da un dispositivo con tastiera (telefono/PC) i link compaiono
@@ -482,6 +484,114 @@ class DefaultExtension extends MProvider {
         return "";
     }
 
+    // --- Scrittura sulla lista condivisa (file GitHub) -------------------------------
+    // Solo un URL «raw» di GitHub è scrivibile; da esso ricaviamo repo, ramo e percorso.
+    remoteApiTarget() {
+        var m = String(this.remoteUrl()).match(/^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i);
+        if (!m) return null;
+        return { owner: m[1], repo: m[2], branch: m[3], path: m[4] };
+    }
+
+    utf8Bytes(str) {
+        var out = [];
+        for (var i = 0; i < str.length; i++) {
+            var c = str.charCodeAt(i);
+            if (c < 0x80) out.push(c);
+            else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+            else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+                var cp = 0x10000 + ((c & 0x3ff) << 10) + (str.charCodeAt(++i) & 0x3ff);
+                out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+            } else out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+        }
+        return out;
+    }
+
+    utf8FromBytes(bytes) {
+        var s = "", i = 0;
+        while (i < bytes.length) {
+            var c = bytes[i++];
+            if (c < 0x80) s += String.fromCharCode(c);
+            else if (c < 0xe0) s += String.fromCharCode(((c & 0x1f) << 6) | (bytes[i++] & 0x3f));
+            else if (c < 0xf0) s += String.fromCharCode(((c & 0x0f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f));
+            else {
+                var cp = ((c & 0x07) << 18) | ((bytes[i++] & 0x3f) << 12) | ((bytes[i++] & 0x3f) << 6) | (bytes[i++] & 0x3f);
+                cp -= 0x10000;
+                s += String.fromCharCode(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
+            }
+        }
+        return s;
+    }
+
+    bytesToB64(bytes) {
+        var abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", out = "";
+        for (var i = 0; i < bytes.length; i += 3) {
+            var b1 = bytes[i], b2 = i + 1 < bytes.length ? bytes[i + 1] : NaN, b3 = i + 2 < bytes.length ? bytes[i + 2] : NaN;
+            var e1 = b1 >> 2, e2 = ((b1 & 3) << 4) | (isNaN(b2) ? 0 : b2 >> 4);
+            var e3 = isNaN(b2) ? 64 : (((b2 & 15) << 2) | (isNaN(b3) ? 0 : b3 >> 6)), e4 = isNaN(b3) ? 64 : (b3 & 63);
+            out += abc.charAt(e1) + abc.charAt(e2) + (e3 === 64 ? "=" : abc.charAt(e3)) + (e4 === 64 ? "=" : abc.charAt(e4));
+        }
+        return out;
+    }
+
+    b64ToBytes(b64) {
+        var abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var t = String(b64 || "").replace(/[^A-Za-z0-9+/]/g, ""), out = [], bits = 0, val = 0;
+        for (var i = 0; i < t.length; i++) {
+            val = (val << 6) | abc.indexOf(t.charAt(i));
+            bits += 6;
+            if (bits >= 8) { bits -= 8; out.push((val >> bits) & 255); }
+        }
+        return out;
+    }
+
+    pushStatus() { return this.readStore(STORE_PUSH_STATUS); }
+    setPushStatus(t) { this.writeStore(STORE_PUSH_STATUS, String(t || "")); }
+
+    pushKey(localLinks) {
+        var h = 0, str = localLinks.map(function (l) { return l.code; }).join("|");
+        for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+        return "gofile_push_" + (parseInt(this.readStore(STORE_PUSH_N), 10) || 0) + "_" + (h >>> 0).toString(36);
+    }
+
+    // Aggiunge i link scelti al file GitHub della lista condivisa. Legge il contenuto
+    // attuale (per il suo sha), accoda le righe mancanti e rimanda indietro il file.
+    async pushToRemote(codes) {
+        var tok = String(this.setting("gofile_remote_token") || "").trim();
+        var tgt = this.remoteApiTarget();
+        if (!tok) { this.setPushStatus("Manca il token GitHub: mettilo in «Token GitHub»."); return; }
+        if (!tgt) { this.setPushStatus("La lista condivisa non è un file GitHub su cui scrivere."); return; }
+        var api = "https://api.github.com/repos/" + tgt.owner + "/" + tgt.repo + "/contents/" + tgt.path;
+        var hdr = { "Authorization": "token " + tok, "Accept": "application/vnd.github+json", "User-Agent": UA };
+        var cur = "", sha = "";
+        try {
+            var g = await this.client.get(api + "?ref=" + encodeURIComponent(tgt.branch), hdr);
+            if (g && g.statusCode === 200) { var j = JSON.parse(String(g.body || "{}")); sha = j.sha || ""; cur = this.utf8FromBytes(this.b64ToBytes(j.content || "")); }
+            else if (!g || g.statusCode !== 404) { this.setPushStatus("GitHub ha risposto " + (g && g.statusCode) + " alla lettura. Controlla il token."); return; }
+        } catch (e) { this.setPushStatus("Non riesco a leggere il file (rete?)."); return; }
+        var links = this.savedLinks(), byCode = {};
+        for (var i = 0; i < links.length; i++) byCode[links[i].code] = links[i];
+        var add = [];
+        for (var k = 0; k < codes.length; k++) {
+            var l = byCode[codes[k]]; if (!l) continue;
+            var url = this.linkUrl(l.code);
+            if (cur.indexOf(url) !== -1) continue; // già presente nel file
+            add.push(url + (l.name ? " | " + l.name : ""));
+        }
+        if (!add.length) { this.setPushStatus("Niente da aggiungere: erano già nella lista."); return; }
+        var next = cur.replace(/\s*$/, "") + "\n" + add.join("\n") + "\n";
+        var body = { message: "Aggiungi " + add.length + " link da Mangayomi", content: this.bytesToB64(this.utf8Bytes(next)), branch: tgt.branch };
+        if (sha) body.sha = sha;
+        try {
+            var p = await this.client.put(api, hdr, body);
+            if (p && (p.statusCode === 200 || p.statusCode === 201)) {
+                this.writeStore(STORE_REMOTE, ""); // forza la rilettura della lista
+                this.setPushStatus("Aggiunti " + add.length + " link alla lista. ✓");
+            } else {
+                this.setPushStatus("GitHub ha risposto " + (p && p.statusCode) + " alla scrittura: il token serve con permesso di scrittura (Contents) su quel repo.");
+            }
+        } catch (e) { this.setPushStatus("Non riesco a scrivere il file (rete?)."); }
+    }
+
     infoMap() {
         try { return JSON.parse(this.readStore(STORE_INFO) || "{}") || {}; } catch (e) { return {}; }
     }
@@ -798,6 +908,13 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
+        // Se hai spuntato dei link in «Aggiungi alla lista condivisa», aggiungili al file.
+        var localLinks = this.savedLinks();
+        var pending = localLinks.length ? this.setting(this.pushKey(localLinks)) : null;
+        if (pending && pending.length) {
+            await this.pushToRemote(pending);
+            this.writeStore(STORE_PUSH_N, String((parseInt(this.readStore(STORE_PUSH_N), 10) || 0) + 1));
+        }
         await this.refreshRemote();
         var groups = this.groups();
         var known = this.infoMap(), fm = this.filesMap(), self = this;
@@ -1149,6 +1266,46 @@ class DefaultExtension extends MProvider {
                 dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga (anche «link | nome» e righe con # ignorate). Lascia vuoto per il file predefinito, scrivi - per disattivare.",
             },
         });
+        // Aggiungere link alla lista condivisa direttamente da qui (serve un token GitHub).
+        var canWrite = !!this.remoteApiTarget();
+        var hasToken = !!String(this.setting("gofile_remote_token") || "").trim();
+        prefs.push({
+            key: "gofile_remote_token",
+            editTextPreference: {
+                title: "🔑 Token GitHub (per aggiungere link da qui)",
+                summary: (hasToken ? "Token impostato. " : "Non impostato. ") +
+                    "Serve solo se vuoi aggiungere link alla lista condivisa da dentro Mangayomi. Crea un token «fine-grained» su GitHub con permesso Contents: Read and write sul repo della lista. I link aggiunti a un repo pubblico sono pubblici.",
+                value: "",
+                dialogTitle: "Token GitHub",
+                dialogMessage: "Incolla il token (resta solo su questo dispositivo). Scrivi - per toglierlo.",
+            },
+        });
+        if (canWrite && hasToken) {
+            var remoteCodes = {};
+            this.cachedRemote().forEach(function (l) { remoteCodes[l.code] = 1; });
+            var addable = newest.filter(function (l) { return !remoteCodes[l.code]; });
+            if (addable.length) {
+                prefs.push({
+                    key: this.pushKey(links),
+                    multiSelectListPreference: {
+                        title: "➕ Aggiungi alla lista condivisa",
+                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + "Spunta i link da aggiungere al file condiviso. Vengono scritti su GitHub quando riapri Popolari.",
+                        entries: addable.map(label),
+                        entryValues: addable.map(function (l) { return l.code; }),
+                        values: [],
+                    },
+                });
+            } else {
+                prefs.push({
+                    key: "gofile_push_info",
+                    editTextPreference: {
+                        title: "➕ Aggiungi alla lista condivisa",
+                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + "Tutti i link salvati sono già nella lista condivisa.",
+                        value: "", dialogTitle: "Lista condivisa", dialogMessage: "Nessun link da aggiungere.",
+                    },
+                });
+            }
+        }
         return prefs;
     }
 }

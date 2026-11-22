@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.22.0
+
+- **Aggiungi link alla lista condivisa da dentro Mangayomi:** nelle impostazioni, dopo aver messo un token GitHub («🔑 Token GitHub»), compare «➕ Aggiungi alla lista condivisa»: spunti i link salvati che vuoi mettere nel file condiviso e vengono scritti su GitHub quando riapri Popolari. Così prepari la lista dal telefono (con la tastiera) e la TV la legge. Nota: i link aggiunti a un repo pubblico sono pubblici — per uso privato usa un repo privato o un Gist segreto.
+
 ## Gofile 1.21.0
 
 - **Lista condivisa (per la TV):** l'estensione può leggere un file di testo con i link (un link per riga), così sulla TV — dove digitare è scomodo — i link compaiono da soli. Basta modificare il file da telefono/PC. Di default legge un file nel repo (`links/gofile.txt`), ma nelle impostazioni («📄 Lista condivisa») puoi mettere il tuo (anche un Gist). Valgono gli stessi formati di «Salva un link» (anche `link | nome` per le raccolte; righe con `#` ignorate). I link locali e quelli della lista convivono.
