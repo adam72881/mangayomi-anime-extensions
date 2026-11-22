@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.23.2
+
+- **Il token GitHub ora resta salvato:** le caselle «Token GitHub» e «Lista condivisa (URL)» venivano ridisegnate vuote, e Mangayomi azzerava il valore salvato (per questo il token risultava sempre «non impostato»). Ora mostrano il valore attuale e lo conservano. Dopo l'aggiornamento, reinserisci il token una volta.
+
 ## Gofile 1.23.1
 
 - **Token più affidabile al momento di scrivere:** la copia interna del token viene rinfrescata subito prima di aggiungere i link, così un token appena inserito viene usato correttamente. Se qualcosa non va, il messaggio sotto «➕ Aggiungi alla lista condivisa» dice esattamente cosa: «Manca il token», «GitHub ha risposto 401/403» (token sbagliato o senza permesso), oppure «Aggiunti N link. ✓».
