@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.22.1
+
+- **Corretto il crash all'apertura di Gofile:** la 1.22.0 leggeva le impostazioni (URL/token della lista condivisa) mentre costruiva la pagina delle impostazioni, mandando l'app in loop fino a chiudersi. Ora quei valori si leggono in modo sicuro e l'app non si chiude più. L'aggiunta dei link alla lista condivisa continua a funzionare.
+
 ## Gofile 1.22.0
 
 - **Aggiungi link alla lista condivisa da dentro Mangayomi:** nelle impostazioni, dopo aver messo un token GitHub («🔑 Token GitHub»), compare «➕ Aggiungi alla lista condivisa»: spunti i link salvati che vuoi mettere nel file condiviso e vengono scritti su GitHub quando riapri Popolari. Così prepari la lista dal telefono (con la tastiera) e la TV la legge. Nota: i link aggiunti a un repo pubblico sono pubblici — per uso privato usa un repo privato o un Gist segreto.

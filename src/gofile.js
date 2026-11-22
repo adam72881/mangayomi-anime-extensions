@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.22.0",
+        "version": "1.22.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -35,6 +35,12 @@ const STORE_FIX = "gofile_fix_1_12";
 const STORE_REMOTE = "gofile_remote_cache";
 const STORE_PUSH_N = "gofile_push_n";
 const STORE_PUSH_STATUS = "gofile_push_status";
+const STORE_PUSH_PENDING = "gofile_push_pending";
+// Copie interne (readStore) dei valori delle impostazioni URL/token. Leggerle con
+// setting() mentre si costruiscono le preferenze fa richiamare getSourcePreferences in
+// loop (app in crash): le impostazioni si leggono solo dentro syncLinks e si copiano qui.
+const MIRROR_URL = "gofile_m_remote_url";
+const MIRROR_TOKEN = "gofile_m_remote_token";
 const REMOTE_TTL = 60000;
 // Lista link condivisa: un file di testo (un link per riga) che l'estensione legge
 // sempre. Modificandolo da un dispositivo con tastiera (telefono/PC) i link compaiono
@@ -413,6 +419,16 @@ class DefaultExtension extends MProvider {
             this.writeStore(STORE_REN_N, String((parseInt(this.readStore(STORE_REN_N), 10) || 0) + 1));
         }
         if (changed) this.writeStore(STORE_LINKS, JSON.stringify(links));
+        // Copia URL/token nelle copie interne e raccogli l'eventuale scelta di «Aggiungi
+        // alla lista condivisa» (l'invio vero, che è asincrono, lo fa getPopular).
+        this.syncSettings();
+        if (links.length) {
+            var pushSel = this.setting(this.pushKey(links));
+            if (pushSel && pushSel.length) {
+                this.writeStore(STORE_PUSH_PENDING, JSON.stringify(pushSel));
+                this.writeStore(STORE_PUSH_N, String((parseInt(this.readStore(STORE_PUSH_N), 10) || 0) + 1));
+            }
+        }
         this._linksMemo = { at: Date.now(), list: links };
         return links.slice();
     }
@@ -435,11 +451,23 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
-    // URL della lista condivisa. Vuoto o «-» = disattivata. Default: file nel repo.
+    // URL della lista condivisa, dalla copia interna (non da setting(): vedi MIRROR_URL).
+    // Vuoto o «-» = disattivata. Default: file nel repo.
     remoteUrl() {
-        var u = String(this.setting("gofile_remote_url") || "").trim();
+        var u = String(this.readStore(MIRROR_URL) || "").trim();
         if (u === "-") return "";
         return u || DEFAULT_REMOTE_URL;
+    }
+
+    remoteToken() {
+        return String(this.readStore(MIRROR_TOKEN) || "").trim();
+    }
+
+    // Copia i valori delle impostazioni URL/token nelle copie interne. Va chiamata solo
+    // da dentro syncLinks (contesto in cui un re-invoke di getSourcePreferences è sicuro).
+    syncSettings() {
+        try { var u = this.setting("gofile_remote_url"); this.writeStore(MIRROR_URL, u == null ? "" : String(u)); } catch (e) {}
+        try { var t = this.setting("gofile_remote_token"); this.writeStore(MIRROR_TOKEN, t == null ? "" : String(t)); } catch (e) {}
     }
 
     // Link letti dall'ultima volta dalla lista remota (cache locale, lettura sincrona).
@@ -556,7 +584,7 @@ class DefaultExtension extends MProvider {
     // Aggiunge i link scelti al file GitHub della lista condivisa. Legge il contenuto
     // attuale (per il suo sha), accoda le righe mancanti e rimanda indietro il file.
     async pushToRemote(codes) {
-        var tok = String(this.setting("gofile_remote_token") || "").trim();
+        var tok = this.remoteToken();
         var tgt = this.remoteApiTarget();
         if (!tok) { this.setPushStatus("Manca il token GitHub: mettilo in «Token GitHub»."); return; }
         if (!tgt) { this.setPushStatus("La lista condivisa non è un file GitHub su cui scrivere."); return; }
@@ -908,14 +936,17 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
-        // Se hai spuntato dei link in «Aggiungi alla lista condivisa», aggiungili al file.
-        var localLinks = this.savedLinks();
-        var pending = localLinks.length ? this.setting(this.pushKey(localLinks)) : null;
-        if (pending && pending.length) {
-            await this.pushToRemote(pending);
-            this.writeStore(STORE_PUSH_N, String((parseInt(this.readStore(STORE_PUSH_N), 10) || 0) + 1));
-        }
-        await this.refreshRemote();
+        // savedLinks() sincronizza (copie interne + raccoglie la scelta «Aggiungi alla
+        // lista condivisa» in STORE_PUSH_PENDING). Qui facciamo l'invio vero (asincrono).
+        this.savedLinks();
+        try {
+            var pending = this.readJson(STORE_PUSH_PENDING, null);
+            if (pending && pending.length) {
+                this.writeStore(STORE_PUSH_PENDING, "");
+                await this.pushToRemote(pending);
+            }
+            await this.refreshRemote();
+        } catch (e) { /* la lista condivisa non deve mai bloccare Popolari */ }
         var groups = this.groups();
         var known = this.infoMap(), fm = this.filesMap(), self = this;
         var codes = [];
@@ -990,7 +1021,8 @@ class DefaultExtension extends MProvider {
     // nuovo entro 2 minuti: è il «trascina in basso per aggiornare».
     async getDetail(url) {
         var raw = String(url);
-        await this.refreshRemote();
+        this.savedLinks(); // aggiorna le copie interne (URL della lista) prima di leggerla
+        try { await this.refreshRemote(); } catch (e) {}
         var g = null, codes;
         var gm = raw.match(/\/g\/([^?#]+)/);
         if (gm) {
@@ -1268,7 +1300,7 @@ class DefaultExtension extends MProvider {
         });
         // Aggiungere link alla lista condivisa direttamente da qui (serve un token GitHub).
         var canWrite = !!this.remoteApiTarget();
-        var hasToken = !!String(this.setting("gofile_remote_token") || "").trim();
+        var hasToken = !!this.remoteToken();
         prefs.push({
             key: "gofile_remote_token",
             editTextPreference: {
