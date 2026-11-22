@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.25.0",
+        "version": "1.25.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -702,7 +702,18 @@ class DefaultExtension extends MProvider {
 
     // Legge una cartella e ricorda lista dei video, titolo e (se chiesta) copertina.
     // Se Gofile non risponde non salva niente: si riprova la volta dopo.
-    async readOne(code) {
+    readOne(code) {
+        this._inflight = this._inflight || {};
+        if (this._inflight[code]) return this._inflight[code];
+        var self = this;
+        var p = this.readOneRaw(code);
+        this._inflight[code] = p;
+        var clear = function () { delete self._inflight[code]; };
+        p.then(clear, clear);
+        return p;
+    }
+
+    async readOneRaw(code) {
         if (this.isBunkr(code)) return this.readBunkr(code);
         if (this.isFilester(code)) return this.readFilester(code);
         if (this.isPixeldrain(code)) return this.readPixeldrain(code);
@@ -743,7 +754,7 @@ class DefaultExtension extends MProvider {
         var tried = [];
         for (var i = 0; i < order.length; i++) {
             var res = null;
-            try { res = await this.client.get("https://" + order[i] + path, { "User-Agent": UA }); } catch (e) {}
+            try { res = await this.withTimeout(this.client.get("https://" + order[i] + path, { "User-Agent": UA }), 12000); } catch (e) {}
             var html = String((res && res.body) || "");
             var status = res ? res.statusCode : 0;
             var isBunkr = /\|\s*Bunkr\s*<\/title>|theItem|bunkr/i.test(html.slice(0, 20000)) && /<title>/i.test(html);
@@ -809,13 +820,20 @@ class DefaultExtension extends MProvider {
         if (b.kind === "a") {
             // Prima la WebView (modalità avanzata = tutti i file in una volta). Se non
             // c'è la WebView o non dà nulla, ripiego sulla lettura paginata via HTTP.
-            var wv = await this.readBunkrAlbumWebview(b, page.host);
-            if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
+            // 1) Modalità avanzata via HTTP: una sola richiesta con tutti i file.
+            files = await this.bunkrAdvancedHttp(page.host, b.id);
+            // 2) WebView solo se c'è davvero (sul Tizen esiste ma lancia subito un errore).
+            if (!files.length && !this._noWebview) {
+                var wv = await this.readBunkrAlbumWebview(b, page.host);
+                if (wv === null) this._noWebview = true;
+                if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
+            }
             if (!files.length) {
                 var seen = {}, expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
                 for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
                 this.collectBunkrFiles(html, page.host, files, seen);
-                for (var pg = 2; pg <= 60; pg++) {
+                var maxPg = Math.min(expMax > 1 ? expMax : 20, 20);
+                for (var pg = 2; pg <= maxPg; pg++) {
                     var before = files.length;
                     var body = await this.bunkrAlbumPage(page.host, b.id, pg);
                     if (body == null) { if (pg <= expMax) partial = true; break; }
@@ -845,11 +863,26 @@ class DefaultExtension extends MProvider {
     // risposto, poi gli altri come ripiego, senza marcare «non valido» chi fallisce
     // (così un intoppo qui non rovina la lettura degli altri album). Restituisce il
     // corpo della prima risposta 200 con elementi album, o null se nessuno risponde.
+    async bunkrAdvancedHttp(host, id) {
+        var res = null, out = [], seen = {};
+        try { res = await this.withTimeout(this.client.get("https://" + host + "/a/" + id + "?advanced=1", { "User-Agent": UA }), 15000); } catch (e) { return out; }
+        if (!res || res.statusCode !== 200) return out;
+        var re = /original:\s*"((?:[^"\\]|\\.)*)"\s*,\s*slug:\s*"([^"]+)"\s*,\s*type:\s*"([^"]+)"[\s\S]*?thumbnail:\s*"([^"]+)"/g, m, html = String(res.body || "");
+        while ((m = re.exec(html))) {
+            if (m[3].indexOf("video/") !== 0 || seen[m[2]]) continue;
+            seen[m[2]] = 1;
+            out.push({ n: this.decodeHtml(m[1].replace(/\\(.)/g, "$1")), img: m[4].replace(/\\\//g, "/"), bf: m[2], bh: host });
+        }
+        return out;
+    }
+
     async bunkrAlbumPage(host, id, pg) {
-        var order = [host].concat(BUNKR_HOSTS).filter(function (h, i, a) { return h && a.indexOf(h) === i; });
+        // Solo il dominio che ha già risposto: provare gli altri 6 a ogni pagina (anche
+        // bloccati dall'operatore, fino a 45 s ciascuno) è la parte più lenta.
+        var order = [host];
         for (var i = 0; i < order.length; i++) {
             var res = null;
-            try { res = await this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }); } catch (e) {}
+            try { res = await this.withTimeout(this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }), 12000); } catch (e) {}
             if (res && res.statusCode === 200 && /theItem/.test(String(res.body || ""))) return String(res.body);
         }
         return null;
@@ -1012,8 +1045,33 @@ class DefaultExtension extends MProvider {
     async getLatestUpdates(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
-        try { this.savedLinks(); await this.refreshRemote(true); } catch (e) {}
-        return this.browseGroups(this.groupsFrom(this.cachedRemote()));
+        try { this.savedLinks(); } catch (e) {}
+        // Card subito dalla cache: la lista condivisa si aggiorna in sottofondo (TTL 60 s)
+        // e si aspetta solo la prima volta, al massimo 8 s.
+        var cached = this.cachedRemote();
+        if (!cached.length) { try { await this.withTimeout(this.refreshRemote(true), 8000); } catch (e) {} cached = this.cachedRemote(); }
+        else { try { Promise.resolve(this.refreshRemote()).catch(function () {}); } catch (e) {} }
+        var groups = this.groupsFrom(cached), self = this;
+        // Gli album non ancora letti si leggono in sottofondo (copertine alla prossima
+        // apertura) o all'apertura della scheda (getDetail): la lista non li aspetta.
+        this.prefetch(groups);
+        return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
+    }
+
+    withTimeout(p, ms) {
+        var t;
+        var guard = new Promise(function (_, rej) { t = setTimeout(function () { rej(new Error("timeout")); }, ms); });
+        return Promise.race([p, guard]).then(function (v) { clearTimeout(t); return v; }, function (e) { clearTimeout(t); throw e; });
+    }
+
+    prefetch(groups) {
+        var fm = this.filesMap(), codes = [];
+        groups.forEach(function (g) { codes = codes.concat(g.codes); });
+        var missing = codes.filter(function (c) { return !fm[c] || fm[c].v !== READ_V; });
+        if (!missing.length || this._prefetching) return;
+        this._prefetching = true;
+        var self = this;
+        Promise.resolve(this.readMany(missing)).catch(function () {}).then(function () { self._prefetching = false; });
     }
 
     // Nella ricerca si può incollare un link (o il codice) per aprirlo una volta;
