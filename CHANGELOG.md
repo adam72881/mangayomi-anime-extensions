@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.23.4
+
+- **Stato della lista condivisa che si aggiorna davvero:** le scritte sotto «Token» e «Lista condivisa» non si aggiornavano (bug noto di Mangayomi #1196 sui riepiloghi a chiave fissa), facendo sembrare il token non impostato anche quando funzionava. Ora c'è una riga «ℹ️ Stato lista condivisa» che si aggiorna sempre (token a posto o no, link presenti nel documento, ultimo esito). Le altre due voci restano solo per inserire token e indirizzo.
+
 ## Gofile 1.23.3
 
 - **Scrittura sulla lista condivisa corretta (errore 400):** alla richiesta di scrittura mancava l'intestazione `Content-Type: application/json`, così GitHub la rifiutava con errore 400 e nessun link veniva aggiunto. Ora l'aggiunta funziona. Migliorati anche i messaggi d'errore per codice (401/403 = token/permesso, 404 = repo/file, ecc.).
