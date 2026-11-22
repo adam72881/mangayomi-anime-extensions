@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.25.1",
+        "version": "1.25.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -753,8 +753,12 @@ class DefaultExtension extends MProvider {
         order = fresh.concat(order.filter(function (h) { return fresh.indexOf(h) === -1; }));
         var tried = [];
         for (var i = 0; i < order.length; i++) {
-            var res = null;
-            try { res = await this.withTimeout(this.client.get("https://" + order[i] + path, { "User-Agent": UA }), 12000); } catch (e) {}
+            var res = null, ourTimeout = false;
+            // Niente timer qui: questa pagina la usa anche il video (getVideoList). Su iPhone
+            // la risposta arriva dopo i 12 s della 1.25.1, e se setTimeout non c'è o scatta
+            // subito il timer rifiutava ogni dominio prima ancora della richiesta.
+            try { res = await this.client.get("https://" + order[i] + path, { "User-Agent": UA }); } catch (e) { ourTimeout = !!(e && e.message === "timeout"); }
+            if (ourTimeout) { tried.push(order[i] + " tempo nostro scaduto"); continue; }
             var html = String((res && res.body) || "");
             var status = res ? res.statusCode : 0;
             var isBunkr = /\|\s*Bunkr\s*<\/title>|theItem|bunkr/i.test(html.slice(0, 20000)) && /<title>/i.test(html);
@@ -865,7 +869,7 @@ class DefaultExtension extends MProvider {
     // corpo della prima risposta 200 con elementi album, o null se nessuno risponde.
     async bunkrAdvancedHttp(host, id) {
         var res = null, out = [], seen = {};
-        try { res = await this.withTimeout(this.client.get("https://" + host + "/a/" + id + "?advanced=1", { "User-Agent": UA }), 15000); } catch (e) { return out; }
+        try { res = await this.withTimeout(this.client.get("https://" + host + "/a/" + id + "?advanced=1", { "User-Agent": UA }), 30000); } catch (e) { return out; }
         if (!res || res.statusCode !== 200) return out;
         var re = /original:\s*"((?:[^"\\]|\\.)*)"\s*,\s*slug:\s*"([^"]+)"\s*,\s*type:\s*"([^"]+)"[\s\S]*?thumbnail:\s*"([^"]+)"/g, m, html = String(res.body || "");
         while ((m = re.exec(html))) {
@@ -882,7 +886,7 @@ class DefaultExtension extends MProvider {
         var order = [host];
         for (var i = 0; i < order.length; i++) {
             var res = null;
-            try { res = await this.withTimeout(this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }), 12000); } catch (e) {}
+            try { res = await this.withTimeout(this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }), 30000); } catch (e) {}
             if (res && res.statusCode === 200 && /theItem/.test(String(res.body || ""))) return String(res.body);
         }
         return null;
@@ -1058,10 +1062,30 @@ class DefaultExtension extends MProvider {
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
 
+    // true solo se setTimeout esiste, non lancia e non esegue la funzione subito.
+    // Su QuickJS/flutter_qjs di Mangayomi iPhone il timer può mancare: chiamarlo
+    // rifiuta la Promise all'istante e ogni richiesta sembra «nessuna risposta».
+    timerOk() {
+        if (this._timerOk != null) return this._timerOk;
+        if (typeof setTimeout !== "function") { this._timerOk = false; return false; }
+        var sync = false, id;
+        try { id = setTimeout(function () { sync = true; }, 0); } catch (e) { this._timerOk = false; return false; }
+        if (sync) { this._timerOk = false; return false; }
+        if (typeof clearTimeout === "function") { try { clearTimeout(id); } catch (e2) {} }
+        this._timerOk = true;
+        return true;
+    }
+
     withTimeout(p, ms) {
-        var t;
-        var guard = new Promise(function (_, rej) { t = setTimeout(function () { rej(new Error("timeout")); }, ms); });
-        return Promise.race([p, guard]).then(function (v) { clearTimeout(t); return v; }, function (e) { clearTimeout(t); throw e; });
+        var waited = Promise.resolve(p);
+        if (!this.timerOk()) return waited;
+        var t, armed = false;
+        var guard = new Promise(function (_, rej) {
+            try { t = setTimeout(function () { rej(new Error("timeout")); }, ms); armed = true; } catch (e) {}
+        });
+        if (!armed) return waited;
+        var clear = function () { if (typeof clearTimeout === "function") { try { clearTimeout(t); } catch (e) {} } };
+        return Promise.race([waited, guard]).then(function (v) { clear(); return v; }, function (e) { clear(); throw e; });
     }
 
     prefetch(groups) {
