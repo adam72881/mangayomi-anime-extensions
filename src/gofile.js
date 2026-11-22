@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.23.1",
+        "version": "1.23.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1305,7 +1305,9 @@ class DefaultExtension extends MProvider {
             editTextPreference: {
                 title: "📄 Lista condivisa",
                 summary: inDoc + "\n\nTocca per cambiare l'indirizzo del file (ora vuoto = file predefinito).",
-                value: "",
+                // Il valore attuale, non "": ridisegnare con "" farebbe azzerare a Mangayomi
+                // il valore salvato (stesso difetto delle preferenze di #1196).
+                value: String(this.readStore(MIRROR_URL) || ""),
                 dialogTitle: "Indirizzo della lista condivisa",
                 dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga. Lascia vuoto per il file predefinito, scrivi - per disattivare. Per vedere cosa contiene, guarda il riepilogo qui sopra.",
             },
@@ -1319,7 +1321,9 @@ class DefaultExtension extends MProvider {
                 title: "🔑 Token GitHub (per aggiungere link da qui)",
                 summary: (hasToken ? "Token impostato. " : "Non impostato. ") +
                     "Serve solo se vuoi aggiungere link alla lista condivisa da dentro Mangayomi. Crea un token «fine-grained» su GitHub con permesso Contents: Read and write sul repo della lista. I link aggiunti a un repo pubblico sono pubblici.",
-                value: "",
+                // Il valore attuale, non "": altrimenti Mangayomi azzera il token salvato
+                // a ogni ridisegno della pagina (per questo risultava sempre «non impostato»).
+                value: this.remoteToken(),
                 dialogTitle: "Token GitHub",
                 dialogMessage: "Incolla il token (resta solo su questo dispositivo). Scrivi - per toglierlo.",
             },
