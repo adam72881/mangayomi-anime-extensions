@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.24.1
+
+- **La lista condivisa si aggiorna subito:** aprendo Popolari, Recenti o la ricerca l'estensione rilegge il documento forzando la versione aggiornata (prima restava la vecchia per via della cache di GitHub di ~5 minuti e di una cache interna). Così i link appena aggiunti compaiono senza aspettare.
+
 ## Gofile 1.24.0
 
 - **Popolari e Recenti separati:** in «Popolari» ora ci sono solo i link che hai salvato tu sul telefono; in «Recenti» quelli della lista condivisa (il documento). La ricerca guarda comunque in entrambi, e ogni scheda si apre da tutte e due.
