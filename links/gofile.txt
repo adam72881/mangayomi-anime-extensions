@@ -1,0 +1,19 @@
+# Lista condivisa per l'estensione "Gofile" di Mangayomi.
+#
+# Scrivi un link per riga. L'estensione legge questo file e mostra i link
+# come schede, anche dove digitare è scomodo (es. la TV): basta modificare
+# questo file da un dispositivo con tastiera (telefono/PC).
+#
+# Formati accettati per ogni riga:
+#   https://gofile.io/d/XXXXXX
+#   https://bunkr.si/a/XXXXXX | Nome della serie
+#   https://filester.gg/d/XXXXXX
+#   https://pixeldrain.com/u/XXXXXX
+#   https://pixeldrain.com/l/XXXXXX | Raccolta
+#
+# - Dopo una barra verticale "|" puoi mettere un nome: i link con lo stesso
+#   nome finiscono in un'unica scheda (raccolta).
+# - Le righe vuote e quelle che iniziano con "#" sono ignorate.
+#
+# Aggiungi i tuoi link qui sotto:
+
