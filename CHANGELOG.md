@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.23.3
+
+- **Scrittura sulla lista condivisa corretta (errore 400):** alla richiesta di scrittura mancava l'intestazione `Content-Type: application/json`, così GitHub la rifiutava con errore 400 e nessun link veniva aggiunto. Ora l'aggiunta funziona. Migliorati anche i messaggi d'errore per codice (401/403 = token/permesso, 404 = repo/file, ecc.).
+
 ## Gofile 1.23.2
 
 - **Il token GitHub ora resta salvato:** le caselle «Token GitHub» e «Lista condivisa (URL)» venivano ridisegnate vuote, e Mangayomi azzerava il valore salvato (per questo il token risultava sempre «non impostato»). Ora mostrano il valore attuale e lo conservano. Dopo l'aggiornamento, reinserisci il token una volta.
