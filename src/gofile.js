@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.24.0",
+        "version": "1.24.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -480,13 +480,16 @@ class DefaultExtension extends MProvider {
 
     // Scarica la lista condivisa (se scaduta) e la mette in cache. In caso di errore di
     // rete tiene l'ultima buona. Si chiama da Popolari e dal «trascina per aggiornare».
-    async refreshRemote() {
+    async refreshRemote(force) {
         var url = this.remoteUrl();
         if (!url) { if (this.readStore(STORE_REMOTE)) this.writeStore(STORE_REMOTE, ""); return; }
         var c = this.readJson(STORE_REMOTE, null);
-        if (c && c.url === url && Date.now() - (c.at || 0) < REMOTE_TTL) return;
+        if (!force && c && c.url === url && Date.now() - (c.at || 0) < REMOTE_TTL) return;
+        // Cache-buster: GitHub «raw» tiene il file per ~5 minuti; con un parametro unico
+        // otteniamo subito la versione aggiornata (utile dopo aver aggiunto un link).
+        var fetchUrl = url + (force ? (url.indexOf("?") === -1 ? "?" : "&") + "_=" + Date.now() : "");
         var res;
-        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { return; }
+        try { res = await this.client.get(fetchUrl, { "User-Agent": UA, "Cache-Control": "no-cache" }); } catch (e) { return; }
         if (!res || res.statusCode !== 200) return;
         var links = [], self = this, seen = {};
         String(res.body || "").split(/\r?\n/).forEach(function (line) {
@@ -964,7 +967,7 @@ class DefaultExtension extends MProvider {
                 this.writeStore(STORE_PUSH_PENDING, "");
                 await this.pushToRemote(pending);
             }
-            await this.refreshRemote();
+            await this.refreshRemote(true);
         } catch (e) { /* la lista condivisa non deve mai bloccare Popolari */ }
         // Popolari: solo i link salvati sul telefono.
         return this.browseGroups(this.groupsFrom(this.savedLinks()));
@@ -1009,7 +1012,7 @@ class DefaultExtension extends MProvider {
     async getLatestUpdates(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
-        try { this.savedLinks(); await this.refreshRemote(); } catch (e) {}
+        try { this.savedLinks(); await this.refreshRemote(true); } catch (e) {}
         return this.browseGroups(this.groupsFrom(this.cachedRemote()));
     }
 
@@ -1022,7 +1025,7 @@ class DefaultExtension extends MProvider {
         if (code) return { list: [this.card(code)], hasNextPage: false };
         // La ricerca guarda tutti (locali + documento).
         this.savedLinks();
-        try { await this.refreshRemote(); } catch (e) {}
+        try { await this.refreshRemote(true); } catch (e) {}
         var all = (await this.browseGroups(this.groupsFrom())).list;
         if (!q) return { list: all, hasNextPage: false };
         var low = q.toLowerCase();
