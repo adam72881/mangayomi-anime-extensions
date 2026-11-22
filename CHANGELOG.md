@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.23.0
+
+- **Vedi cosa c'è nella lista condivisa:** la voce «📄 Lista condivisa» ora elenca i link presenti nel documento (per nome), così sai se ci sono. Toccandola puoi comunque cambiare l'indirizzo del file. Dopo aver aggiunto dei link, compaiono subito nell'elenco (senza aspettare la cache di GitHub).
+
 ## Gofile 1.22.2
 
 - **La lista dei link da spuntare compare sempre:** «➕ Aggiungi alla lista condivisa» (con l'elenco dei link del telefono da spuntare) ora si vede anche prima di mettere il token, con un avviso di metterlo. Prima appariva solo dopo aver inserito il token, e non era chiaro dove scegliere i link.

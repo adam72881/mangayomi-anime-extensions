@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.22.2",
+        "version": "1.23.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -598,12 +598,13 @@ class DefaultExtension extends MProvider {
         } catch (e) { this.setPushStatus("Non riesco a leggere il file (rete?)."); return; }
         var links = this.savedLinks(), byCode = {};
         for (var i = 0; i < links.length; i++) byCode[links[i].code] = links[i];
-        var add = [];
+        var add = [], addedLinks = [];
         for (var k = 0; k < codes.length; k++) {
             var l = byCode[codes[k]]; if (!l) continue;
             var url = this.linkUrl(l.code);
             if (cur.indexOf(url) !== -1) continue; // già presente nel file
             add.push(url + (l.name ? " | " + l.name : ""));
+            addedLinks.push({ code: l.code, name: l.name });
         }
         if (!add.length) { this.setPushStatus("Niente da aggiungere: erano già nella lista."); return; }
         var next = cur.replace(/\s*$/, "") + "\n" + add.join("\n") + "\n";
@@ -612,7 +613,12 @@ class DefaultExtension extends MProvider {
         try {
             var p = await this.client.put(api, hdr, body);
             if (p && (p.statusCode === 200 || p.statusCode === 201)) {
-                this.writeStore(STORE_REMOTE, ""); // forza la rilettura della lista
+                // Aggiorna subito la cache locale così l'elenco del documento mostra i
+                // nuovi link senza aspettare la cache di GitHub (raw può restare vecchia).
+                var cached = this.cachedRemote().slice(), have = {};
+                cached.forEach(function (x) { have[x.code] = 1; });
+                addedLinks.forEach(function (x) { if (!have[x.code]) cached.push(x); });
+                this.writeStore(STORE_REMOTE, JSON.stringify({ url: this.remoteUrl(), at: Date.now(), links: cached }));
                 this.setPushStatus("Aggiunti " + add.length + " link alla lista. ✓");
             } else {
                 this.setPushStatus("GitHub ha risposto " + (p && p.statusCode) + " alla scrittura: il token serve con permesso di scrittura (Contents) su quel repo.");
@@ -1286,16 +1292,19 @@ class DefaultExtension extends MProvider {
                 },
             });
         }
-        var remoteN = this.cachedRemote().length;
+        var remoteList = this.cachedRemote();
+        var remoteNames = remoteList.map(function (l) { return "• " + (l.name || self.shortLink(l.code)); });
+        var inDoc = !this.remoteUrl() ? "Lista condivisa disattivata."
+            : remoteList.length ? ("Nel documento ci sono " + remoteList.length + " link:\n" + remoteNames.join("\n"))
+            : "Il documento è vuoto (nessun link ancora).";
         prefs.push({
             key: "gofile_remote_url",
             editTextPreference: {
-                title: "📄 Lista condivisa (URL)",
-                summary: (this.remoteUrl() ? (remoteN + " link letti dalla lista. ") : "Disattivata. ") +
-                    "Un file di testo (un link per riga) che l'estensione legge sempre: modificalo da telefono/PC e i link compaiono anche sulla TV. Vuoto = file predefinito nel repo; «-» = disattiva.",
+                title: "📄 Lista condivisa",
+                summary: inDoc + "\n\nTocca per cambiare l'indirizzo del file (ora vuoto = file predefinito).",
                 value: "",
-                dialogTitle: "Lista condivisa",
-                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga (anche «link | nome» e righe con # ignorate). Lascia vuoto per il file predefinito, scrivi - per disattivare.",
+                dialogTitle: "Indirizzo della lista condivisa",
+                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga. Lascia vuoto per il file predefinito, scrivi - per disattivare. Per vedere cosa contiene, guarda il riepilogo qui sopra.",
             },
         });
         // Aggiungere link alla lista condivisa direttamente da qui (serve un token GitHub).
