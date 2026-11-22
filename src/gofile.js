@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.23.2",
+        "version": "1.23.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -589,7 +589,7 @@ class DefaultExtension extends MProvider {
         if (!tok) { this.setPushStatus("Manca il token GitHub: mettilo in «Token GitHub»."); return; }
         if (!tgt) { this.setPushStatus("La lista condivisa non è un file GitHub su cui scrivere."); return; }
         var api = "https://api.github.com/repos/" + tgt.owner + "/" + tgt.repo + "/contents/" + tgt.path;
-        var hdr = { "Authorization": "token " + tok, "Accept": "application/vnd.github+json", "User-Agent": UA };
+        var hdr = { "Authorization": "token " + tok, "Accept": "application/vnd.github+json", "Content-Type": "application/json", "User-Agent": UA };
         var cur = "", sha = "";
         try {
             var g = await this.client.get(api + "?ref=" + encodeURIComponent(tgt.branch), hdr);
@@ -621,7 +621,13 @@ class DefaultExtension extends MProvider {
                 this.writeStore(STORE_REMOTE, JSON.stringify({ url: this.remoteUrl(), at: Date.now(), links: cached }));
                 this.setPushStatus("Aggiunti " + add.length + " link alla lista. ✓");
             } else {
-                this.setPushStatus("GitHub ha risposto " + (p && p.statusCode) + " alla scrittura: il token serve con permesso di scrittura (Contents) su quel repo.");
+                var sc = p && p.statusCode;
+                var why = (sc === 401 || sc === 403) ? "il token è sbagliato o senza permesso Contents: Read and write su quel repo."
+                    : sc === 404 ? "repo o file non trovato (controlla l'URL della lista)."
+                    : sc === 409 ? "conflitto: riprova (il file è cambiato nel frattempo)."
+                    : sc === 422 ? "richiesta rifiutata (file troppo grande o dati non validi)."
+                    : "richiesta non valida; riprova.";
+                this.setPushStatus("GitHub ha risposto " + sc + " alla scrittura: " + why);
             }
         } catch (e) { this.setPushStatus("Non riesco a scrivere il file (rete?)."); }
     }
