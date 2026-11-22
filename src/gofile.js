@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.20.0",
+        "version": "1.21.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -32,6 +32,13 @@ const STORE_BK_HOST = "gofile_bunkr_host";
 const STORE_BK_BAD = "gofile_bunkr_bad";
 const BAD_TTL = 24 * 3600000;
 const STORE_FIX = "gofile_fix_1_12";
+const STORE_REMOTE = "gofile_remote_cache";
+const REMOTE_TTL = 60000;
+// Lista link condivisa: un file di testo (un link per riga) che l'estensione legge
+// sempre. Modificandolo da un dispositivo con tastiera (telefono/PC) i link compaiono
+// anche dove digitare è scomodo (es. TV). Di default un file nel repo; cambiabile dalle
+// impostazioni (anche un Gist o un altro URL «raw»).
+const DEFAULT_REMOTE_URL = "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/links/gofile.txt";
 // Domini di Bunkr: alcuni operatori italiani ne bloccano qualcuno, si prova il successivo.
 const BUNKR_HOSTS = ["bunkr.cr", "bunkr.si", "bunkr.fi", "bunkr.ph", "bunkr.ws", "bunkr.site", "bunkr.pk"];
 const FILES_TTL = 6 * 3600000;
@@ -426,8 +433,51 @@ class DefaultExtension extends MProvider {
         return out;
     }
 
+    // URL della lista condivisa. Vuoto o «-» = disattivata. Default: file nel repo.
+    remoteUrl() {
+        var u = String(this.setting("gofile_remote_url") || "").trim();
+        if (u === "-") return "";
+        return u || DEFAULT_REMOTE_URL;
+    }
+
+    // Link letti dall'ultima volta dalla lista remota (cache locale, lettura sincrona).
+    cachedRemote() {
+        var url = this.remoteUrl();
+        if (!url) return [];
+        var c = this.readJson(STORE_REMOTE, null);
+        return c && c.url === url && c.links ? c.links : [];
+    }
+
+    // Scarica la lista condivisa (se scaduta) e la mette in cache. In caso di errore di
+    // rete tiene l'ultima buona. Si chiama da Popolari e dal «trascina per aggiornare».
+    async refreshRemote() {
+        var url = this.remoteUrl();
+        if (!url) { if (this.readStore(STORE_REMOTE)) this.writeStore(STORE_REMOTE, ""); return; }
+        var c = this.readJson(STORE_REMOTE, null);
+        if (c && c.url === url && Date.now() - (c.at || 0) < REMOTE_TTL) return;
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { return; }
+        if (!res || res.statusCode !== 200) return;
+        var links = [], self = this, seen = {};
+        String(res.body || "").split(/\r?\n/).forEach(function (line) {
+            var t = line.trim();
+            if (!t || t.charAt(0) === "#") return;
+            self.parseLinks(t).forEach(function (l) { if (l.code && !seen[l.code]) { seen[l.code] = 1; links.push(l); } });
+        });
+        this.writeStore(STORE_REMOTE, JSON.stringify({ url: url, at: Date.now(), links: links }));
+    }
+
+    // Link locali più quelli della lista condivisa (i locali hanno la precedenza).
+    allLinks() {
+        var local = this.savedLinks(), seen = {};
+        for (var i = 0; i < local.length; i++) seen[local[i].code] = 1;
+        var out = local.slice(), remote = this.cachedRemote();
+        for (var j = 0; j < remote.length; j++) if (!seen[remote[j].code]) { seen[remote[j].code] = 1; out.push(remote[j]); }
+        return out;
+    }
+
     customName(code) {
-        var links = this.savedLinks();
+        var links = this.allLinks();
         for (var i = 0; i < links.length; i++) if (links[i].code === code) return links[i].name;
         return "";
     }
@@ -443,7 +493,7 @@ class DefaultExtension extends MProvider {
     }
 
     groups() {
-        var links = this.savedLinks();
+        var links = this.allLinks();
         var byKey = {}, order = [];
         for (var i = 0; i < links.length; i++) {
             var key = links[i].name ? this.groupKey(links[i].name) : "#" + links[i].code;
@@ -748,6 +798,7 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
+        await this.refreshRemote();
         var groups = this.groups();
         var known = this.infoMap(), fm = this.filesMap(), self = this;
         var codes = [];
@@ -822,6 +873,7 @@ class DefaultExtension extends MProvider {
     // nuovo entro 2 minuti: è il «trascina in basso per aggiornare».
     async getDetail(url) {
         var raw = String(url);
+        await this.refreshRemote();
         var g = null, codes;
         var gm = raw.match(/\/g\/([^?#]+)/);
         if (gm) {
@@ -1085,6 +1137,18 @@ class DefaultExtension extends MProvider {
                 },
             });
         }
+        var remoteN = this.cachedRemote().length;
+        prefs.push({
+            key: "gofile_remote_url",
+            editTextPreference: {
+                title: "📄 Lista condivisa (URL)",
+                summary: (this.remoteUrl() ? (remoteN + " link letti dalla lista. ") : "Disattivata. ") +
+                    "Un file di testo (un link per riga) che l'estensione legge sempre: modificalo da telefono/PC e i link compaiono anche sulla TV. Vuoto = file predefinito nel repo; «-» = disattiva.",
+                value: "",
+                dialogTitle: "Lista condivisa",
+                dialogMessage: "Indirizzo «raw» di un file di testo (es. su GitHub o un Gist) con un link per riga (anche «link | nome» e righe con # ignorate). Lascia vuoto per il file predefinito, scrivi - per disattivare.",
+            },
+        });
         return prefs;
     }
 }

@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.21.0
+
+- **Lista condivisa (per la TV):** l'estensione può leggere un file di testo con i link (un link per riga), così sulla TV — dove digitare è scomodo — i link compaiono da soli. Basta modificare il file da telefono/PC. Di default legge un file nel repo (`links/gofile.txt`), ma nelle impostazioni («📄 Lista condivisa») puoi mettere il tuo (anche un Gist). Valgono gli stessi formati di «Salva un link» (anche `link | nome` per le raccolte; righe con `#` ignorate). I link locali e quelli della lista convivono.
+
 ## Gofile 1.20.0
 
 - **Lettura album Bunkr finalizzata.** Tolta la riga di diagnostica temporanea. Il metodo in uso è quello più veloce che funziona sul telefono: la WebView apre l'album e scarica dall'interno la lista completa dei file (modalità avanzata); l'HTTP paginato resta come ripiego. I video si aprono prendendo il link firmato dalla pagina del singolo file solo al momento della riproduzione.
