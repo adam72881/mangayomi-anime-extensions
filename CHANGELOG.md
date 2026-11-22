@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.22.2
+
+- **La lista dei link da spuntare compare sempre:** «➕ Aggiungi alla lista condivisa» (con l'elenco dei link del telefono da spuntare) ora si vede anche prima di mettere il token, con un avviso di metterlo. Prima appariva solo dopo aver inserito il token, e non era chiaro dove scegliere i link.
+
 ## Gofile 1.22.1
 
 - **Corretto il crash all'apertura di Gofile:** la 1.22.0 leggeva le impostazioni (URL/token della lista condivisa) mentre costruiva la pagina delle impostazioni, mandando l'app in loop fino a chiudersi. Ora quei valori si leggono in modo sicuro e l'app non si chiude più. L'aggiunta dei link alla lista condivisa continua a funzionare.

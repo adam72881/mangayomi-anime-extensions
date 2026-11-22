@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.22.1",
+        "version": "1.22.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1312,16 +1312,17 @@ class DefaultExtension extends MProvider {
                 dialogMessage: "Incolla il token (resta solo su questo dispositivo). Scrivi - per toglierlo.",
             },
         });
-        if (canWrite && hasToken) {
+        if (canWrite) {
             var remoteCodes = {};
             this.cachedRemote().forEach(function (l) { remoteCodes[l.code] = 1; });
             var addable = newest.filter(function (l) { return !remoteCodes[l.code]; });
+            var tokenNote = hasToken ? "" : "⚠️ Prima metti il token qui sopra. ";
             if (addable.length) {
                 prefs.push({
                     key: this.pushKey(links),
                     multiSelectListPreference: {
                         title: "➕ Aggiungi alla lista condivisa",
-                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + "Spunta i link da aggiungere al file condiviso. Vengono scritti su GitHub quando riapri Popolari.",
+                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + tokenNote + "Spunta i link del telefono da mettere nella lista condivisa. Vengono scritti quando riapri Popolari.",
                         entries: addable.map(label),
                         entryValues: addable.map(function (l) { return l.code; }),
                         values: [],
@@ -1332,7 +1333,7 @@ class DefaultExtension extends MProvider {
                     key: "gofile_push_info",
                     editTextPreference: {
                         title: "➕ Aggiungi alla lista condivisa",
-                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + "Tutti i link salvati sono già nella lista condivisa.",
+                        summary: (this.pushStatus() ? this.pushStatus() + " " : "") + (links.length ? "Tutti i link salvati sono già nella lista condivisa." : "Prima salva qualche link con «➕ Salva un link»."),
                         value: "", dialogTitle: "Lista condivisa", dialogMessage: "Nessun link da aggiungere.",
                     },
                 });
