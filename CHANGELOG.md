@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.24.2
+
+- **Le impostazioni rileggono il documento:** aprendo le impostazioni ora parte una rilettura della lista condivisa in sottofondo, così riaprendole la voce «ℹ️ Stato» mostra i link presenti nel documento anche senza passare prima da Popolari/Recenti.
+
 ## Gofile 1.24.1
 
 - **La lista condivisa si aggiorna subito:** aprendo Popolari, Recenti o la ricerca l'estensione rilegge il documento forzando la versione aggiornata (prima restava la vecchia per via della cache di GitHub di ~5 minuti e di una cache interna). Così i link appena aggiunti compaiono senza aspettare.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.24.1",
+        "version": "1.24.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1275,6 +1275,13 @@ class DefaultExtension extends MProvider {
         if (!this._syncing) {
             this._linksMemo = null;
             try { this.savedLinks(); } catch (e) {}
+            // Rilegge il documento in sottofondo (una volta ogni pochi secondi): così,
+            // riaprendo le impostazioni, lo stato e la lista riflettono il documento,
+            // anche senza passare prima da Popolari/Recenti.
+            if (Date.now() - (this._remoteKick || 0) > 4000) {
+                this._remoteKick = Date.now();
+                try { Promise.resolve(this.refreshRemote(true)).catch(function () {}); } catch (e) {}
+            }
         }
         var links = this.readJson(STORE_LINKS, []);
         var newest = links.slice().reverse();
