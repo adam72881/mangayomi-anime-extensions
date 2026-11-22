@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": false,
         "itemType": 1,
-        "version": "1.23.0",
+        "version": "1.23.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -942,8 +942,11 @@ class DefaultExtension extends MProvider {
     async getPopular(page) {
         if (page > 1) return { list: [], hasNextPage: false };
         this.fixOnce();
-        // savedLinks() sincronizza (copie interne + raccoglie la scelta «Aggiungi alla
-        // lista condivisa» in STORE_PUSH_PENDING). Qui facciamo l'invio vero (asincrono).
+        // savedLinks() sincronizza (copie interne del token/URL + raccoglie la scelta
+        // «Aggiungi alla lista condivisa» in STORE_PUSH_PENDING). Azzeriamo la memo così
+        // la sincronizzazione (e quindi la copia del token) è sempre fresca prima di
+        // scrivere: altrimenti un token appena messo potrebbe non essere ancora copiato.
+        this._linksMemo = null;
         this.savedLinks();
         try {
             var pending = this.readJson(STORE_PUSH_PENDING, null);
