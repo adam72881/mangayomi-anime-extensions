@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.25.1
+
+- **Recenti si apre subito:** la lista mostra le schede immediatamente dalla copia salvata della lista condivisa, che si aggiorna in sottofondo. Gli album Bunkr non ancora letti si leggono dopo, in sottofondo o quando apri la scheda, invece di far aspettare tutta la lista.
+- **Album Bunkr più veloci:** si prova prima la «modalità avanzata» con una sola richiesta (tutti i file insieme); la lettura a pagine resta come ripiego, con al massimo 20 pagine e solo sul dominio che ha già risposto. Ogni richiesta a Bunkr ha un tempo massimo (12–15 s), così un dominio bloccato dall'operatore non fa aspettare minuti.
+
 ## Gofile 1.25.0
 
 - **Estensione segnata +18:** Gofile è ora marcata come NSFW, così compare solo quando è attiva la modalità adulti (prima si vedeva sempre, anche sulla TV). Se vuoi vederla, attiva la modalità contenuti per adulti nelle impostazioni di Mangayomi.
