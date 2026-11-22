@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.25.2
+
+- **Gli episodi Bunkr si aprono di nuovo:** dalla 1.25.1 un limite di 12 secondi sulla pagina Bunkr scattava prima che il telefono ricevesse la risposta (su iPhone quel timer può anche scattare subito, se non è disponibile). L'episodio usciva con «nessuna risposta» da tutti i domini, anche quando Bunkr rispondeva. Ora la pagina usata per il video aspetta la risposta vera, come prima della 1.25.1. Un timer nostro non viene mai contato come «nessuna risposta» e non segna il dominio come bloccato.
+- **Recenti resta immediato:** la lista si apre ancora subito dalla copia salvata. Il limite di attesa resta solo sul primo scaricamento della lista condivisa, quando non c'è ancora una copia, e solo se il timer del telefono funziona.
+
 ## Gofile 1.25.1
 
 - **Recenti si apre subito:** la lista mostra le schede immediatamente dalla copia salvata della lista condivisa, che si aggiorna in sottofondo. Gli album Bunkr non ancora letti si leggono dopo, in sottofondo o quando apri la scheda, invece di far aspettare tutta la lista.
