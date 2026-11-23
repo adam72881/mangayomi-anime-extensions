@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.34.0
+
+- **Cartelle Gofile «vuote» forzate ad aprirsi.** Alcune cartelle (soprattutto grandi, es. molti video da Gofile-douga) dicevano «Nessun file trovato» anche se i video c'erano: la pagina di Gofile non riusciva a disegnarle in tempo. Ora l'estensione chiede i file **direttamente all'API di Gofile** dentro la WebView (come fa il sito), così arrivano tutti in una volta, e usa il link di download diretto per la riproduzione. Se l'API non risponde, ricade sul metodo di prima: nel caso peggiore resta tutto com'era.
+
 ## Gofile 1.33.0
 
 - **Gofile-douga con ordinamenti.** Nel filtro «Cosa cerco» ora ci sono quattro voci Gofile-douga: «novità», «più visti (12h)», «più visti (24h)» e «più visti (3 giorni)». Così hai molti più video diversi da guardare, non solo gli ultimi. (Nota: Bunkr, Erome e findr offrono solo «recenti» — i loro indici pubblici non supportano altri ordinamenti.)

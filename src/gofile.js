@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.33.0",
+        "version": "1.34.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -104,6 +104,81 @@ function listScript() {
         }
         window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(out));
     }, 500);
+})();`;
+}
+
+// Lettura «forzata» di una cartella Gofile dentro la WebView: prima chiede i file
+// direttamente all'API di Gofile (come fa il sito: Authorization Bearer + token del
+// sito generateWT), così arrivano TUTTI in una volta, anche sulle cartelle grandi che
+// la pagina non riesce a disegnare in tempo (e che sembravano «vuote»). Se l'API non
+// risponde, ricade sul vecchio metodo che legge le righe già disegnate: così, nel
+// caso peggiore, il comportamento resta quello di prima.
+function gofileReadScript(code) {
+    return `(function () {
+    var done = false;
+    function send(o) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(o)); } catch (e) {} }
+    function tokenNow() {
+        try {
+            var raw = localStorage.getItem('gofile.accounts');
+            if (raw) { var p = JSON.parse(raw); var accs = p && p.accounts; if (accs) { var k = Object.keys(accs); for (var i = 0; i < k.length; i++) { if (accs[k[i]] && accs[k[i]].token) return accs[k[i]].token; } } }
+        } catch (e) {}
+        return (document.cookie.match(/accountToken=([^;]+)/) || [])[1] || '';
+    }
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    async function viaApi() {
+        var token = '';
+        for (var i = 0; i < 24 && !token; i++) { token = tokenNow(); if (!token) await sleep(300); }
+        if (!token) throw new Error('no token');
+        var gen = globalThis.generateWT;
+        if (typeof gen !== 'function') { try { var mm = await import('/js/core/wt.js'); gen = mm.generateWT; } catch (e) {} }
+        if (typeof gen !== 'function') throw new Error('no wt');
+        var wt = await gen(token);
+        var all = {}, title = '', gate = '', total = null;
+        for (var page = 1; page <= 40; page++) {
+            var q = 'page=' + page + '&pageSize=100&sortField=name&sortDirection=1';
+            var res = await fetch('https://api.gofile.io/contents/' + encodeURIComponent(${JSON.stringify(code)}) + '?' + q, { headers: { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': navigator.language || '' } });
+            var j = await res.json();
+            var d = j && j.data;
+            if (!d) throw new Error('no data');
+            title = d.name || title;
+            if (d.canAccess === false) { gate = d.password ? 'password' : 'noaccess'; break; }
+            if (d.type === 'file') { all[d.id] = d; break; }
+            var ch = d.children || {};
+            var ks = Object.keys(ch);
+            for (var a = 0; a < ks.length; a++) all[ks[a]] = ch[ks[a]];
+            total = (d.childrenCount != null) ? d.childrenCount : Object.keys(all).length;
+            if (!ks.length || Object.keys(all).length >= total) break;
+        }
+        var rows = [], ak = Object.keys(all);
+        for (var b = 0; b < ak.length; b++) { var it = all[ak[b]]; rows.push({ id: it.id, type: it.type, name: it.name || '', img: it.thumbnail || '', dl: it.link || '' }); }
+        return { title: title || document.title, cookie: document.cookie, token: token, text: gate === 'password' ? 'password' : (gate === 'noaccess' ? 'not found' : ''), rows: rows };
+    }
+    function viaDom() {
+        var last = -1, same = 0, ticks = 0;
+        var timer = setInterval(function () {
+            ticks++;
+            var rows = document.querySelectorAll('.fm-row[data-type]');
+            if (rows.length && rows.length === last) same++; else same = 0;
+            last = rows.length;
+            var body = document.body ? document.body.innerText : '';
+            var count = parseInt((body.match(/(\\d+)\\s+items?\\b/i) || [])[1], 10);
+            var complete = rows.length && count > 0 && rows.length >= count;
+            var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
+            var vid = document.querySelector('video');
+            var vsrc = vid ? (vid.currentSrc || vid.src || ((vid.querySelector('source') || {}).src) || '') : '';
+            var single = !rows.length && /gofile\\.io\\/download\\//.test(vsrc);
+            if (!(complete || single || same >= 3 || stop || ticks > 50)) return;
+            clearInterval(timer);
+            var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [] };
+            for (var i = 0; i < rows.length; i++) {
+                var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
+                out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
+            }
+            if (single) { var fname = decodeURIComponent(vsrc.split('?')[0].split('/').pop()); out.rows.push({ id: 'single', type: 'file', name: fname, img: vid.poster || vsrc.replace(/[^\\/]+$/, '') }); }
+            send(out);
+        }, 500);
+    }
+    viaApi().then(function (o) { if (o && (o.rows.length || o.text)) send(o); else viaDom(); }).catch(function () { viaDom(); });
 })();`;
 }
 
@@ -1136,7 +1211,7 @@ class DefaultExtension extends MProvider {
         var title = notFound ? "Gofile " + code + " (non trovata)" : String(data.title || "").replace(/\s*·\s*Gofile\s*$/i, "").trim() || code;
         if (VIDEO_EXT.test(title)) title = this.episodeName(title);
         var files = rows.filter(function (r) { return r.type === "file" && VIDEO_EXT.test(r.name || ""); })
-            .map(function (r) { return { n: r.name, img: r.img }; });
+            .map(function (r) { return { n: r.name, img: r.img, dl: r.dl || "" }; });
         var fm = this.filesMap();
         fm[code] = { title: title, files: files, folders: rows.filter(function (r) { return r.type === "folder"; }).length, at: Date.now(), v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
@@ -1670,11 +1745,11 @@ class DefaultExtension extends MProvider {
         if (typeof evaluateJavascriptViaWebview !== "function") {
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
-        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [listScript()], 40);
+        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [gofileReadScript(code)], 40);
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
-        var token = (String(data.cookie || "").match(/accountToken=([^;]+)/) || [])[1] || "";
+        var token = data.token || (String(data.cookie || "").match(/accountToken=([^;]+)/) || [])[1] || "";
         if (token) this.writeStore(STORE_TOKEN, token);
         return data;
     }
@@ -1841,6 +1916,11 @@ class DefaultExtension extends MProvider {
                 else if (v.pd) epUrl = "pixeldrain:" + v.pd;
                 else if (v.er) epUrl = "erome:" + codes[i] + ":" + j;
                 else if (v.tb) epUrl = "turbo:" + v.tb;
+                else if (v.dl) {
+                    // Link di download diretto preso dall'API di Gofile (più affidabile
+                    // del ricavarlo dalla miniatura: la miniatura sta su un altro host).
+                    epUrl = v.dl;
+                }
                 else {
                     var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
                     if (!base) { missingThumb++; continue; }
