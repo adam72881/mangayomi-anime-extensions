@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.27.2
+
+- **La ricerca guarda solo Bunkr:** una parola cerca sempre su bunkrsearch.link, anche se hai schede salvate con lo stesso nome. Il filtro parte su «Album su Bunkr». «Le mie schede» non è più nel filtro: i link salvati restano in Popolari e Recenti.
+- **Una parola non diventa più una scheda Gofile finta:** «HopeHeaven» non apre più un link gofile.io inventato. Un link incollato (Gofile, Bunkr, filester, pixeldrain) si apre ancora subito.
+- **Se il sito di ricerca non risponde, lo dice:** quando bunkrsearch.link non risponde o non dà una pagina valida, compare «Il sito di ricerca Bunkr (bunkrsearch.link) non risponde: forse è bloccato dall'operatore», invece di una lista vuota.
+
 ## Gofile 1.27.1
 
 - **Ricerca Bunkr solo video:** «Album su Bunkr» ora mostra solo gli album che contengono video (niente più album di sole foto); «Video su Bunkr» mostra i singoli video. I risultati non hanno doppioni tra una pagina e l'altra.
