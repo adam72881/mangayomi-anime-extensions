@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.1",
+        "version": "1.31.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1201,27 +1201,34 @@ class DefaultExtension extends MProvider {
         var partial = false;
         var title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*Bunkr\s*$/i, "");
         if (b.kind === "a") {
-            // Prima la WebView (modalità avanzata = tutti i file in una volta). Se non
-            // c'è la WebView o non dà nulla, ripiego sulla lettura paginata via HTTP.
-            // 1) Modalità avanzata via HTTP: una sola richiesta con tutti i file.
-            files = await this.bunkrAdvancedHttp(page.host, b.id);
-            // 2) WebView solo se c'è davvero (sul Tizen esiste ma lancia subito un errore).
-            if (!files.length && !this._noWebview) {
-                var wv = await this.readBunkrAlbumWebview(b, page.host);
-                if (wv === null) this._noWebview = true;
-                if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
+            // I file della pagina già scaricata si usano subito. Le pagine dopo
+            // partono 3 alla volta e si aspettano prima di rispondere. ?advanced=1
+            // e la WebView restano solo se non c'è nessun video: prima partivano
+            // prima, un timer le faceva risultare vuote, e la lista compariva
+            // solo al refresh (entro 2 minuti la scheda si rilegge).
+            var seen = {}, self = this;
+            this.collectBunkrFiles(html, page.host, files, seen);
+            var expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
+            for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
+            var maxPg = Math.min(expMax > 1 ? expMax : 1, 20);
+            var pages = [];
+            for (var pg = 2; pg <= maxPg; pg++) pages.push(pg);
+            for (var bi = 0; bi < pages.length; bi += 3) {
+                var slice = pages.slice(bi, bi + 3);
+                var bodies = await Promise.all(slice.map(function (n) { return self.bunkrAlbumPage(page.host, b.id, n); }));
+                for (var bj = 0; bj < bodies.length; bj++) {
+                    if (bodies[bj] == null) { if (slice[bj] <= expMax) partial = true; continue; }
+                    var before = files.length;
+                    this.collectBunkrFiles(bodies[bj], page.host, files, seen);
+                    if (files.length === before && slice[bj] <= expMax && !/theItem/.test(bodies[bj])) partial = true;
+                }
             }
             if (!files.length) {
-                var seen = {}, expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
-                for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
-                this.collectBunkrFiles(html, page.host, files, seen);
-                var maxPg = Math.min(expMax > 1 ? expMax : 20, 20);
-                for (var pg = 2; pg <= maxPg; pg++) {
-                    var before = files.length;
-                    var body = await this.bunkrAlbumPage(page.host, b.id, pg);
-                    if (body == null) { if (pg <= expMax) partial = true; break; }
-                    this.collectBunkrFiles(body, page.host, files, seen);
-                    if (files.length === before) { if (pg <= expMax && !/theItem/.test(body)) partial = true; break; }
+                files = await this.bunkrAdvancedHttp(page.host, b.id);
+                if (!files.length && !this._noWebview) {
+                    var wv = await this.readBunkrAlbumWebview(b, page.host);
+                    if (wv === null) this._noWebview = true;
+                    if (wv && wv.files.length) { if (wv.title) title = wv.title; files = wv.files; }
                 }
             }
         } else {
@@ -1233,6 +1240,7 @@ class DefaultExtension extends MProvider {
         }
         var notFound = page.status === 404;
         if (notFound) title = this.shortLink(code) + " (non trovata)";
+        if (!files.length && !notFound && b.kind === "a") return { rows: [], text: "bunkr-blocked " + (page.host || "") };
         var fm = this.filesMap();
         fm[code] = { title: title || this.shortLink(code), files: files, folders: 0, at: Date.now(), partial: !!partial, v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
@@ -1248,7 +1256,7 @@ class DefaultExtension extends MProvider {
     // corpo della prima risposta 200 con elementi album, o null se nessuno risponde.
     async bunkrAdvancedHttp(host, id) {
         var res = null, out = [], seen = {};
-        try { res = await this.withTimeout(this.client.get("https://" + host + "/a/" + id + "?advanced=1", { "User-Agent": UA }), 30000); } catch (e) { return out; }
+        try { res = await this.client.get("https://" + host + "/a/" + id + "?advanced=1", { "User-Agent": UA }); } catch (e) { return out; }
         if (!res || res.statusCode !== 200) return out;
         var re = /original:\s*"((?:[^"\\]|\\.)*)"\s*,\s*slug:\s*"([^"]+)"\s*,\s*type:\s*"([^"]+)"[\s\S]*?thumbnail:\s*"([^"]+)"/g, m, html = String(res.body || "");
         while ((m = re.exec(html))) {
@@ -1265,7 +1273,7 @@ class DefaultExtension extends MProvider {
         var order = [host];
         for (var i = 0; i < order.length; i++) {
             var res = null;
-            try { res = await this.withTimeout(this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }), 30000); } catch (e) {}
+            try { res = await this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }); } catch (e) {}
             if (res && res.statusCode === 200 && /theItem/.test(String(res.body || ""))) return String(res.body);
         }
         return null;
@@ -1529,7 +1537,22 @@ class DefaultExtension extends MProvider {
     }
 
     episodeName(name) {
-        return String(name || "").replace(/\.[A-Za-z0-9]{2,4}$/, "").trim() || "Video";
+        return String(name || "").replace(/\.[A-Za-z0-9]{2,4}$/, "").replace(/\s+/g, " ").trim().slice(0, 60) || "Video";
+    }
+
+    // Ogni campo è una stringa. dateUpload sono millisecondi in cifre (non «1e20»):
+    // su iPhone un valore non numerico lascia la lista episodi grigia.
+    chapterFields(name, url, thumb, ms) {
+        var n = String(name || "Video").replace(/\s+/g, " ").trim();
+        if (n.length > 80) n = n.slice(0, 77) + "...";
+        var img = this.absHttp(thumb);
+        return {
+            name: n || "Video",
+            url: String(url || ""),
+            dateUpload: String(ms > 0 ? ms : 1600000000000),
+            scanlator: "",
+            thumbnailUrl: img || "",
+        };
     }
 
     // La scheda usa le liste ricordate. Si rileggono quelle mai lette o vecchie di più
@@ -1560,7 +1583,13 @@ class DefaultExtension extends MProvider {
         var again = this._seen[raw] && Date.now() - this._seen[raw] < 120000;
         this._seen[raw] = Date.now();
         var fm = this.filesMap(), info = this.infoMap(), isEr = this.isErome.bind(this);
-        var need = codes.filter(function (c) { return isEr(c) || again || !fm[c] || fm[c].v !== READ_V || Date.now() - (fm[c].at || 0) > FILES_TTL; });
+        // Una lista vuota non è un risultato buono: la prima apertura deve rileggerla,
+        // altrimenti i video compaiono solo al secondo «trascina per aggiornare».
+        var need = codes.filter(function (c) {
+            var f = fm[c];
+            var empty = f && !(f.files && f.files.length) && !/non trovata/.test(f.title || "");
+            return isEr(c) || again || empty || !f || f.v !== READ_V || Date.now() - (f.at || 0) > FILES_TTL;
+        });
         var problem = "";
         if (need.length) {
             for (var k = 0; k < need.length; k += 3) {
@@ -1581,6 +1610,7 @@ class DefaultExtension extends MProvider {
         }
 
         var chapters = [], videos = 0, folders = 0, missingThumb = 0, gone = 0, cut = 0, other = "";
+        var seenUrl = {};
         for (var i = 0; i < codes.length; i++) {
             var f = fm[codes[i]];
             if (!f) continue;
@@ -1591,43 +1621,33 @@ class DefaultExtension extends MProvider {
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
                 videos++;
-                if (v.em) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "embed:" + v.em });
-                    continue;
+                var epName = "Episodio " + (chapters.length + 1) + " - " + (v.er ? v.n : this.episodeName(v.n));
+                var epUrl = "";
+                if (v.em) epUrl = "embed:" + v.em;
+                else if (v.bf) epUrl = "bunkr:https://" + v.bh + "/f/" + v.bf;
+                else if (v.fl) epUrl = "filester:" + v.fl;
+                else if (v.pd) epUrl = "pixeldrain:" + v.pd;
+                else if (v.er) epUrl = "erome:" + codes[i] + ":" + j;
+                else if (v.tb) epUrl = "turbo:" + v.tb;
+                else {
+                    var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
+                    if (!base) { missingThumb++; continue; }
+                    epUrl = base + encodeURIComponent(v.n);
                 }
-                if (v.bf) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "bunkr:https://" + v.bh + "/f/" + v.bf, thumbnailUrl: v.img });
-                    continue;
-                }
-                if (v.fl) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "filester:" + v.fl, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
-                    continue;
-                }
-                if (v.pd) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "pixeldrain:" + v.pd, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
-                    continue;
-                }
-                if (v.er) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + v.n, url: "erome:" + codes[i] + ":" + j, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
-                    continue;
-                }
-                if (v.tb) {
-                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "turbo:" + v.tb, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
-                    continue;
-                }
-                var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
-                if (!base) { missingThumb++; continue; }
-                chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: base + encodeURIComponent(v.n), thumbnailUrl: v.img });
+                if (!epUrl || seenUrl[epUrl]) continue;
+                seenUrl[epUrl] = 1;
+                chapters.push(this.chapterFields(epName, epUrl, v.img, 1600000000000 + chapters.length * 1000));
             }
         }
-        // Dall'ultimo al primo, come le altre sorgenti: così Mangayomi trova il successivo.
         chapters.reverse();
+        for (var di = 0; di < chapters.length; di++) {
+            chapters[di].dateUpload = String(1600000000000 + (chapters.length - di) * 1000);
+        }
         if (codes.length === 1 && this.searchSaveKind(codes[0])) {
-            // Date fuori scala (non sono un giorno): sulla TV l'ordine degli episodi
-            // si legge dal primo e dall'ultimo. Queste due righe restano in cima e
-            // «Riprendi» continua a puntare all'episodio vero.
-            if (chapters.length && !chapters[chapters.length - 1].dateUpload) chapters[chapters.length - 1].dateUpload = "1e20";
-            chapters = this.saveRows(codes[0]).concat(chapters);
+            var saves = this.saveRows(codes[0]);
+            saves[0].dateUpload = String(1600000000000 + (chapters.length + 2) * 1000);
+            saves[1].dateUpload = String(1600000000000 + (chapters.length + 1) * 1000);
+            chapters = saves.concat(chapters);
         }
 
         var single = codes.length === 1 ? (fm[codes[0]] || {}) : null;
@@ -1675,6 +1695,9 @@ class DefaultExtension extends MProvider {
     // Bunkr: la pagina del file ha l'indirizzo del mp4 (jsCDN) e quello che lo firma
     // (signUrl); il loro lettore chiede la firma e la aggiunge al link, come qui.
     async bunkrVideo(page) {
+        this._playCache = this._playCache || {};
+        var hit = this._playCache[page];
+        if (hit && Date.now() - hit.at < 120000) return hit.list;
         var m = String(page).match(/^https?:\/\/([^/]+)(\/.*)$/);
         var got = m ? await this.bunkrPage(m[2], m[1]) : { html: "" };
         if (!got.status) throw new Error("Bunkr non risponde dal tuo telefono: forse i suoi domini sono bloccati dal tuo operatore. Provati: " + (got.tried || []).join(", "));
@@ -1693,7 +1716,9 @@ class DefaultExtension extends MProvider {
             out = cdn + (cdn.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(sig.token) + "&ex=" + encodeURIComponent(sig.ex);
         }
         var ext = ((cdn.split("?")[0].match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
-        return [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
+        var list = [{ url: out, originalUrl: out, quality: "Bunkr · " + ext, headers: { "User-Agent": UA } }];
+        this._playCache[page] = { at: Date.now(), list: list };
+        return list;
     }
 
     // filester.me: API pubblica. POST /v2/api/public/view con lo slug → permesso a tempo,
@@ -1791,13 +1816,14 @@ class DefaultExtension extends MProvider {
 
     // Due righe, una per elenco. Lo stato di ciascuna non dipende dall'altra.
     saveRows(code) {
-        var local = this.onPhone(code), remote = this.inShared(code);
-        var row = function (name, kind, have, date) {
-            return { name: name, url: "save:" + kind + ":" + code + (have ? ":have" : ""), dateUpload: date };
+        var self = this, local = this.onPhone(code), remote = this.inShared(code);
+        var row = function (name, kind, have, ms) {
+            return self.chapterFields(name, "save:" + kind + ":" + code + (have ? ":have" : ""), "", ms);
         };
+        var now = 1700000000000;
         return [
-            row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, "3e20"),
-            row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, "2e20"),
+            row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, now + 2000),
+            row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, now + 1000),
         ];
     }
 
@@ -2281,26 +2307,13 @@ class DefaultExtension extends MProvider {
         var bits = String(spec || "").split(":");
         var code = bits[0];
         var idx = parseInt(bits[1], 10) || 0;
-        var headers = { "Referer": "https://www.erome.com/", "User-Agent": UA };
-        var self = this;
-        var load = async function () {
-            await self.readErome(code);
-            var files = (self.filesMap()[code] || {}).files || [];
-            return files[idx] || files[0];
-        };
-        var file = await load();
+        var headers = { "Referer": "https://www.erome.com/", "Origin": "https://www.erome.com", "User-Agent": UA };
+        var cached = this.filesMap()[code] || {};
+        var fresh = cached.files && cached.files.length && Date.now() - (cached.at || 0) < 120000;
+        if (!fresh) await this.readErome(code);
+        var files = (this.filesMap()[code] || {}).files || [];
+        var file = files[idx] || files[0];
         if (!file || !file.er) throw new Error("Erome non risponde: forse è bloccato dall'operatore");
-        var playable = async function (url) {
-            try {
-                var res = await self.client.head(url, headers);
-                var sc = res && res.statusCode;
-                return sc === 200 || sc === 206 || sc === 302;
-            } catch (e) { return false; }
-        };
-        if (!await playable(file.er)) {
-            file = await load();
-            if (!file || !file.er || !await playable(file.er)) throw new Error("I video Erome non partono sulla TV: servono sul telefono");
-        }
         var q = file.q || "720p";
         return [{ url: file.er, originalUrl: file.er, quality: "Erome · " + q, headers: headers }];
     }
