@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.31.1
+
+- **turbo.cr si apre alla prima:** gli album turbo (da findr o incollati direttamente) a volte dicevano «Nessun file trovato» alla prima apertura e si vedevano solo ricaricando. Ora la lettura ritenta da sola qualche volta nello stesso giro, così l'album si apre subito senza dover trascinare in basso. Se proprio turbo.cr non risponde, lo dice chiaramente («riprova tra qualche secondo») invece di sembrare vuoto.
+
 ## Gofile 1.31.0
 
 - **turbo.cr aperto:** ora si aprono anche gli album e i video di turbo.cr (il provider più usato da findr, prima scartato). Il video si ottiene dall'indirizzo firmato del sito, in chiaro e senza WebView. Di conseguenza la ricerca e l'home di findr sono molto più piene e veloci.
