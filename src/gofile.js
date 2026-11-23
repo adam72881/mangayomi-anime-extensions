@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.27.1",
+        "version": "1.27.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1450,27 +1450,14 @@ class DefaultExtension extends MProvider {
         Promise.resolve(this.readMany(missing)).catch(function () {}).then(function () { self._prefetching = false; });
     }
 
-    // Nella ricerca si può incollare un link (o il codice) per aprirlo una volta;
-    // altrimenti filtra le schede salvate per nome.
+    // Un link incollato si apre subito. Una parola cerca solo su bunkrsearch.link,
+    // mai tra le schede salvate o la lista condivisa.
     async search(query, page, filters) {
         var q = String(query || "").trim();
         var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
-        // Ricerca su Bunkr (album o video) se scelta col filtro «Cosa cerco».
-        var mode = this.searchMode(filters);
-        if (q && (mode === "album" || mode === "video")) return this.bunkrSearch(q, page, mode);
-        if (page > 1) return { list: [], hasNextPage: false };
-        // «Le mie schede»: guarda tutti i link salvati (locali + documento).
-        this.savedLinks();
-        try { Promise.resolve(this.flushPush()).catch(function () {}); } catch (e) {}
-        try { Promise.resolve(this.flushRemoteEdits()).catch(function () {}); } catch (e) {}
-        try { await this.refreshRemote(true); } catch (e) {}
-        var all = (await this.browseGroups(this.groupsFrom())).list;
-        if (!q) return { list: all, hasNextPage: false };
-        var low = q.toLowerCase();
-        var list = all.filter(function (c) { return c.name.toLowerCase().indexOf(low) !== -1 || c.link.toLowerCase().indexOf(low) !== -1; });
-        if (!list.length && this.codeOf(q)) list = [this.card(this.codeOf(q))];
-        return { list: list, hasNextPage: false };
+        if (!q) return { list: [], hasNextPage: false };
+        return this.bunkrSearch(q, page || 1, this.searchMode(filters));
     }
 
     async readFolder(code) {
@@ -1707,27 +1694,27 @@ class DefaultExtension extends MProvider {
                 name: "Cosa cerco",
                 state: 0,
                 values: [
-                    { type_name: "SelectOption", name: "Le mie schede (salvate)", value: "mine" },
                     { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
                     { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "«Album/Video su Bunkr» cerca in un indice pubblico. Incolla invece un link (Gofile, Bunkr, filester, pixeldrain) per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
+            { type_name: "HeaderFilter", name: "La ricerca guarda solo Bunkr (bunkrsearch.link): album con video, oppure i singoli video. Incolla un link Gofile, Bunkr, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
         ];
     }
 
-    // Legge il valore del filtro «Cosa cerco» (mine / album / video).
+    // «Cosa cerco»: album (predefinito) o video. Qualsiasi altro valore, anche il
+    // vecchio «Le mie schede», resta sugli album di Bunkr.
     searchMode(filters) {
         try {
             for (var i = 0; i < (filters || []).length; i++) {
                 var f = filters[i];
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
-                    if (v && v.value) return v.value;
+                    if (v && v.value === "video") return "video";
                 }
             }
         } catch (e) {}
-        return "mine";
+        return "album";
     }
 
     // Ricerca su bunkrsearch.link (API JSON, nessun anti-bot). kind: «album» o «video».
@@ -1738,10 +1725,14 @@ class DefaultExtension extends MProvider {
         page = page || 1;
         var url = "https://" + BUNKR_SEARCH_HOST + "/api/search?q=" + encodeURIComponent(q) + "&page=" + page;
         var res;
-        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { return { list: [], hasNextPage: false }; }
+        var down = "Il sito di ricerca Bunkr (bunkrsearch.link) non risponde: forse è bloccato dall'operatore";
+        // Nessun timer: su iPhone un timeout nostro può scattare prima della risposta (1.25.2).
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
         var data = null;
-        try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
-        if (!data || !data.results || !data.results.length) return { list: [], hasNextPage: false };
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        if (!data || !data.results) throw new Error(down);
+        if (!data.results.length) return { list: [], hasNextPage: false };
         var self = this, info = this.infoMap(), dirty = false, list = [];
         // Album: niente doppioni tra le pagine della stessa ricerca (azzerato a pagina 1).
         if (kind !== "video" && page === 1) this._albSeen = {};
