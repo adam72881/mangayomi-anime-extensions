@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.38.0",
+        "version": "1.38.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.38.0";
+const VERSION = "1.38.1";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -114,12 +114,34 @@ function listScript() {
 // risponde, ricade sul vecchio metodo che legge le righe già disegnate: così, nel
 // caso peggiore, il comportamento resta quello di prima.
 function gofileReadScript(code) {
+    // Niente async/await: nella WebView di Mangayomi uno script async iniettato può
+    // morire prima di chiamare setResponse, e la scheda resta «vuota» senza gf-api/gf-dom.
     return `(function () {
-    var done = false;
+    var done = false, domStarted = false;
+    var CODE = ${JSON.stringify(code)};
     function send(o) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(o)); } catch (e) {} }
-    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-    // Il token del sito sta in gofile.accounts -> accounts[activeId].token (il sito lo
-    // crea in modo asincrono). Provo anche il cookie.
+    function later(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function fetchJson(url, opts, ms) {
+        return new Promise(function (resolve, reject) {
+            var finished = false;
+            var timer = setTimeout(function () { if (finished) return; finished = true; reject(new Error('timeout')); }, ms || 9000);
+            function finish(err, val) {
+                if (finished) return;
+                finished = true;
+                clearTimeout(timer);
+                if (err) reject(err); else resolve(val);
+            }
+            try {
+                fetch(url, opts).then(function (res) {
+                    res.text().then(function (t) {
+                        var j = null;
+                        try { j = JSON.parse(t); } catch (e2) {}
+                        finish(null, { status: res.status, json: j || {} });
+                    }, function () { finish(new Error('body')); });
+                }, function (e3) { finish(e3 || new Error('fetch')); });
+            } catch (e4) { finish(e4); }
+        });
+    }
     function tokenNow() {
         try {
             var raw = localStorage.getItem('gofile.accounts');
@@ -134,55 +156,96 @@ function gofileReadScript(code) {
         } catch (e) {}
         return (document.cookie.match(/accountToken=([^;]+)/) || [])[1] || '';
     }
-    // Aspetto il token del sito per qualche secondo; se non arriva, me ne creo uno mio
-    // (stesso User-Agent della pagina, così il wt combacia).
-    async function makeToken() {
-        var token = '';
-        for (var i = 0; i < 16 && !token; i++) { token = tokenNow(); if (!token) await sleep(300); }
-        if (token) return token;
-        try { var r = await fetch('https://api.gofile.io/accounts', { method: 'POST' }); var j = await r.json(); token = (j && j.data && j.data.token) || ''; } catch (e) {}
-        return token;
-    }
-    async function getWT(token) {
-        var gen = globalThis.generateWT;
-        for (var i = 0; i < 20 && typeof gen !== 'function'; i++) { await sleep(200); gen = globalThis.generateWT; }
-        if (typeof gen !== 'function') { try { var mm = await import('/js/core/wt.js'); gen = mm.generateWT; } catch (e) {} }
-        if (typeof gen !== 'function') throw new Error('no wt');
-        return gen(token);
-    }
-    async function viaApi() {
-        var token = await makeToken();
-        if (!token) throw new Error('no token');
-        var wt = await getWT(token);
-        var CODE = ${JSON.stringify(code)};
-        var all = {}, title = '', gate = '', notFound = false;
-        for (var page = 1; page <= 40; page++) {
-            var q = 'page=' + page + '&pageSize=100&sortField=name&sortDirection=1';
-            var res, j;
-            for (var tn = 0; tn < 3; tn++) {
-                res = await fetch('https://api.gofile.io/contents/' + encodeURIComponent(CODE) + '?' + q, { headers: { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': navigator.language || '' } });
-                j = await res.json();
-                if (res.status === 429 || (j && j.status === 'error-rateLimit')) { await sleep(1200); continue; }
-                break;
-            }
-            if (j && /error-not(found|content)/i.test(String(j.status || ''))) { notFound = true; break; }
-            var d = j && j.data;
-            if (!d || typeof d !== 'object' || !d.type) { if (page === 1) throw new Error('no data'); break; }
-            title = d.name || title;
-            if (d.canAccess === false) { gate = d.password ? 'password' : 'closed'; break; }
-            if (d.type === 'file') { all[d.id] = d; break; }
-            var ch = d.children || {};
-            var ks = Object.keys(ch);
-            for (var a = 0; a < ks.length; a++) all[ks[a]] = ch[ks[a]];
-            var total = (d.childrenCount != null) ? d.childrenCount : Object.keys(all).length;
-            if (!ks.length || Object.keys(all).length >= total) break;
+    function makeToken(left) {
+        var token = tokenNow();
+        if (token) return Promise.resolve(token);
+        if (left <= 0) {
+            return fetchJson('https://api.gofile.io/accounts', { method: 'POST' }, 9000).then(function (r) {
+                return (r.json && r.json.data && r.json.data.token) || '';
+            }, function () { return ''; });
         }
+        return later(300).then(function () { return makeToken(left - 1); });
+    }
+    function getWT(token, left) {
+        var gen = globalThis.generateWT;
+        if (typeof gen === 'function') {
+            try { return Promise.resolve(gen(token)); } catch (e) { return Promise.reject(e); }
+        }
+        if (left <= 0) {
+            return new Promise(function (resolve, reject) {
+                try {
+                    import('/js/core/wt.js').then(function (mm) {
+                        if (mm && typeof mm.generateWT === 'function') resolve(mm.generateWT(token));
+                        else if (typeof globalThis.generateWT === 'function') resolve(globalThis.generateWT(token));
+                        else reject(new Error('no wt'));
+                    }, function () { reject(new Error('no wt')); });
+                } catch (e2) { reject(new Error('no wt')); }
+            });
+        }
+        return later(200).then(function () { return getWT(token, left - 1); });
+    }
+    function pack(all, state, token) {
         var rows = [], ak = Object.keys(all);
-        for (var b = 0; b < ak.length; b++) { var it = all[ak[b]]; rows.push({ id: it.id, type: it.type, name: it.name || '', img: it.thumbnail || '', dl: it.link || '' }); }
-        var text = gate === 'password' ? 'password' : ((notFound || gate) ? 'not found' : '');
-        return { title: title || document.title, cookie: document.cookie, token: token, text: text, rows: rows, via: 'api' };
+        for (var b = 0; b < ak.length; b++) {
+            var it = all[ak[b]] || {};
+            rows.push({ id: it.id, type: it.type, name: it.name || '', img: it.thumbnail || '', dl: it.link || '' });
+        }
+        var text = '';
+        if (state.gate === 'password') text = 'password';
+        else if (state.gate === 'closed') text = 'closed';
+        else if (state.gate === 'expired') text = 'expired';
+        else if (state.notFound) text = 'not found';
+        return { title: state.title || document.title, cookie: document.cookie, token: token, text: text, rows: rows, via: 'api' };
+    }
+    function loadPages(token, wt, page, all, state) {
+        if (page > 40 || state.stop) return Promise.resolve(pack(all, state, token));
+        var q = 'page=' + page + '&pageSize=100&sortField=name&sortDirection=1';
+        var url = 'https://api.gofile.io/contents/' + encodeURIComponent(CODE) + '?' + q;
+        var headers = { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': (navigator.language || '') };
+        function attempt(n) {
+            return fetchJson(url, { headers: headers }, 9000).then(function (r) {
+                var j = r.json || {};
+                var st = String(j.status || '');
+                if (r.status === 429 || st === 'error-rateLimit') {
+                    if (n >= 2) { state.stop = true; return pack(all, state, token); }
+                    return later(1200).then(function () { return attempt(n + 1); });
+                }
+                if (r.status === 401 || st === 'error-notPremium') return Promise.reject(new Error('wt'));
+                if (/error-not(found|content)/i.test(st) || r.status === 404) { state.notFound = true; state.stop = true; return pack(all, state, token); }
+                var d = j.data;
+                if (!d || typeof d !== 'object' || !d.type) {
+                    if (page === 1) return Promise.reject(new Error('no data'));
+                    return pack(all, state, token);
+                }
+                state.title = d.name || state.title;
+                if (d.canAccess === false) {
+                    state.gate = d.password ? 'password' : (d.public === false ? 'closed' : (d.expire ? 'expired' : 'closed'));
+                    state.stop = true;
+                    return pack(all, state, token);
+                }
+                if (d.type === 'file') { all[d.id || 'file'] = d; return pack(all, state, token); }
+                var ch = d.children || {};
+                var ks = Object.keys(ch);
+                for (var a = 0; a < ks.length; a++) all[ks[a]] = ch[ks[a]];
+                var total = (d.childrenCount != null) ? d.childrenCount : Object.keys(all).length;
+                var meta = j.metadata || {};
+                if (!ks.length || Object.keys(all).length >= total || meta.hasNextPage === false) return pack(all, state, token);
+                return loadPages(token, wt, page + 1, all, state);
+            });
+        }
+        return attempt(0);
+    }
+    function viaApi() {
+        return makeToken(10).then(function (token) {
+            if (!token) return Promise.reject(new Error('no token'));
+            return getWT(token, 20).then(function (wt) {
+                return loadPages(token, wt, 1, {}, { title: '', gate: '', notFound: false, stop: false });
+            });
+        });
     }
     function viaDom() {
+        if (domStarted || done) return;
+        domStarted = true;
         var last = -1, same = 0, ticks = 0;
         var timer = setInterval(function () {
             ticks++;
@@ -190,24 +253,45 @@ function gofileReadScript(code) {
             if (rows.length && rows.length === last) same++; else same = 0;
             last = rows.length;
             var body = document.body ? document.body.innerText : '';
-            var count = parseInt((body.match(/(\\d+)\\s+items?\\b/i) || [])[1], 10);
+            var count = parseInt((body.match(/(\\d+)\\s+items?/i) || [])[1], 10);
             var complete = rows.length && count > 0 && rows.length >= count;
-            var stop = !rows.length && ticks >= 6 && /not found|unreachable|password|expired|deleted|removed/i.test(body);
+            var marked = /not found|unreachable|password|expired|deleted|removed/i.test(body);
+            var stop = !rows.length && ticks >= 6 && marked;
             var vid = document.querySelector('video');
             var vsrc = vid ? (vid.currentSrc || vid.src || ((vid.querySelector('source') || {}).src) || '') : '';
             var single = !rows.length && /gofile\\.io\\/download\\//.test(vsrc);
             if (!(complete || single || same >= 3 || stop || ticks > 50)) return;
             clearInterval(timer);
-            var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [], via: 'dom' };
+            var text = '';
+            if (!rows.length && !single) {
+                if (/password/i.test(body)) text = 'password';
+                else if (/expired/i.test(body)) text = 'expired';
+                else if (/not found|deleted|removed/i.test(body)) text = 'not found';
+                else text = body.slice(0, 300);
+            }
+            var out = { title: document.title, cookie: document.cookie, text: text, rows: [], via: 'dom' };
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
                 out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
             }
-            if (single) { var fname = decodeURIComponent(vsrc.split('?')[0].split('/').pop()); out.rows.push({ id: 'single', type: 'file', name: fname, img: vid.poster || vsrc.replace(/[^\\/]+$/, '') }); }
+            if (single) { var fname = decodeURIComponent(vsrc.split('?')[0].split('/').pop()); out.rows.push({ id: 'single', type: 'file', name: fname, img: vid.poster || vsrc.replace(/[^\\/]+$/, ''), dl: vsrc }); }
             send(out);
         }, 500);
     }
-    viaApi().then(function (o) { if (o && (o.rows.length || o.text)) send(o); else viaDom(); }).catch(function () { viaDom(); });
+    var apiSettled = false;
+    var apiTimer = setTimeout(function () { if (!apiSettled) viaDom(); }, 15000);
+    viaApi().then(function (o) {
+        apiSettled = true;
+        clearTimeout(apiTimer);
+        if (done) return;
+        if (o && ((o.rows && o.rows.length) || o.text)) send(o);
+        else viaDom();
+    }, function () {
+        apiSettled = true;
+        clearTimeout(apiTimer);
+        if (!done) viaDom();
+    });
+    setTimeout(function () { send({ title: document.title || '', cookie: document.cookie || '', text: '', rows: [], via: 'dom' }); }, 48000);
 })();`;
 }
 
@@ -1778,7 +1862,7 @@ class DefaultExtension extends MProvider {
         if (typeof evaluateJavascriptViaWebview !== "function") {
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
-        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [gofileReadScript(code)], 40);
+        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [gofileReadScript(code)], 55);
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
@@ -1886,7 +1970,18 @@ class DefaultExtension extends MProvider {
                     whyOf[c] = String(d.text || "");
                     if (d.waited) whyOf[c + "#w"] = 1;
                     if ((d.rows || []).length) {
-                        fresh[c] = { title: d.title || "", files: d.rows, partial: !!d.partial, folders: d.folders || 0 };
+                        var rawRows = d.rows, mapped = rawRows;
+                        if (rawRows[0] && rawRows[0].n == null && (rawRows[0].name != null || rawRows[0].dl)) {
+                            mapped = [];
+                            for (var mi = 0; mi < rawRows.length; mi++) {
+                                var rr = rawRows[mi] || {};
+                                if (rr.type && rr.type !== "file") continue;
+                                if (rr.name && rr.type === "file" && !VIDEO_EXT.test(rr.name)) continue;
+                                mapped.push({ n: rr.name || rr.n || "video.mp4", img: rr.img || "", dl: rr.dl || "" });
+                            }
+                            if (!mapped.length) mapped = rawRows;
+                        }
+                        fresh[c] = { title: d.title || "", files: mapped, partial: !!d.partial, folders: d.folders || 0 };
                     }
                 }
             }
@@ -1918,6 +2013,8 @@ class DefaultExtension extends MProvider {
             if (/pd-unreachable/.test(why)) return "pixeldrain non risponde dal tuo telefono (ha dato una pagina di blocco, non i dati del file). Spesso in Italia pixeldrain.com è bloccato dall'operatore: prova a cambiare rete (dati mobili al posto del Wi-Fi o viceversa), oppure apri il link nel browser per controllare. Se si sblocca, trascina in basso la scheda.";
             if (/turbo-unreachable/.test(why)) return "turbo.cr non risponde in questo momento: riprova tra qualche secondo (trascina in basso la scheda).";
             if (/unreachable/i.test(why)) return "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
+            if (/^expired$/i.test(why)) return "Questa cartella è scaduta e non esiste più su Gofile.";
+            if (/^closed$/i.test(why)) return "Questa cartella non è pubblica: non si può aprire da qui.";
             if (/password/i.test(why)) return "Una cartella è protetta da password: aprila nel browser.";
             if (/embed-cut/.test(why)) return "Il link si è tagliato quando l'hai incollato: toglilo da «Togli i link» e reincollalo per intero (tutto fino alla fine).";
             if (/^read-error$/.test(why)) return "";
@@ -1996,7 +2093,8 @@ class DefaultExtension extends MProvider {
         if (!videos && !problem && !gone && !Object.keys(fm).some(function (c) { return codes.indexOf(c) !== -1; })) {
             lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
         }
-        if (!videos) lines.push(this.diagText());
+        var hasGf = (this._steps || []).some(function (s) { return String(s).indexOf("gf-") === 0; });
+        if (!videos || hasGf) lines.push(this.diagText());
         var description = lines.join("\n") + "\n\n" + codes.map(this.linkUrl.bind(this)).join("\n") + "\n\nGofile " + VERSION;
 
         // Stesso filtro dei titoli, solo se il Bunkr non è già tra i link salvati
