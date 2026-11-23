@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.26.3",
+        "version": "1.26.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1720,7 +1720,15 @@ class DefaultExtension extends MProvider {
         }
         var links = this.readJson(STORE_LINKS, []);
         var newest = links.slice().reverse();
-        var label = function (l) { return l.name || self.shortLink(l.code); };
+        // Etichetta leggibile: il nome che hai dato, altrimenti il titolo letto dal sito
+        // (es. «asuna_love»), e solo in ultima battuta l'indirizzo.
+        var pInfo = this.infoMap(), pFm = this.filesMap();
+        var niceOf = function (code) {
+            var t = (pInfo[code] && pInfo[code].name) || (pFm[code] && pFm[code].title) || "";
+            if (t && !/\(non trovata\)/.test(t)) return t;
+            return self.shortLink(code);
+        };
+        var label = function (l) { return l.name || niceOf(l.code); };
         var shared = {};
         this.cachedRemote().forEach(function (l) { shared[l.code] = 1; });
         var pool = this.linkPool(links);
@@ -1765,7 +1773,7 @@ class DefaultExtension extends MProvider {
                 multiSelectListPreference: {
                     title: removeTitle,
                     summary: "Spunta i link da togliere. I 🌐 sono nel file condiviso" + (hasToken ? " e si tolgono solo scrivendo OK." : ": senza token non si possono togliere.") + " Un OK a vuoto non cancella nulla.",
-                    entries: poolView.map(function (l) { return (l.remote ? "🌐 " : "") + (l.name || self.shortLink(l.code)); }),
+                    entries: poolView.map(function (l) { return (l.remote ? "🌐 " : "") + (l.name || niceOf(l.code)); }),
                     entryValues: poolView.map(function (l) { return l.code; }),
                     values: [],
                 },
@@ -1798,7 +1806,7 @@ class DefaultExtension extends MProvider {
             });
         }
         var remoteList = this.cachedRemote();
-        var remoteNames = remoteList.map(function (l) { return "• " + (l.name || self.shortLink(l.code)); });
+        var remoteNames = remoteList.map(function (l) { return "• " + (l.name || niceOf(l.code)); });
         var canWrite = !!this.remoteApiTarget();
         var inDoc = remoteList.length ? ("Nel documento ci sono " + remoteList.length + " link:\n" + remoteNames.join("\n")) : "Il documento è ancora vuoto (nessun link).";
         // Riga di stato con chiave che cambia con lo stato: così il riepilogo si aggiorna
