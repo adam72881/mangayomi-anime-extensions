@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.31.2
+
+- **Gli episodi ci sono alla prima apertura:** una lettura senza file non resta più in memoria, e i video già nella prima pagina dell'album si usano subito (le pagine dopo partono insieme). Prima la scheda tornava grigia e i video uscivano solo ricaricando. Ogni episodio ha nome, indirizzo, data in millisecondi, scanlator e miniatura, tutti stringhe.
+- **Erome parte sull'iPhone:** il video porta Referer, Origin e User-Agent, e non si ferma più sul controllo che mostrava il messaggio della TV.
+
 ## Gofile 1.31.1
 
 - **turbo.cr si apre alla prima:** gli album turbo (da findr o incollati direttamente) a volte dicevano «Nessun file trovato» alla prima apertura e si vedevano solo ricaricando. Ora la lettura ritenta da sola qualche volta nello stesso giro, così l'album si apre subito senza dover trascinare in basso. Se proprio turbo.cr non risponde, lo dice chiaramente («riprova tra qualche secondo») invece di sembrare vuoto.
