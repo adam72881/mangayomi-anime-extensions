@@ -1,8 +1,12 @@
 # Novità
 
+## Gofile 1.27.1
+
+- **Ricerca Bunkr solo video:** «Album su Bunkr» ora mostra solo gli album che contengono video (niente più album di sole foto); «Video su Bunkr» mostra i singoli video. I risultati non hanno doppioni tra una pagina e l'altra.
+
 ## Gofile 1.27.0
 
-- **Ricerca su Bunkr (album e video):** nella ricerca, con il filtro «Cosa cerco» scegli «Album su Bunkr» o «Video su Bunkr» e cerca per parola/nome: l'estensione usa un indice pubblico (API diretta, veloce, senza WebView) e mostra i risultati con copertina, da aprire come schede. Il filtro resta su «Le mie schede» per la ricerca tra i link salvati, come prima. Nota: gli album di sole foto risultano vuoti, perché l'estensione mostra solo video.
+- **Ricerca su Bunkr (album e video):** nella ricerca, con il filtro «Cosa cerco» scegli «Album su Bunkr» o «Video su Bunkr» e cerca per parola/nome: l'estensione usa un indice pubblico (API diretta, veloce, senza WebView) e mostra i risultati con copertina, da aprire come schede. Il filtro resta su «Le mie schede» per la ricerca tra i link salvati, come prima.
 
 ## Gofile 1.26.4
 

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.27.0",
+        "version": "1.27.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1708,8 +1708,8 @@ class DefaultExtension extends MProvider {
                 state: 0,
                 values: [
                     { type_name: "SelectOption", name: "Le mie schede (salvate)", value: "mine" },
-                    { type_name: "SelectOption", name: "Album su Bunkr", value: "album" },
-                    { type_name: "SelectOption", name: "Video su Bunkr", value: "video" },
+                    { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
+                    { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
                 ],
             },
             { type_name: "HeaderFilter", name: "«Album/Video su Bunkr» cerca in un indice pubblico. Incolla invece un link (Gofile, Bunkr, filester, pixeldrain) per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
@@ -1731,25 +1731,34 @@ class DefaultExtension extends MProvider {
     }
 
     // Ricerca su bunkrsearch.link (API JSON, nessun anti-bot). kind: «album» o «video».
+    // Si usa sempre l'endpoint dei file (che dice il tipo), così si mostrano solo i VIDEO:
+    // in modalità «video» i singoli file, in modalità «album» gli album che hanno video
+    // (raggruppati). Gli album di sole foto non compaiono.
     async bunkrSearch(q, page, kind) {
         page = page || 1;
-        var path = kind === "video" ? "/api/search?q=" : "/api/albums?q=";
-        var url = "https://" + BUNKR_SEARCH_HOST + path + encodeURIComponent(q) + "&page=" + page;
+        var url = "https://" + BUNKR_SEARCH_HOST + "/api/search?q=" + encodeURIComponent(q) + "&page=" + page;
         var res;
         try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { return { list: [], hasNextPage: false }; }
         var data = null;
         try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
         if (!data || !data.results || !data.results.length) return { list: [], hasNextPage: false };
         var self = this, info = this.infoMap(), dirty = false, list = [];
+        // Album: niente doppioni tra le pagine della stessa ricerca (azzerato a pagina 1).
+        if (kind !== "video" && page === 1) this._albSeen = {};
+        var seen = kind !== "video" ? (this._albSeen || (this._albSeen = {})) : {};
         data.results.forEach(function (r) {
-            if (!r.slug) return;
+            var isVideo = r.ext === "Video" || /^video\//.test(String(r.mime || ""));
+            if (!isVideo) return;
             var code, name, thumb = /^http/.test(r.thumbnail || "") ? r.thumbnail : "";
             if (kind === "video") {
+                if (!r.slug) return;
                 code = "bk~f~" + r.slug;
                 name = self.episodeName(r.original || r.name || r.slug);
             } else {
-                code = "bk~a~" + r.slug;
-                name = r.name || r.slug;
+                var aslug = r.album_slug; if (!aslug || seen[aslug]) return;
+                seen[aslug] = 1;
+                code = "bk~a~" + aslug;
+                name = r.album_name || aslug;
             }
             if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
                 info[code] = { name: name, image: thumb };
@@ -1759,8 +1768,8 @@ class DefaultExtension extends MProvider {
         });
         if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
         var size = data.results.length;
-        var pages = data.pages || (data.total ? Math.max(1, Math.ceil(data.total / Math.max(size, 1))) : page);
-        return { list: list, hasNextPage: page < pages };
+        var pages = data.total ? Math.max(1, Math.ceil(data.total / Math.max(size, 1))) : page;
+        return { list: list, hasNextPage: page < pages && size > 0 };
     }
 
     getSourcePreferences() {
