@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.30.1",
+        "version": "1.31.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -255,7 +255,7 @@ class DefaultExtension extends MProvider {
     }
 
     linkCode(text) {
-        return this.bunkrCode(text) || this.eromeCode(text) || this.filesterCode(text) || this.pixeldrainCode(text) || this.embedCode(text) || this.codeOf(text);
+        return this.bunkrCode(text) || this.eromeCode(text) || this.turboCode(text) || this.filesterCode(text) || this.pixeldrainCode(text) || this.embedCode(text) || this.codeOf(text);
     }
 
     eromeCode(text) {
@@ -265,6 +265,21 @@ class DefaultExtension extends MProvider {
 
     isErome(code) {
         return /^er~[A-Za-z0-9]+$/i.test(String(code || ""));
+    }
+
+    // turbo.cr: album /a/<id> (video); singolo /v/ o /d/ o /embed/ <id>. Stile «saint»:
+    // il video si ottiene dall'URL firmato di /api/sign?v=<id>. Codice «tb~<id>» (album)
+    // o «tb~v~<id>» (singolo video).
+    turboCode(text) {
+        var s = String(text || "");
+        var a = s.match(/turbo\.cr\/a\/([A-Za-z0-9]+)/i);
+        if (a) return "tb~" + a[1];
+        var v = s.match(/turbo\.cr\/(?:v|d|embed)\/([A-Za-z0-9]+)/i);
+        return v ? "tb~v~" + v[1] : "";
+    }
+
+    isTurbo(code) {
+        return String(code || "").indexOf("tb~") === 0;
     }
 
     isBunkr(code) {
@@ -281,6 +296,7 @@ class DefaultExtension extends MProvider {
         if (this.isFilester(code)) return "https://filester.me/d/" + String(code).slice(3);
         if (this.isPixeldrain(code)) { var p = this.pdParts(code); return "https://pixeldrain.com/" + (p.kind === "l" ? "l" : "u") + "/" + p.id; }
         if (this.isErome(code)) return "https://www.erome.com/a/" + String(code).slice(3);
+        if (this.isTurbo(code)) { var ti = String(code).slice(3); return ti.indexOf("v~") === 0 ? "https://turbo.cr/d/" + ti.slice(2) : "https://turbo.cr/a/" + ti; }
         if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
         var b = this.bunkrParts(code);
         return "https://" + b.host + "/" + b.kind + "/" + b.id;
@@ -1037,6 +1053,7 @@ class DefaultExtension extends MProvider {
         if (this.isFilester(code)) return "/fl/" + code;
         if (this.isPixeldrain(code)) return "/pd/" + code;
         if (this.isErome(code)) return "/er/" + code;
+        if (this.isTurbo(code)) return "/tb/" + code;
         return (this.isBunkr(code) ? "/bk/" : "/d/") + code;
     }
 
@@ -1075,6 +1092,7 @@ class DefaultExtension extends MProvider {
 
     async readOneRaw(code) {
         if (this.isErome(code)) return this.readErome(code);
+        if (this.isTurbo(code)) return this.readTurbo(code);
         if (this.isBunkr(code)) return this.readBunkr(code);
         if (this.isFilester(code)) return this.readFilester(code);
         if (this.isPixeldrain(code)) return this.readPixeldrain(code);
@@ -1384,7 +1402,7 @@ class DefaultExtension extends MProvider {
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
-        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isErome(c) || self.isFilester(c) || self.isPixeldrain(c) || self.isEmbed(c); });
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isErome(c) || self.isTurbo(c) || self.isFilester(c) || self.isPixeldrain(c) || self.isEmbed(c); });
         if (missing.length) await this.readMany(missing);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
@@ -1523,10 +1541,11 @@ class DefaultExtension extends MProvider {
         } else {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
             var erm = raw.match(/\/er\/(er~[A-Za-z0-9]+)/i);
+            var tbm = raw.match(/\/tb\/(tb~[A-Za-z0-9~]+)/i);
             var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
             var flm = raw.match(/\/fl\/(fl~[A-Za-z0-9]+)/i);
             var pdm = raw.match(/\/pd\/(pd~[^?#\/]+)/i);
-            var code = erm ? erm[1] : pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var code = erm ? erm[1] : tbm ? tbm[1] : pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
@@ -1582,6 +1601,10 @@ class DefaultExtension extends MProvider {
                 }
                 if (v.er) {
                     chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + v.n, url: "erome:" + codes[i] + ":" + j, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
+                    continue;
+                }
+                if (v.tb) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "turbo:" + v.tb, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
                     continue;
                 }
                 var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
@@ -1724,7 +1747,7 @@ class DefaultExtension extends MProvider {
     // Schede di un solo link (ricerca Bunkr, Erome o findr). Non le raccolte con nome.
     searchSaveKind(code) {
         if (!code || this.isEmbed(code)) return false;
-        if (this.isErome(code) || this.isFilester(code) || this.isPixeldrain(code)) return true;
+        if (this.isErome(code) || this.isTurbo(code) || this.isFilester(code) || this.isPixeldrain(code)) return true;
         if (this.isBunkr(code)) {
             var k = this.bunkrParts(code).kind;
             return k === "a" || k === "f";
@@ -1837,6 +1860,7 @@ class DefaultExtension extends MProvider {
         if (file.indexOf("filester:") === 0) return this.filesterVideo(file.slice(9));
         if (file.indexOf("pixeldrain:") === 0) return this.pixeldrainVideo(file.slice(11));
         if (file.indexOf("erome:") === 0) return this.eromeVideo(file.slice(6));
+        if (file.indexOf("turbo:") === 0) return this.turboVideo(file.slice(6));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
@@ -2271,6 +2295,60 @@ class DefaultExtension extends MProvider {
         }
         var q = file.q || "720p";
         return [{ url: file.er, originalUrl: file.er, quality: "Erome · " + q, headers: headers }];
+    }
+
+    // turbo.cr: album /a/<id> con «const FILES = [{id,name,thumb,...}]» (solo video);
+    // singolo /d/ o /v/ con «videoData». Il video si ottiene al momento dall'URL firmato.
+    async readTurbo(code) {
+        var id = String(code).slice(3);
+        var single = id.indexOf("v~") === 0;
+        if (single) id = id.slice(2);
+        var res;
+        try { res = await this.client.get(single ? "https://turbo.cr/d/" + id : "https://turbo.cr/a/" + id, { "User-Agent": UA }); } catch (e) { return null; }
+        var html = String((res && res.body) || "");
+        var status = res ? res.statusCode : 0;
+        if (status >= 500) return null;
+        var unesc = function (s) { return String(s || "").replace(/\\\//g, "/"); };
+        var files = [], title = "", notFound = false;
+        if (single) {
+            var enc = (html.match(/encId:\s*"([^"]+)"/) || [])[1] || id;
+            var fn = this.decodeHtml((html.match(/originalFilename:\s*"((?:[^"\\]|\\.)*)"/) || [])[1] || "");
+            notFound = status === 404 || !enc;
+            title = notFound ? this.shortLink(code) + " (non trovata)" : (this.episodeName(fn) || id);
+            if (!notFound) files.push({ n: fn || "video.mp4", img: "", tb: enc });
+        } else {
+            title = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*[-—|]\s*turbo\.cr\s*$/i, "").trim();
+            var i2 = html.indexOf("const FILES");
+            var blk = i2 >= 0 ? html.slice(i2, html.indexOf("];", i2)) : "";
+            var re = /id:\s*"([^"]+)"\s*,\s*name:\s*"((?:[^"\\]|\\.)*)"[\s\S]*?thumb:\s*"([^"]*)"/g, m, seen = {};
+            while ((m = re.exec(blk))) {
+                if (seen[m[1]]) continue;
+                seen[m[1]] = 1;
+                var nm = this.decodeHtml(unesc(m[2]));
+                if (!VIDEO_EXT.test(nm)) continue;
+                files.push({ n: nm, img: this.absHttp(unesc(m[3])), tb: m[1] });
+            }
+            notFound = status === 404 || (!files.length && !title);
+            if (notFound) title = this.shortLink(code) + " (non trovata)";
+            else if (!title) title = id;
+        }
+        var fm = this.filesMap();
+        fm[code] = { title: title, files: files, folders: 0, at: Date.now(), v: READ_V };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        map[code] = { name: title, image: files.length ? files[0].img : "" };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: files, text: notFound ? "not found" : "" };
+    }
+
+    async turboVideo(id) {
+        var res;
+        try { res = await this.client.get("https://turbo.cr/api/sign?v=" + encodeURIComponent(id), { "User-Agent": UA }); } catch (e) { throw new Error("turbo.cr non risponde: forse è bloccato dall'operatore"); }
+        var data = null;
+        try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
+        if (!data || !data.success || !data.url) throw new Error("turbo.cr: il video non è più disponibile.");
+        var ext = ((String(data.filename || data.url).split("?")[0].match(/\.([A-Za-z0-9]+)$/) || [])[1] || "video").toUpperCase();
+        return [{ url: data.url, originalUrl: data.url, quality: "turbo · " + ext, headers: { "User-Agent": UA } }];
     }
 
     getSourcePreferences() {

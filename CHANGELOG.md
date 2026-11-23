@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.31.0
+
+- **turbo.cr aperto:** ora si aprono anche gli album e i video di turbo.cr (il provider più usato da findr, prima scartato). Il video si ottiene dall'indirizzo firmato del sito, in chiaro e senza WebView. Di conseguenza la ricerca e l'home di findr sono molto più piene e veloci.
+
 ## Gofile 1.30.1
 
 - **Album e Video Bunkr ora diversi anche a ricerca vuota:** prima, senza testo, «Album su Bunkr» e «Video su Bunkr» mostravano la stessa lista. Ora «Album» mostra gli ultimi album (con video), «Video» gli ultimi video singoli.
