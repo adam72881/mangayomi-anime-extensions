@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.37.0
+
+- **Gofile-douga: niente più link morti.** Alcuni video non si aprivano perché la cartella Gofile era scaduta/rotta (lo stesso sito la segna «broken»). Ora quelle voci vengono nascoste dall'elenco, così quello che vedi è apribile.
+- **La «Diagnosi» mostra la versione giusta.** Prima scriveva sempre «1.31.5» anche dopo gli aggiornamenti: era un numero rimasto fermo. Ora riporta la versione reale, così si capisce al volo quale versione hai sul telefono.
+
 ## Gofile 1.36.0
 
 - **Nuovo filtro «Bunkr: ultimi (novità)».** In «Cosa cerco» c'è una voce che mostra gli **ultimi album Bunkr veri** (in ordine di data, da freebunkr.com), così hai sempre roba nuova e diversa — non più solo i soliti album più grossi. Nota: questa lista non distingue video da foto, quindi ogni tanto può capitare un album di sole foto (aprendolo risulta senza video). Le altre voci Bunkr restano solo-video.

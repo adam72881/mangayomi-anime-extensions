@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.36.0",
+        "version": "1.37.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.31.5";
+const VERSION = "1.37.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2403,6 +2403,9 @@ class DefaultExtension extends MProvider {
         var items = (data && data.items) || [];
         var info = this.infoMap(), dirty = false, list = [];
         items.forEach(function (it) {
+            // Salto le voci che gofile-douga segna come rotte/scadute: la cartella
+            // Gofile non esiste più e si aprirebbe «vuota».
+            if (it && it.status && it.status !== "active") return;
             var code = String((it && it.gofileCode) || "").trim();
             if (!/^[A-Za-z0-9]{4,}$/.test(code)) return;
             var title = String((it && it.contentTitle) || "").trim();
