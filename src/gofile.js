@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.26.4",
+        "version": "1.27.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -55,6 +55,8 @@ const REMOTE_TTL = 60000;
 const DEFAULT_REMOTE_URL = "https://raw.githubusercontent.com/adam72881/mangayomi-anime-extensions/main/links/gofile.txt";
 // Domini di Bunkr: alcuni operatori italiani ne bloccano qualcuno, si prova il successivo.
 const BUNKR_HOSTS = ["bunkr.cr", "bunkr.si", "bunkr.fi", "bunkr.ph", "bunkr.ws", "bunkr.site", "bunkr.pk"];
+// Indice pubblico di Bunkr con API JSON in chiaro (niente anti-bot): cerca album e file.
+const BUNKR_SEARCH_HOST = "bunkrsearch.link";
 const FILES_TTL = 6 * 3600000;
 // Versione dello schema della cache (lista file di una scheda). Aumentandola, le schede
 // salvate con una versione precedente vengono rilette una volta, anche se non scadute:
@@ -1451,11 +1453,14 @@ class DefaultExtension extends MProvider {
     // Nella ricerca si può incollare un link (o il codice) per aprirlo una volta;
     // altrimenti filtra le schede salvate per nome.
     async search(query, page, filters) {
-        if (page > 1) return { list: [], hasNextPage: false };
         var q = String(query || "").trim();
         var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
-        // La ricerca guarda tutti (locali + documento).
+        // Ricerca su Bunkr (album o video) se scelta col filtro «Cosa cerco».
+        var mode = this.searchMode(filters);
+        if (q && (mode === "album" || mode === "video")) return this.bunkrSearch(q, page, mode);
+        if (page > 1) return { list: [], hasNextPage: false };
+        // «Le mie schede»: guarda tutti i link salvati (locali + documento).
         this.savedLinks();
         try { Promise.resolve(this.flushPush()).catch(function () {}); } catch (e) {}
         try { Promise.resolve(this.flushRemoteEdits()).catch(function () {}); } catch (e) {}
@@ -1697,8 +1702,65 @@ class DefaultExtension extends MProvider {
 
     getFilterList() {
         return [
-            { type_name: "HeaderFilter", name: "Incolla nella ricerca un link Gofile (https://gofile.io/d/…) per aprirlo. Per tenerlo in elenco, salvalo in «➕ Salva un link» nelle impostazioni dell'estensione." },
+            {
+                type_name: "SelectFilter",
+                name: "Cosa cerco",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Le mie schede (salvate)", value: "mine" },
+                    { type_name: "SelectOption", name: "Album su Bunkr", value: "album" },
+                    { type_name: "SelectOption", name: "Video su Bunkr", value: "video" },
+                ],
+            },
+            { type_name: "HeaderFilter", name: "«Album/Video su Bunkr» cerca in un indice pubblico. Incolla invece un link (Gofile, Bunkr, filester, pixeldrain) per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
         ];
+    }
+
+    // Legge il valore del filtro «Cosa cerco» (mine / album / video).
+    searchMode(filters) {
+        try {
+            for (var i = 0; i < (filters || []).length; i++) {
+                var f = filters[i];
+                if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
+                    var v = f.values[f.state];
+                    if (v && v.value) return v.value;
+                }
+            }
+        } catch (e) {}
+        return "mine";
+    }
+
+    // Ricerca su bunkrsearch.link (API JSON, nessun anti-bot). kind: «album» o «video».
+    async bunkrSearch(q, page, kind) {
+        page = page || 1;
+        var path = kind === "video" ? "/api/search?q=" : "/api/albums?q=";
+        var url = "https://" + BUNKR_SEARCH_HOST + path + encodeURIComponent(q) + "&page=" + page;
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { return { list: [], hasNextPage: false }; }
+        var data = null;
+        try { data = JSON.parse(String((res && res.body) || "")); } catch (e) {}
+        if (!data || !data.results || !data.results.length) return { list: [], hasNextPage: false };
+        var self = this, info = this.infoMap(), dirty = false, list = [];
+        data.results.forEach(function (r) {
+            if (!r.slug) return;
+            var code, name, thumb = /^http/.test(r.thumbnail || "") ? r.thumbnail : "";
+            if (kind === "video") {
+                code = "bk~f~" + r.slug;
+                name = self.episodeName(r.original || r.name || r.slug);
+            } else {
+                code = "bk~a~" + r.slug;
+                name = r.name || r.slug;
+            }
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        var size = data.results.length;
+        var pages = data.pages || (data.total ? Math.max(1, Math.ceil(data.total / Math.max(size, 1))) : page);
+        return { list: list, hasNextPage: page < pages };
     }
 
     getSourcePreferences() {

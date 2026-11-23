@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.27.0
+
+- **Ricerca su Bunkr (album e video):** nella ricerca, con il filtro «Cosa cerco» scegli «Album su Bunkr» o «Video su Bunkr» e cerca per parola/nome: l'estensione usa un indice pubblico (API diretta, veloce, senza WebView) e mostra i risultati con copertina, da aprire come schede. Il filtro resta su «Le mie schede» per la ricerca tra i link salvati, come prima. Nota: gli album di sole foto risultano vuoti, perché l'estensione mostra solo video.
+
 ## Gofile 1.26.4
 
 - **Nelle liste delle impostazioni si vede il nome, non l'indirizzo:** in «Togli i link», «Aggiungi alla lista condivisa» e «Nome…», un link senza nome che gli hai dato ora mostra il titolo letto dal sito (es. «asuna_love») invece dell'indirizzo, così lo riconosci. Solo se non c'è nemmeno quello appare l'indirizzo.
