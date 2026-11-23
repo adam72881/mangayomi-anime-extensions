@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.27.4",
+        "version": "1.28.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1576,6 +1576,13 @@ class DefaultExtension extends MProvider {
         }
         // Dall'ultimo al primo, come le altre sorgenti: così Mangayomi trova il successivo.
         chapters.reverse();
+        if (codes.length === 1 && this.searchSaveKind(codes[0])) {
+            // Date fuori scala (non sono un giorno): sulla TV l'ordine degli episodi
+            // si legge dal primo e dall'ultimo. Queste due righe restano in cima e
+            // «Riprendi» continua a puntare all'episodio vero.
+            if (chapters.length && !chapters[chapters.length - 1].dateUpload) chapters[chapters.length - 1].dateUpload = "1e20";
+            chapters = this.saveRows(codes[0]).concat(chapters);
+        }
 
         var single = codes.length === 1 ? (fm[codes[0]] || {}) : null;
         var title = g ? g.name : (this.customName(codes[0]) || (single && single.title) || this.shortLink(codes[0]));
@@ -1597,6 +1604,15 @@ class DefaultExtension extends MProvider {
         else if (problem) lines.push(problem);
         if (!videos && !problem && !gone && !Object.keys(fm).some(function (c) { return codes.indexOf(c) !== -1; })) {
             lines = ["Nessun file trovato. La cartella può essere vuota o scaduta."];
+        }
+
+        // Stesso filtro dei titoli, solo se il Bunkr non è già tra i link salvati
+        // (Popolari o Recenti). Una scheda aperta dalla ricerca si ferma qui.
+        if (!g && codes.length === 1 && this.isBunkr(codes[0]) && !this.onPhone(codes[0]) && !this.inShared(codes[0])) {
+            var infoName = (info[codes[0]] || {}).name || "";
+            if (this.blockedTitle(title) || this.blockedTitle(infoName) || this.blockedTitle(single && single.title)) {
+                throw new Error("Contenuto non disponibile");
+            }
         }
 
         return {
@@ -1690,8 +1706,114 @@ class DefaultExtension extends MProvider {
         return [{ url: finalUrl, originalUrl: finalUrl, quality: "Gofile · " + ext, headers: headers }];
     }
 
+    // Schede aperte dalla ricerca: album Bunkr, video Bunkr, album Erome.
+    searchSaveKind(code) {
+        if (this.isErome(code)) return true;
+        if (!this.isBunkr(code)) return false;
+        var k = this.bunkrParts(code).kind;
+        return k === "a" || k === "f";
+    }
+
+    onPhone(code) {
+        var links = this.readJson(STORE_LINKS, []);
+        for (var i = 0; i < links.length; i++) if (links[i].code === code) return true;
+        return false;
+    }
+
+    inShared(code) {
+        var links = this.cachedRemote();
+        for (var i = 0; i < links.length; i++) if (links[i].code === code) return true;
+        return false;
+    }
+
+    saveTitle(code) {
+        var t = this.customName(code) || "";
+        if (!t) {
+            var f = this.filesMap()[code];
+            t = (f && f.title) || "";
+            if (/non trovata/.test(t)) t = "";
+        }
+        if (!t) {
+            var info = this.infoMap()[code];
+            t = (info && info.name) || "";
+        }
+        return String(t || "").replace(/\s+/g, " ").trim().slice(0, 60);
+    }
+
+    // Due righe, una per elenco. Lo stato di ciascuna non dipende dall'altra.
+    saveRows(code) {
+        var local = this.onPhone(code), remote = this.inShared(code);
+        var row = function (name, kind, have, date) {
+            return { name: name, url: "save:" + kind + ":" + code + (have ? ":have" : ""), dateUpload: date };
+        };
+        return [
+            row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, "3e20"),
+            row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, "2e20"),
+        ];
+    }
+
+    addLocalLink(code, name) {
+        var links = this.readJson(STORE_LINKS, []);
+        for (var i = 0; i < links.length; i++) if (links[i].code === code) return false;
+        links.push({ code: code, name: name || "" });
+        this.writeStore(STORE_LINKS, JSON.stringify(links));
+        this._linksMemo = null;
+        return true;
+    }
+
+    // Scrive solo il file GitHub. Il link non resta (e non viene tolto) dal telefono:
+    // pushAttempt lo cerca tra i link locali e poi lo toglie, quindi si presta una
+    // copia e alla fine si rimette l'elenco di prima.
+    async pushSharedOnly(code, name) {
+        if (!this.remoteToken()) throw new Error("Serve il token nelle impostazioni");
+        var prev = this.readStore(STORE_LINKS);
+        var links = this.readJson(STORE_LINKS, []);
+        var copy = [], found = false;
+        for (var i = 0; i < links.length; i++) {
+            var l = links[i];
+            if (l.code === code) { found = true; copy.push({ code: l.code, name: name || l.name || "" }); }
+            else copy.push({ code: l.code, name: l.name || "" });
+        }
+        if (!found) copy.push({ code: code, name: name || "" });
+        this.writeStore(STORE_LINKS, JSON.stringify(copy));
+        this._linksMemo = { at: Date.now(), list: copy };
+        var ok = false;
+        try { ok = await this.pushToRemote([code]); }
+        finally {
+            this.writeStore(STORE_LINKS, prev || "[]");
+            this._linksMemo = null;
+        }
+        var st = String(this.pushStatus() || "");
+        var tok = this.remoteToken();
+        if (tok && st.indexOf(tok) !== -1) st = st.split(tok).join("");
+        if (!ok) throw new Error(st || "GitHub non ha accettato la scrittura.");
+        if (/già nella lista/.test(st)) throw new Error("È già nella lista condivisa: lo trovi in Recenti");
+        this.setPushStatus("Aggiunto alla lista condivisa.");
+    }
+
+    async runSave(spec) {
+        var have = /:have$/.test(spec);
+        var body = have ? String(spec).slice(0, -5) : String(spec);
+        var colon = body.indexOf(":");
+        var kind = colon < 0 ? "" : body.slice(0, colon);
+        var code = colon < 0 ? "" : body.slice(colon + 1);
+        if (!code) throw new Error("Salvataggio non riuscito.");
+        if (kind === "local") {
+            if (have || this.onPhone(code)) throw new Error("È già sul telefono: lo trovi in Popolari");
+            this.addLocalLink(code, this.saveTitle(code));
+            throw new Error("✅ Salvato sul telefono: lo trovi in Popolari");
+        }
+        if (kind === "remote") {
+            if (have || this.inShared(code)) throw new Error("È già nella lista condivisa: lo trovi in Recenti");
+            await this.pushSharedOnly(code, this.saveTitle(code));
+            throw new Error("✅ Aggiunto alla lista condivisa: lo trovi in Recenti");
+        }
+        throw new Error("Salvataggio non riuscito.");
+    }
+
     async getVideoList(url) {
         var file = String(url);
+        if (file.indexOf("save:") === 0) return this.runSave(file.slice(5));
         if (file.indexOf("bunkr:") === 0) return this.bunkrVideo(file.slice(6));
         if (file.indexOf("embed:") === 0) return this.embedVideo(file.slice(6));
         if (file.indexOf("filester:") === 0) return this.filesterVideo(file.slice(9));
@@ -1774,6 +1896,7 @@ class DefaultExtension extends MProvider {
                 code = "bk~a~" + aslug;
                 name = r.album_name || aslug;
             }
+            if (self.blockedTitle(name)) return;
             if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
                 info[code] = { name: name, image: thumb };
                 dirty = true;
@@ -1786,20 +1909,19 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: page < pages && size > 0 };
     }
 
-    // Titoli da non mostrare: minori, oppure riprese non consensuali o di nascosto.
-    // Le parole corte valgono da sole («spy» non blocca «spicy»); «teen» vale anche dentro «teenager».
+    // Bunkr ed Erome usano la stessa lista: solo termini inequivocabili di minori.
+    // Teen, 18yo, 19yo, young, school, leak, hidden e caught non entrano.
+    // I confini di parola evitano «minority», «kidney» e «grandchild».
     blockedTitle(s) {
         var t = String(s || "").toLowerCase().replace(/&#0*39;|&apos;/g, "'").replace(/&amp;/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
         if (!t) return false;
         var re = [
-            /(^| )teen/, /(^| )young/, /(^| )tiny/, /(^| )school/, /(^| )student/,
-            /(^| )under ?age/, /(^| )minors?( |$)/, /(^| )kids?( |$)/, /(^| )child(ren)?( |$)/,
-            /(^| )loli/, /(^| )shota/, /(^| )barely( |$)/, /(^| )1[89] ?yo( |$)/,
-            /(^| )leak(ed)?( |$)/, /(^| )caught( |$)/, /(^| )hidden/, /(^| )spy( |$)/, /spycam/,
-            /(^| )voyeur/, /upskirt/, /(^| )sleep/, /(^| )drunk/, /passed out/,
-            /(^| )forced( |$)/, /(^| )rap(e|ed|ing)( |$)/, /non ?consent/,
-            /(^| )revenge/, /(^| )stolen( |$)/, /(^| )ex ?gf( |$)/, /(^| )creep/,
-            /(^| )pre ?teen/, /(^| )toddler/, /(^| )infant/, /(^| )kindergarten/
+            /\bunderage\b/, /\bunder age\b/, /\bminors?\b/, /\bchildren\b/, /\bchild\b/,
+            /\bkids?\b/, /\blolicon\b/, /\bloli\b/, /\bshotacon\b/, /\bshota\b/,
+            /\bpreteen\b/, /\bpre teen\b/, /\bjailbait\b/,
+            /(^|\s)1[0-7]\s?(yo|y o|years? old)\b/,
+            /(^|\s)age 1[0-7]\b/,
+            /(^|\s)[1-9]\s?(yo|y o)\b/
         ];
         for (var i = 0; i < re.length; i++) if (re[i].test(t)) return true;
         return false;
