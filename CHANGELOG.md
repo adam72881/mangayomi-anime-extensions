@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.26.3
+
+- **Il link caricato nel documento si toglie dal telefono:** quando aggiungi un link alla lista condivisa (e la scrittura va a buon fine), il link viene tolto dai salvati del telefono. Così si «sposta» da Popolari a Recenti, senza restare doppio. Se la scrittura fallisce, il link resta sul telefono.
+
 ## Gofile 1.26.2
 
 - **Popolari e Recenti di nuovo separati:** in «Popolari» solo i link salvati su questo telefono, in «Recenti» quelli della lista condivisa (il documento). «Togli i link» continua a vedere tutto (🌐 = lista condivisa), così puoi togliere anche quelli del documento. Popolari non aspetta più la rete: si apre subito.

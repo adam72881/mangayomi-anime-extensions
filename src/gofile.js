@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.26.2",
+        "version": "1.26.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -819,6 +819,26 @@ class DefaultExtension extends MProvider {
         return "➕ " + this.countsTitle() + (sp ? " · " + sp : "");
     }
 
+    // Dei codici scelti, quelli il cui link compare nel testo del documento.
+    codesInText(codes, text) {
+        var self = this, t = String(text || "");
+        return (codes || []).filter(function (c) { return t.indexOf(self.linkUrl(c)) !== -1; });
+    }
+
+    // Toglie dai link salvati sul telefono i codici indicati (sono ora nel documento):
+    // così un link caricato nella lista condivisa sparisce da Popolari e resta in Recenti.
+    removeFromPhone(codes) {
+        if (!codes || !codes.length) return;
+        var drop = {};
+        codes.forEach(function (c) { drop[c] = 1; });
+        var links = this.readJson(STORE_LINKS, []);
+        var kept = links.filter(function (l) { return !drop[l.code]; });
+        if (kept.length !== links.length) {
+            this.writeStore(STORE_LINKS, JSON.stringify(kept));
+            this._linksMemo = null;
+        }
+    }
+
     // Aggiunge i link scelti al file GitHub della lista condivisa. Legge il contenuto
     // attuale (per il suo sha), accoda le righe mancanti e rimanda indietro il file.
     async pushAttempt(codes) {
@@ -843,7 +863,12 @@ class DefaultExtension extends MProvider {
             if (cur.indexOf(url) !== -1) continue; // già presente nel file
             add.push(url + (l.name ? " | " + l.name : ""));
         }
-        if (!add.length) { this.setPushStatus("Niente da aggiungere: erano già nella lista."); return true; }
+        if (!add.length) {
+            // Già nel documento: tolgo comunque dal telefono i codici scelti che ci sono.
+            this.removeFromPhone(this.codesInText(codes, cur));
+            this.setPushStatus("Erano già nella lista: tolti dal telefono.");
+            return true;
+        }
         var next = cur.replace(/\s*$/, "") + "\n" + add.join("\n") + "\n";
         var body = { message: "Aggiungi " + add.length + " link da Mangayomi", content: this.bytesToB64(this.utf8Bytes(next)), branch: tgt.branch };
         if (sha) body.sha = sha;
@@ -853,8 +878,10 @@ class DefaultExtension extends MProvider {
                 // Tutta la lista, non solo il link appena aggiunto: altrimenti la copia
                 // sul telefono restava di una voce anche se il file ne aveva tre.
                 this.saveRemoteText(next);
+                // Il link è ora nel documento: lo tolgo dal telefono (si sposta in Recenti).
+                this.removeFromPhone(this.codesInText(codes, next));
                 this.writeStore(STORE_PUSH_AT, this.pushWhen());
-                this.setPushStatus("Aggiunti " + add.length + " link alla lista. ✓");
+                this.setPushStatus("Aggiunti " + add.length + " link alla lista (tolti dal telefono). ✓");
                 return true;
             }
             var sc = p && p.statusCode;
