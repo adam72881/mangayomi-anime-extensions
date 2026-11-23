@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.38.2",
+        "version": "1.39.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.38.2";
+const VERSION = "1.39.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -550,7 +550,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.[a-z]{2,}\/d\/[A-Za-z0-9]+|pixeldrain\.com\/[ul]\/[A-Za-z0-9]+|erome\.com\/a\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|turbo\.cr\/(?:a|v|d|embed)\/[A-Za-z0-9]+|filester\.[a-z]{2,}\/d\/[A-Za-z0-9]+|pixeldrain\.com\/[ul]\/[A-Za-z0-9]+|erome\.com\/a\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -565,7 +565,7 @@ class DefaultExtension extends MProvider {
             rest = line.replace(links[0], " ");
         } else {
             var first = line.split(/[\s|]+/)[0];
-            code = this.codeOf(first);
+            code = this.linkCode(first);
             rest = line.slice(first.length);
         }
         if (code) out.push({ code: code, name: rest.replace(/^[\s|:\-–—]+|[\s|:\-–—]+$/g, "").slice(0, 60) });
@@ -1279,7 +1279,8 @@ class DefaultExtension extends MProvider {
         var info = this.infoMap()[code] || {};
         if (/^http/.test(info.image || "")) return info.image;
         var f = this.filesMap()[code];
-        return f && f.files.length && f.files[0].img ? f.files[0].img : "";
+        var img = f && f.files && f.files.length ? f.files[0].img : "";
+        return /^http/.test(img || "") ? img : "";
     }
 
     card(code, name) {
@@ -1364,7 +1365,7 @@ class DefaultExtension extends MProvider {
             // Niente timer qui: questa pagina la usa anche il video (getVideoList). Su iPhone
             // la risposta arriva dopo i 12 s della 1.25.1, e se setTimeout non c'è o scatta
             // subito il timer rifiutava ogni dominio prima ancora della richiesta.
-            try { res = await this.client.get("https://" + order[i] + path, { "User-Agent": UA }); } catch (e) { reqErr = (e && e.message) || "errore"; ourTimeout = reqErr === "timeout"; }
+            try { res = await this.withTimeout(this.client.get("https://" + order[i] + path, { "User-Agent": UA }), 9000); } catch (e) { reqErr = (e && e.message) || "errore"; ourTimeout = reqErr === "timeout"; }
             if (ourTimeout) { this.saw("https://" + order[i] + path, null, reqErr); tried.push(order[i] + " tempo nostro scaduto"); continue; }
             var html = String((res && res.body) || "");
             var status = res ? res.statusCode : 0;
@@ -1545,6 +1546,7 @@ class DefaultExtension extends MProvider {
             }
             var expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
             for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
+            if (files.length) this.saveBunkrProgress(code, title, files, expMax > 1);
             var maxPg = Math.min(expMax > 1 ? expMax : 1, 20);
             var pages = [];
             for (var pg = 2; pg <= maxPg; pg++) pages.push(pg);
@@ -1587,6 +1589,19 @@ class DefaultExtension extends MProvider {
         return { rows: files, title: fm[code].title, partial: !!partial, text: notFound ? "not found" : "", waited: true };
     }
 
+    // Copertina e primi video subito, così Recenti non aspetta le pagine dopo.
+    saveBunkrProgress(code, title, files, isPartial) {
+        var name = title || this.shortLink(code);
+        var fm = this.filesMap();
+        fm[code] = { title: name, files: files.slice(), folders: 0, at: Date.now(), partial: !!isPartial, v: READ_V };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var img = "";
+        for (var i = 0; i < files.length; i++) if (/^http/.test(files[i].img || "")) { img = files[i].img; break; }
+        var map = this.infoMap();
+        map[code] = { name: name, image: img };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+    }
+
     // Una pagina successiva di un album Bunkr (?page=N): prima il dominio che ha già
     // risposto, poi gli altri come ripiego, senza marcare «non valido» chi fallisce
     // (così un intoppo qui non rovina la lettura degli altri album). Restituisce il
@@ -1611,7 +1626,7 @@ class DefaultExtension extends MProvider {
         var order = [host];
         for (var i = 0; i < order.length; i++) {
             var res = null;
-            try { res = await this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }); } catch (e) {}
+            try { res = await this.withTimeout(this.client.get("https://" + order[i] + "/a/" + id + "?page=" + pg, { "User-Agent": UA }), 9000); } catch (e) {}
             if (res && res.statusCode === 200 && /theItem/.test(String(res.body || ""))) return String(res.body);
         }
         return null;
