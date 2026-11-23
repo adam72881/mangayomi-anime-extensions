@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.28.0
+
+- **Salva dalla ricerca:** in cima alla scheda di un album Bunkr, di un video Bunkr o di un album Erome ci sono due righe. «💾 Salva sul telefono» mette il link solo tra i link di questo telefono (Popolari). «🌐 Salva nella lista condivisa» scrive solo il file condiviso, col titolo dell'album, e lo trovi in Recenti sul telefono e sulla TV. Le due azioni non si mescolano: se un link è già in un elenco, quella riga diventa «✓ Già …» e l'altra resta da salvare.
+- **Toccando la riga compare il messaggio:** «✅ Salvato sul telefono: lo trovi in Popolari», «✅ Aggiunto alla lista condivisa: lo trovi in Recenti», «Serve il token nelle impostazioni», oppure l'errore di GitHub. Se è già salvato, il messaggio lo dice e non rifà l'azione. Le righe non sono episodi numerati e non spostano «Riprendi».
+- **Un solo filtro, su Bunkr e su Erome:** la ricerca e la scheda scartano solo termini inequivocabili di minori (underage, minor, child, kid, loli, shota, preteen, jailbait e un'età scritta sotto i 18). Teen, 18yo, 19yo, young, school, barely, leak, hidden e caught restano. I link già in Popolari o in Recenti non si toccano.
+
 ## Gofile 1.27.4
 
 - **Bunkr ed Erome insieme:** nel filtro «Cosa cerco» c'è «Bunkr + Erome (album)». Cerca gli album sui due siti in parallelo e alterna i risultati, senza doppioni. Se uno non risponde restano i risultati dell'altro; l'errore compare solo se non risponde nessuno. All'inizio il filtro resta «Album su Bunkr».
