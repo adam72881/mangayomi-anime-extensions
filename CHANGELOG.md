@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.30.1
+
+- **La lista episodi esce alla prima apertura:** prima la scheda poteva tornare vuota (la lettura lenta finiva solo in memoria, e il refresh entro due minuti la rileggeva). Ora i file della prima pagina si usano subito e le pagine dopo partono insieme. Ogni episodio ha nome, indirizzo, data in millisecondi, scanlator e miniatura, tutti stringhe.
+- **Erome parte sull'iPhone:** il video porta Referer, Origin e User-Agent. Non si ferma più su un controllo che mostrava il messaggio della TV.
+- **turbo.cr non entra in lista:** findr a volte dà album di siti che qui non si aprono. Quei risultati si saltano, in ricerca e nella home.
+
 ## Gofile 1.30.0
 
 - **Ricerca vuota, home del sito:** se il testo è vuoto (o solo spazi) e scegli un filtro in «Cosa cerco», compaiono gli ultimi album di quel sito. Con una parola la ricerca resta quella di prima. Un link incollato si apre ancora subito.
