@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.4",
+        "version": "1.31.5",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.31.4";
+const VERSION = "1.31.5";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -426,15 +426,13 @@ class DefaultExtension extends MProvider {
             }
             this.writeStore(STORE_MIGRATED, "1");
         }
-        // «Togli i link» segna soltanto. Si cancella solo se, nella stessa lettura,
-        // «Conferma rimozione» contiene OK: un OK a vuoto non toglie nulla.
-        // I link 🌐 sono solo nella lista condivisa: si tolgono dal file solo col token.
+        // «Togli i link»: l'OK del riquadro è la conferma. Una spunta vuota non toglie nulla.
+        // I link 🌐 sono solo nella lista condivisa: si mettono in coda solo col token.
         var pool = this.linkPool(links);
         var marked = pool.length ? this.setting(this.removeKey(pool)) : null;
         if (!marked || !marked.length) marked = [];
-        this._marked = marked;
-        var confirmText = marked.length ? String(this.setting(this.confirmKey(marked)) || "").trim() : "";
-        if (marked.length && /^ok$/i.test(confirmText)) {
+        this._marked = [];
+        if (marked.length) {
             var localCodes = {};
             for (var li = 0; li < links.length; li++) localCodes[links[li].code] = 1;
             var localMarked = marked.filter(function (c) { return localCodes[c]; });
@@ -458,8 +456,6 @@ class DefaultExtension extends MProvider {
             this.dropLocalCache(removed.map(function (l) { return l.code; }));
             changed = true;
             this.writeStore(STORE_REM_N, String((parseInt(this.readStore(STORE_REM_N), 10) || 0) + 1));
-            this.writeStore(STORE_CONFIRM_N, String((parseInt(this.readStore(STORE_CONFIRM_N), 10) || 0) + 1));
-            this._marked = [];
         }
         var undo = this.readJson(STORE_UNDO, null);
         var undoHas = undo && ((undo.links && undo.links.length) || (undo.remote && undo.remote.length));
@@ -2664,32 +2660,19 @@ class DefaultExtension extends MProvider {
         }
         if (pool.length) {
             var poolView = pool.slice().reverse();
-            var removeTitle = "Togli i link: segna, non si cancellano ancora";
-            if (pool.some(function (l) { return l.remote; }) && !hasToken) removeTitle = "Togli i link: segna. I 🌐 della lista condivisa si tolgono solo col token";
-            else if (pool.some(function (l) { return l.remote; })) removeTitle = "Togli i link: segna (🌐 = lista condivisa, solo dopo OK)";
+            var removeTitle = "Togli i link: spunta e premi OK";
+            if (pool.some(function (l) { return l.remote; }) && !hasToken) removeTitle = "Togli i link: i 🌐 si tolgono solo col token";
+            else if (pool.some(function (l) { return l.remote; })) removeTitle = "Togli i link: OK toglie (🌐 = lista condivisa)";
             prefs.push({
                 key: this.removeKey(pool),
                 multiSelectListPreference: {
                     title: removeTitle,
-                    summary: "Spunta i link da togliere. I 🌐 sono nel file condiviso" + (hasToken ? " e si tolgono solo scrivendo OK." : ": senza token non si possono togliere.") + " Un OK a vuoto non cancella nulla.",
+                    summary: "Spunta i link e premi OK. I 🌐 sono nel file condiviso" + (hasToken ? " e partono subito." : ": senza token restano.") + " Un OK senza spunte non cancella nulla.",
                     entries: poolView.map(function (l) { return (l.remote ? "🌐 " : "") + (l.name || niceOf(l.code)); }),
                     entryValues: poolView.map(function (l) { return l.code; }),
                     values: [],
                 },
             });
-            var markedNow = this._marked || [];
-            if (markedNow.length) {
-                prefs.push({
-                    key: this.confirmKey(markedNow),
-                    editTextPreference: {
-                        title: "Conferma rimozione (" + markedNow.length + "): scrivi OK",
-                        summary: "Solo scrivendo OK i link segnati spariscono. Un OK a vuoto non cancella nulla.",
-                        value: "",
-                        dialogTitle: "Conferma rimozione",
-                        dialogMessage: "Scrivi OK per togliere i " + markedNow.length + " link segnati. Lascia vuoto per non fare nulla.",
-                    },
-                });
-            }
         }
         var undo = this.readJson(STORE_UNDO, null);
         if (undo && ((undo.links && undo.links.length) || (undo.remote && undo.remote.length))) {

@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.31.5
+
+- **Togliere un link 🌐 non chiede un secondo OK.** La spunta in «Togli i link» e l'OK di quel riquadro mettono subito in coda la rimozione dalla lista condivisa. Resta il token, e resta «Annulla ultima rimozione».
+
 ## Gofile 1.31.4
 
 - **La prima apertura ha i video, su ogni sito.** La lettura poteva riuscire e l'archivio non mostrarla ancora: la scheda usciva con l'indirizzo nudo e «Nessun file trovato», e i file comparivano solo ricaricando. Ora la lista si disegna con quello appena letto. Se la prima risposta non ha né titolo né schede (e non è un 404), si aspetta un secondo e si riprova, poi gli altri domini Bunkr, la modalità avanzata e la WebView.
