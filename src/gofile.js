@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.32.0",
+        "version": "1.33.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1646,7 +1646,7 @@ class DefaultExtension extends MProvider {
         }
         var mode = this.searchMode(filters);
         if (!q) return this.homeSearch(mode, page || 1);
-        if (mode === "douga") return this.dougaHome(page || 1); // gofile-douga non cerca per parola: mostra le novità
+        if (mode.indexOf("douga") === 0) return this.dougaHome(mode, page || 1); // gofile-douga non cerca per parola: mostra novità/più visti
         if (mode === "erome") return this.eromeSearch(q, page || 1);
         if (mode === "findr") return this.findrSearch(q, page || 1);
         if (mode === "all" || mode === "both") return this.allSearch(q, page || 1);
@@ -1657,7 +1657,7 @@ class DefaultExtension extends MProvider {
     // video singoli (così le due voci non mostrano la stessa cosa).
     async homeSearch(mode, page) {
         page = page || 1;
-        if (mode === "douga") return this.dougaHome(page);
+        if (mode.indexOf("douga") === 0) return this.dougaHome(mode, page);
         if (mode === "erome") return this.eromeHome(page);
         if (mode === "findr") return this.findrHome(page);
         if (mode === "all" || mode === "both") return this.allHome(page);
@@ -2131,10 +2131,13 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
                     { type_name: "SelectOption", name: "findr (tutti i servizi)", value: "findr" },
                     { type_name: "SelectOption", name: "Tutti (Bunkr + Erome + findr)", value: "all" },
-                    { type_name: "SelectOption", name: "Gofile-douga (novità Gofile)", value: "douga" },
+                    { type_name: "SelectOption", name: "Gofile-douga: novità", value: "douga" },
+                    { type_name: "SelectOption", name: "Gofile-douga: più visti (12h)", value: "douga-12h" },
+                    { type_name: "SelectOption", name: "Gofile-douga: più visti (24h)", value: "douga-24h" },
+                    { type_name: "SelectOption", name: "Gofile-douga: più visti (3 giorni)", value: "douga-3d" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia le novità Gofile (non cerca per parola). Un link incollato si apre subito." },
+            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (novità o più visti; non cerca per parola). Un link incollato si apre subito." },
         ];
     }
 
@@ -2147,7 +2150,8 @@ class DefaultExtension extends MProvider {
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
                     if (v && v.value === "both") return "all";
-                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "all" || v.value === "findr" || v.value === "douga")) return v.value;
+                    if (v && v.value && v.value.indexOf("douga") === 0) return v.value;
+                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "all" || v.value === "findr")) return v.value;
                 }
             }
         } catch (e) {}
@@ -2278,11 +2282,17 @@ class DefaultExtension extends MProvider {
     // gofile-douga.com: classifica/novità di video Gofile presi da X (Twitter).
     // Ogni voce è già un codice Gofile, quindi si apre con il flusso Gofile normale.
     // Il sito non ha ricerca per parola: si sfoglia e basta (paginazione per offset).
-    async dougaHome(page) {
+    // mode: «douga» = novità (/api/new); «douga-12h/24h/3d» = più visti (/api/rankings).
+    async dougaHome(mode, page) {
         page = page || 1;
+        var ep = "new";
+        if (mode === "douga-12h") ep = "rankings?tab=12h";
+        else if (mode === "douga-24h") ep = "rankings?tab=24h";
+        else if (mode === "douga-3d") ep = "rankings?tab=3d";
         var down = "gofile-douga non risponde: forse è bloccato dall'operatore";
         var limit = 25, offset = (page - 1) * limit, self = this, res;
-        try { res = await this.withTimeout(this.client.get("https://gofile-douga.com/api/new?offset=" + offset + "&limit=" + limit, { "User-Agent": UA, "Accept": "application/json" }), 20000); } catch (e) { throw new Error(down); }
+        var sep = ep.indexOf("?") >= 0 ? "&" : "?";
+        try { res = await this.withTimeout(this.client.get("https://gofile-douga.com/api/" + ep + sep + "offset=" + offset + "&limit=" + limit, { "User-Agent": UA, "Accept": "application/json" }), 20000); } catch (e) { throw new Error(down); }
         if (!res || res.statusCode !== 200) throw new Error(down);
         var data = null;
         try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
