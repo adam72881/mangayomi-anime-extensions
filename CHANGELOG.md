@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.35.0
+
+- **Gofile-douga più pulito nei filtri.** In «Cosa cerco» ora c'è una sola voce «Gofile-douga». L'ordine (novità / più visti 12h / 24h / 3 giorni) si sceglie da un filtro separato «Ordine Gofile-douga» qui sotto, invece di avere quattro voci tutte in fila.
+
 ## Gofile 1.34.0
 
 - **Cartelle Gofile «vuote» forzate ad aprirsi.** Alcune cartelle (soprattutto grandi, es. molti video da Gofile-douga) dicevano «Nessun file trovato» anche se i video c'erano: la pagina di Gofile non riusciva a disegnarle in tempo. Ora l'estensione chiede i file **direttamente all'API di Gofile** dentro la WebView (come fa il sito), così arrivano tutti in una volta, e usa il link di download diretto per la riproduzione. Se l'API non risponde, ricade sul metodo di prima: nel caso peggiore resta tutto com'era.
