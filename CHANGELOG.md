@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.26.2
+
+- **Popolari e Recenti di nuovo separati:** in «Popolari» solo i link salvati su questo telefono, in «Recenti» quelli della lista condivisa (il documento). «Togli i link» continua a vedere tutto (🌐 = lista condivisa), così puoi togliere anche quelli del documento. Popolari non aspetta più la rete: si apre subito.
+
 ## Gofile 1.26.1
 
 - **Popolari mostra anche la lista condivisa:** le schede sono i link del telefono più quelli del file (senza doppioni). Si aprono subito dalla copia salvata, come Recenti; il resto si aggiorna in sottofondo.
