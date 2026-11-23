@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.31.3
+
+- **Gli episodi ci sono alla prima apertura.** Bunkr mette già tutti i video nella prima pagina, con un indirizzo tipo `/f/Titolo---Nome.mp4`. Quel link veniva scartato (si accettavano solo lettere e cifre), quindi la scheda restava vuota e i video uscivano solo ricaricando. Ora si leggono da quella pagina. Se la prima risposta è la verifica e non un album, si riprova subito con il cookie, poi con la modalità avanzata e la WebView. Una lettura vuota che non è un 404 non viene salvata.
+- **Date e nomi.** La data è quella del file (prima era il 13 settembre 2020 su ogni riga). Il nome è «52 - titolo», corto e senza caratteri invisibili.
+
 ## Gofile 1.31.2
 
 - **Gli episodi ci sono alla prima apertura:** una lettura senza file non resta più in memoria, e i video già nella prima pagina dell'album si usano subito (le pagine dopo partono insieme). Prima la scheda tornava grigia e i video uscivano solo ricaricando. Ogni episodio ha nome, indirizzo, data in millisecondi, scanlator e miniatura, tutti stringhe.

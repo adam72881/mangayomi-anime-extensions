@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.2",
+        "version": "1.31.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1144,7 +1144,9 @@ class DefaultExtension extends MProvider {
             if (status === 200 && isBunkr) {
                 this.writeStore(STORE_BK_HOST, order[i]);
                 if (bad[order[i]]) { delete bad[order[i]]; this.writeStore(STORE_BK_BAD, JSON.stringify(bad)); }
-                return { html: html, host: order[i], status: 200 };
+                var finalUrl = res.request && res.request.url ? String(res.request.url) : "";
+                var finalHost = (finalUrl.match(/^https?:\/\/([^/]+)/i) || [])[1] || order[i];
+                return { html: html, host: finalHost, status: 200, headers: (res && res.headers) || {}, finalUrl: finalUrl };
             }
             if (status === 404 && isBunkr) return { html: html, host: order[i], status: 404 };
             bad[order[i]] = Date.now();
@@ -1154,17 +1156,39 @@ class DefaultExtension extends MProvider {
         return { html: "", host: host, status: 0, tried: tried };
     }
 
+    // «04:34:36 23/09/2022» (orario e data che Bunkr stampa sulla scheda) → millisecondi.
+    bunkrTime(text) {
+        var m = String(text || "").match(/(\d{2}):(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) return Date.UTC(+m[6], +m[5] - 1, +m[4], +m[1], +m[2], +m[3]);
+        var d = String(text || "").match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        return d ? Date.UTC(+d[3], +d[2] - 1, +d[1]) : 0;
+    }
+
+    // Cookie della risposta (nome=valore), da rimandare subito al secondo tentativo.
+    cookieFrom(headers) {
+        var raw = headers && (headers["set-cookie"] || headers["Set-Cookie"]) || "";
+        if (raw && typeof raw !== "string") raw = raw.join ? raw.join(",") : String(raw);
+        var parts = String(raw).split(/,(?=\s*[^;,\s]+=)/), bits = [];
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i].split(";")[0].trim();
+            if (p.indexOf("=") > 0) bits.push(p);
+        }
+        return bits.join("; ");
+    }
+
     // Estrae i file video da una pagina album Bunkr (nome, miniatura, slug /f/),
-    // saltando i doppioni tra pagine diverse.
+    // saltando i doppioni tra pagine diverse. Lo slug oggi è il nome del file
+    // («Titolo---Nome-AbCd.mp4»), non più solo lettere e cifre.
     collectBunkrFiles(html, host, files, seen) {
         var parts = String(html).split(/class="relative group\/item theItem"/).slice(1);
         for (var i = 0; i < parts.length; i++) {
             var p = parts[i];
-            var slug = (p.match(/href="\/f\/([A-Za-z0-9]+)"/) || [])[1];
+            var slug = (p.match(/href="\/f\/([^"?#]+)"/) || [])[1];
             var name = this.decodeHtml((p.match(/class="truncate theName[^"]*">([^<]+)</) || [])[1] || (p.match(/title="([^"]+)"/) || [])[1] || "");
             if (!slug || seen[slug] || !VIDEO_EXT.test(name)) continue;
             seen[slug] = 1;
-            files.push({ n: name, img: this.absHttp((p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || ""), bf: slug, bh: host });
+            var when = this.bunkrTime((p.match(/theDate">([^<]+)</) || [])[1] || "");
+            files.push({ n: name, img: this.absHttp((p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || ""), bf: slug, bh: host, t: when });
         }
     }
 
@@ -1208,6 +1232,25 @@ class DefaultExtension extends MProvider {
             // solo al refresh (entro 2 minuti la scheda si rilegge).
             var seen = {}, self = this;
             this.collectBunkrFiles(html, page.host, files, seen);
+            // La prima pagina a volte è solo la verifica (niente schede) e il cookie
+            // arriva con quella risposta. Si riprova subito, nello stesso giro, con
+            // quel cookie e l'indirizzo dopo il rimbalzo: i file sono già nell'HTML
+            // vero, senza aspettare la modalità avanzata né la WebView.
+            if (!files.length && page.status !== 404) {
+                var headers = { "User-Agent": UA, "Referer": "https://" + page.host + "/" };
+                var cookie = this.cookieFrom(page.headers);
+                if (cookie) headers.Cookie = cookie;
+                var again = null;
+                try { again = await this.client.get("https://" + page.host + reqPath, headers); } catch (e) {}
+                var html2 = String((again && again.body) || "");
+                if (again && again.statusCode === 200 && /theItem/.test(html2)) {
+                    var hop = again.request && again.request.url ? String(again.request.url) : "";
+                    var hopHost = (hop.match(/^https?:\/\/([^/]+)/i) || [])[1] || page.host;
+                    page.host = hopHost;
+                    html = html2;
+                    this.collectBunkrFiles(html, page.host, files, seen);
+                }
+            }
             var expMax = 1, pmx = html.match(/[?&]page=(\d+)/g) || [];
             for (var xi = 0; xi < pmx.length; xi++) { var xn = parseInt(pmx[xi].replace(/\D/g, ""), 10) || 1; if (xn > expMax) expMax = xn; }
             var maxPg = Math.min(expMax > 1 ? expMax : 1, 20);
@@ -1262,7 +1305,8 @@ class DefaultExtension extends MProvider {
         while ((m = re.exec(html))) {
             if (m[3].indexOf("video/") !== 0 || seen[m[2]]) continue;
             seen[m[2]] = 1;
-            out.push({ n: this.decodeHtml(m[1].replace(/\\(.)/g, "$1")), img: m[4].replace(/\\\//g, "/"), bf: m[2], bh: host });
+            var when = this.bunkrTime((m[0].match(/timestamp:\s*"([^"]*)"/) || [])[1] || "");
+            out.push({ n: this.decodeHtml(m[1].replace(/\\(.)/g, "$1")), img: m[4].replace(/\\\//g, "/"), bf: m[2], bh: host, t: when });
         }
         return out;
     }
@@ -1537,19 +1581,34 @@ class DefaultExtension extends MProvider {
     }
 
     episodeName(name) {
-        return String(name || "").replace(/\.[A-Za-z0-9]{2,4}$/, "").replace(/\s+/g, " ").trim().slice(0, 60) || "Video";
+        var n = String(name || "")
+            .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "")
+            .replace(/\.[A-Za-z0-9]{2,4}$/, "")
+            .replace(/\s+/g, " ")
+            .replace(/^[\s.:;\-–—|>]+/, "")
+            .trim();
+        if (n.length > 42) n = n.slice(0, 39) + "...";
+        return n || "Video";
     }
 
-    // Ogni campo è una stringa. dateUpload sono millisecondi in cifre (non «1e20»):
-    // su iPhone un valore non numerico lascia la lista episodi grigia.
+    // «52 - titolo»: corto, senza «Episodio» davanti (su iPhone il nome lungo
+    // viene tagliato a sinistra e si legge «sodio 52»). Niente caratteri invisibili.
+    episodeLabel(num, name) {
+        return String(num) + " - " + this.episodeName(name);
+    }
+
+    // Ogni campo è una stringa. dateUpload sono millisecondi in cifre.
+    // Senza una data vera si usa adesso: 1600000000000 è il 13 settembre 2020
+    // e finiva su tutte le righe, anche quelle di salvataggio.
     chapterFields(name, url, thumb, ms) {
-        var n = String(name || "Video").replace(/\s+/g, " ").trim();
-        if (n.length > 80) n = n.slice(0, 77) + "...";
+        var n = String(name || "Video").replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, "").replace(/\s+/g, " ").trim();
+        if (n.length > 56) n = n.slice(0, 53) + "...";
         var img = this.absHttp(thumb);
+        var when = ms > 0 ? ms : Date.now();
         return {
             name: n || "Video",
             url: String(url || ""),
-            dateUpload: String(ms > 0 ? ms : 1600000000000),
+            dateUpload: String(when),
             scanlator: "",
             thumbnailUrl: img || "",
         };
@@ -1561,7 +1620,9 @@ class DefaultExtension extends MProvider {
     async getDetail(url) {
         var raw = String(url);
         this.savedLinks(); // aggiorna le copie interne (URL della lista) prima di leggerla
-        try { await this.refreshRemote(); } catch (e) {}
+        // La lista condivisa non serve a disegnare gli episodi: si aggiorna dopo,
+        // così la prima apertura non aspetta GitHub prima di leggere l'album.
+        try { Promise.resolve(this.refreshRemote()).catch(function () {}); } catch (e) {}
         var g = null, codes;
         var gm = raw.match(/\/g\/([^?#]+)/);
         if (gm) {
@@ -1575,7 +1636,7 @@ class DefaultExtension extends MProvider {
             var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
             var flm = raw.match(/\/fl\/(fl~[A-Za-z0-9]+)/i);
             var pdm = raw.match(/\/pd\/(pd~[^?#\/]+)/i);
-            var code = erm ? erm[1] : tbm ? tbm[1] : pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var code = erm ? erm[1] : tbm ? tbm[1] : pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.linkCode(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
@@ -1621,10 +1682,10 @@ class DefaultExtension extends MProvider {
             for (var j = 0; j < f.files.length; j++) {
                 var v = f.files[j];
                 videos++;
-                var epName = "Episodio " + (chapters.length + 1) + " - " + (v.er ? v.n : this.episodeName(v.n));
+                var epName = this.episodeLabel(chapters.length + 1, v.n);
                 var epUrl = "";
                 if (v.em) epUrl = "embed:" + v.em;
-                else if (v.bf) epUrl = "bunkr:https://" + v.bh + "/f/" + v.bf;
+                else if (v.bf) epUrl = "bunkr:https://" + v.bh + "/f/" + encodeURIComponent(v.bf);
                 else if (v.fl) epUrl = "filester:" + v.fl;
                 else if (v.pd) epUrl = "pixeldrain:" + v.pd;
                 else if (v.er) epUrl = "erome:" + codes[i] + ":" + j;
@@ -1636,17 +1697,16 @@ class DefaultExtension extends MProvider {
                 }
                 if (!epUrl || seenUrl[epUrl]) continue;
                 seenUrl[epUrl] = 1;
-                chapters.push(this.chapterFields(epName, epUrl, v.img, 1600000000000 + chapters.length * 1000));
+                var when = v.t > 0 ? v.t : Date.now() - chapters.length * 1000;
+                chapters.push(this.chapterFields(epName, epUrl, v.img, when));
             }
         }
         chapters.reverse();
-        for (var di = 0; di < chapters.length; di++) {
-            chapters[di].dateUpload = String(1600000000000 + (chapters.length - di) * 1000);
-        }
         if (codes.length === 1 && this.searchSaveKind(codes[0])) {
             var saves = this.saveRows(codes[0]);
-            saves[0].dateUpload = String(1600000000000 + (chapters.length + 2) * 1000);
-            saves[1].dateUpload = String(1600000000000 + (chapters.length + 1) * 1000);
+            var top = Date.now();
+            saves[0].dateUpload = String(top + 2000);
+            saves[1].dateUpload = String(top + 1000);
             chapters = saves.concat(chapters);
         }
 
@@ -1820,7 +1880,7 @@ class DefaultExtension extends MProvider {
         var row = function (name, kind, have, ms) {
             return self.chapterFields(name, "save:" + kind + ":" + code + (have ? ":have" : ""), "", ms);
         };
-        var now = 1700000000000;
+        var now = Date.now();
         return [
             row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, now + 2000),
             row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, now + 1000),
