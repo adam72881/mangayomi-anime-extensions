@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.27.3",
+        "version": "1.27.4",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1146,7 +1146,7 @@ class DefaultExtension extends MProvider {
             var name = this.decodeHtml((p.match(/class="truncate theName[^"]*">([^<]+)</) || [])[1] || (p.match(/title="([^"]+)"/) || [])[1] || "");
             if (!slug || seen[slug] || !VIDEO_EXT.test(name)) continue;
             seen[slug] = 1;
-            files.push({ n: name, img: (p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || "", bf: slug, bh: host });
+            files.push({ n: name, img: this.absHttp((p.match(/class="grid-images_box-img"[^>]*?src="([^"]+)"/) || p.match(/src="([^"]+)"[^>]*class="grid-images_box-img"/) || [])[1] || ""), bf: slug, bh: host });
         }
     }
 
@@ -1207,7 +1207,7 @@ class DefaultExtension extends MProvider {
                 }
             }
         } else {
-            var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
+            var og = this.absHttp((html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "");
             if (VIDEO_EXT.test(title)) {
                 files.push({ n: title, img: og, bf: b.id, bh: page.host });
                 title = this.episodeName(title);
@@ -1265,7 +1265,7 @@ class DefaultExtension extends MProvider {
         var raw = this.decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").replace(/\s*\|\s*filester\.me\s*$/i, "");
         var notFound = status === 404 || (!raw && !/videoPlayer/.test(html));
         var title = notFound ? this.shortLink(code) + " (non trovata)" : (this.episodeName(raw) || slug);
-        var img = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "";
+        var img = this.absHttp((html.match(/property="og:image" content="([^"]+)"/) || [])[1] || "");
         var fm = this.filesMap();
         fm[code] = { title: title, files: notFound ? [] : [{ n: raw || "video.mp4", img: img, fl: slug }], folders: 0, at: Date.now(), v: READ_V };
         this.writeStore(STORE_FILES, JSON.stringify(fm));
@@ -1471,6 +1471,7 @@ class DefaultExtension extends MProvider {
         if (!q) return { list: [], hasNextPage: false };
         var mode = this.searchMode(filters);
         if (mode === "erome") return this.eromeSearch(q, page || 1);
+        if (mode === "both") return this.bothSearch(q, page || 1);
         return this.bunkrSearch(q, page || 1, mode === "video" ? "video" : "album");
     }
 
@@ -1717,9 +1718,10 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
                     { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
                     { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
+                    { type_name: "SelectOption", name: "Bunkr + Erome (album)", value: "both" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "La ricerca parte su Bunkr. «Album su Erome» cerca solo lì, se lo scegli. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
+            { type_name: "HeaderFilter", name: "La ricerca parte sugli album Bunkr. «Album su Erome» cerca solo lì. «Bunkr + Erome (album)» alterna i due. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
         ];
     }
 
@@ -1731,7 +1733,7 @@ class DefaultExtension extends MProvider {
                 var f = filters[i];
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
-                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album")) return v.value;
+                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "both")) return v.value;
                 }
             }
         } catch (e) {}
@@ -1761,7 +1763,7 @@ class DefaultExtension extends MProvider {
         data.results.forEach(function (r) {
             var isVideo = r.ext === "Video" || /^video\//.test(String(r.mime || ""));
             if (!isVideo) return;
-            var code, name, thumb = /^http/.test(r.thumbnail || "") ? r.thumbnail : "";
+            var code, name, thumb = self.absHttp(r.thumbnail);
             if (kind === "video") {
                 if (!r.slug) return;
                 code = "bk~f~" + r.slug;
@@ -1824,7 +1826,7 @@ class DefaultExtension extends MProvider {
             var videos = parseInt(((b.match(/class="album-videos"[^>]*>[\s\S]*?<\/span>/i) || [""])[0].replace(/<[^>]+>/g, " ").match(/\d+/) || [])[0], 10) || 0;
             if (videos < 1) return;
             var thumb = (b.match(/class="album-thumbnail[^"]*"[^>]*src="([^"]+)"/i) || b.match(/src="([^"]+)"[^>]*class="album-thumbnail/i) || [])[1] || "";
-            if (!/^http/.test(thumb)) thumb = "";
+            thumb = self.absHttp(thumb);
             var code = "er~" + id;
             if (!info[code] || info[code].name !== title || (thumb && info[code].image !== thumb)) {
                 info[code] = { name: title, image: thumb };
@@ -1834,6 +1836,31 @@ class DefaultExtension extends MProvider {
         });
         if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
         return { list: list, hasNextPage: /rel=["']next["']/i.test(html) };
+    }
+
+    // Indirizzo immagine sempre assoluto. //cdn/… diventa https://cdn/…
+    absHttp(u) {
+        var s = String(u || "").trim();
+        if (/^https?:\/\//i.test(s)) return s;
+        if (s.indexOf("//") === 0) return "https:" + s;
+        return "";
+    }
+
+    // Album Bunkr ed Erome insieme: partono in parallelo, poi si alternano.
+    // Se uno dei due non risponde restano i risultati dell'altro.
+    async bothSearch(q, page) {
+        var bunkrP = this.bunkrSearch(q, page, "album").then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; });
+        var eromeP = this.eromeSearch(q, page).then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; });
+        var bunkr = await bunkrP, erome = await eromeP;
+        if (!bunkr.ok && !erome.ok) throw new Error("Bunkr e Erome non rispondono: forse sono bloccati dall'operatore");
+        var a = bunkr.ok ? bunkr.r.list : [], b = erome.ok ? erome.r.list : [];
+        var list = [], seen = {}, i = 0;
+        while (i < a.length || i < b.length) {
+            if (i < a.length && a[i] && !seen[a[i].link]) { seen[a[i].link] = 1; list.push(a[i]); }
+            if (i < b.length && b[i] && !seen[b[i].link]) { seen[b[i].link] = 1; list.push(b[i]); }
+            i++;
+        }
+        return { list: list, hasNextPage: !!((bunkr.ok && bunkr.r.hasNextPage) || (erome.ok && erome.r.hasNextPage)) };
     }
 
     // Pagina album Erome. Gli indirizzi dei video cambiano: si rilegge a ogni apertura.
@@ -1857,7 +1884,7 @@ class DefaultExtension extends MProvider {
             var poster = (g.match(/poster=["']([^"']+)["']/i) || [])[1] || "";
             var resN = (g.match(/\bres=["'](\d+)["']/i) || [])[1];
             var label = (g.match(/\blabel=["']([^"']+)["']/i) || [])[1] || "";
-            files.push({ n: "Video " + n, img: /^http/.test(poster) ? poster : "", er: src, q: resN ? resN + "p" : (label || "720p") });
+            files.push({ n: "Video " + n, img: this.absHttp(poster), er: src, q: resN ? resN + "p" : (label || "720p") });
         }
         var fm = this.filesMap();
         fm[code] = { title: title || id, files: files, folders: 0, at: Date.now(), v: READ_V };

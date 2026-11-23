@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.27.4
+
+- **Bunkr ed Erome insieme:** nel filtro «Cosa cerco» c'è «Bunkr + Erome (album)». Cerca gli album sui due siti in parallelo e alterna i risultati, senza doppioni. Se uno non risponde restano i risultati dell'altro; l'errore compare solo se non risponde nessuno. All'inizio il filtro resta «Album su Bunkr».
+- **Le miniature sono indirizzi interi:** copertine di ricerca, scheda ed episodi (Bunkr e Erome) usano un indirizzo http completo. Rispondono come immagine anche senza un riferimento alla pagina, quindi non serve un'intestazione diversa per ogni sito.
+
 ## Gofile 1.27.3
 
 - **Ricerca album su Erome, solo se la scegli:** nel filtro «Cosa cerco» c'è «Album su Erome», oltre a Bunkr. All'inizio resta «Album su Bunkr». I risultati sono album con almeno un video, da aprire come schede.
