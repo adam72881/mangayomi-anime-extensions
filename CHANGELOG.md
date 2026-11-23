@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.38.1
+
+- **Le cartelle Gofile vive si aprono.** Lo script nella WebView usava async/await e su iPhone moriva senza rispondere: la scheda diceva «vuota» e la Diagnosi restava su «attesa 1s · ripeti», senza `gf-api` né `gf-dom`. Ora lo script è solo con Promise e chiama sempre la risposta. Se l'API non arriva in 15 secondi si leggono le righe della pagina. Ogni richiesta ha un tetto di 9 secondi. Una cartella che non esiste o è scaduta lo dice, non risulta vuota.
+
 ## Gofile 1.38.0
 
 - **Lettura cartelle Gofile più robusta.** La lettura via API ora: crea un suo token se quello del sito non è ancora pronto (prima a volte partiva troppo presto e falliva), aspetta che il generatore del token del sito sia caricato, manda la lingua giusta e riprova se il sito risponde «troppe richieste». Inoltre distingue i casi: cartella **inesistente/scaduta** → «non esiste più» (chiaro), protetta da **password** → messaggio apposito, invece del generico «vuota».
