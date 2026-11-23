@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.36.0
+
+- **Nuovo filtro «Bunkr: ultimi (novità)».** In «Cosa cerco» c'è una voce che mostra gli **ultimi album Bunkr veri** (in ordine di data, da freebunkr.com), così hai sempre roba nuova e diversa — non più solo i soliti album più grossi. Nota: questa lista non distingue video da foto, quindi ogni tanto può capitare un album di sole foto (aprendolo risulta senza video). Le altre voci Bunkr restano solo-video.
+
 ## Gofile 1.35.0
 
 - **Gofile-douga più pulito nei filtri.** In «Cosa cerco» ora c'è una sola voce «Gofile-douga». L'ordine (novità / più visti 12h / 24h / 3 giorni) si sceglie da un filtro separato «Ordine Gofile-douga» qui sotto, invece di avere quattro voci tutte in fila.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.35.0",
+        "version": "1.36.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1723,6 +1723,7 @@ class DefaultExtension extends MProvider {
         // gofile-douga non cerca per parola: mostra sempre novità/più visti (l'ordine
         // è nel filtro «Ordine Gofile-douga»), con o senza testo.
         if (mode === "douga") return this.dougaHome(this.dougaOrder(filters), page || 1);
+        if (mode === "bunkr-new") return this.freebunkrLatest(page || 1); // ultimi album Bunkr veri (anche foto)
         if (!q) return this.homeSearch(mode, page || 1);
         if (mode === "erome") return this.eromeSearch(q, page || 1);
         if (mode === "findr") return this.findrSearch(q, page || 1);
@@ -1735,6 +1736,7 @@ class DefaultExtension extends MProvider {
     async homeSearch(mode, page) {
         page = page || 1;
         if (mode === "douga") return this.dougaHome("new", page);
+        if (mode === "bunkr-new") return this.freebunkrLatest(page);
         if (mode === "erome") return this.eromeHome(page);
         if (mode === "findr") return this.findrHome(page);
         if (mode === "all" || mode === "both") return this.allHome(page);
@@ -2213,6 +2215,7 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
                     { type_name: "SelectOption", name: "findr (tutti i servizi)", value: "findr" },
                     { type_name: "SelectOption", name: "Tutti (Bunkr + Erome + findr)", value: "all" },
+                    { type_name: "SelectOption", name: "Bunkr: ultimi (novità)", value: "bunkr-new" },
                     { type_name: "SelectOption", name: "Gofile-douga", value: "douga" },
                 ],
             },
@@ -2249,7 +2252,7 @@ class DefaultExtension extends MProvider {
     searchMode(filters) {
         var v = this.selectValue(filters, "Cosa cerco");
         if (v === "both") return "all";
-        if (v === "video" || v === "erome" || v === "album" || v === "all" || v === "findr" || v === "douga") return v;
+        if (v === "video" || v === "erome" || v === "album" || v === "all" || v === "findr" || v === "douga" || v === "bunkr-new") return v;
         return "album";
     }
 
@@ -2414,6 +2417,38 @@ class DefaultExtension extends MProvider {
         });
         if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
         return { list: list, hasNextPage: !!(data && data.hasMore) };
+    }
+
+    // Ultimi album Bunkr (novità vere), da freebunkr.com/api/index. A differenza
+    // dell'indice che usiamo per la ricerca (ordinato per numero di file, quindi
+    // sempre gli stessi grossi album), questo è in ordine di data. Non distingue
+    // video da foto: un album di sole foto, aprendolo, risulta senza video.
+    async freebunkrLatest(page) {
+        page = page || 1;
+        var down = "freebunkr non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.withTimeout(this.client.get("https://freebunkr.com/api/index?page=" + page, { "User-Agent": UA, "Accept": "application/json" }), 20000); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var data = null;
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        var items = (data && data.items) || [];
+        var self = this, info = this.infoMap(), dirty = false, list = [];
+        items.forEach(function (it) {
+            var slug = String((it && it.id) || "").trim();
+            if (!/^[A-Za-z0-9]+$/.test(slug)) return;
+            var name = String((it && it.title) || "").trim() || slug;
+            if (self.blockedTitle(name)) return;
+            var code = "bk~a~" + slug;
+            var thumb = self.absHttp((it && it.thumb) || "");
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        var totalPages = (data && data.totalPages) || page;
+        return { list: list, hasNextPage: page < totalPages && items.length > 0 };
     }
 
     // Indirizzo immagine sempre assoluto. //cdn/… diventa https://cdn/…
