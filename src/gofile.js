@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.38.1",
+        "version": "1.38.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.38.1";
+const VERSION = "1.38.2";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -119,7 +119,9 @@ function gofileReadScript(code) {
     return `(function () {
     var done = false, domStarted = false;
     var CODE = ${JSON.stringify(code)};
-    function send(o) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(o)); } catch (e) {} }
+    var marks = ['start'];
+    function mark(s) { if (marks.length < 14 && marks[marks.length - 1] !== s) marks.push(s); }
+    function send(o) { if (done) return; done = true; o = o || {}; if (!o.t) o.t = marks.join(','); try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(o)); } catch (e) {} }
     function later(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function fetchJson(url, opts, ms) {
         return new Promise(function (resolve, reject) {
@@ -158,30 +160,23 @@ function gofileReadScript(code) {
     }
     function makeToken(left) {
         var token = tokenNow();
-        if (token) return Promise.resolve(token);
+        if (token) { mark('token'); return Promise.resolve(token); }
         if (left <= 0) {
+            mark('new-token');
             return fetchJson('https://api.gofile.io/accounts', { method: 'POST' }, 9000).then(function (r) {
-                return (r.json && r.json.data && r.json.data.token) || '';
-            }, function () { return ''; });
+                var tok = (r.json && r.json.data && r.json.data.token) || '';
+                mark(tok ? 'token' : 'no-token');
+                return tok;
+            }, function () { mark('no-token'); return ''; });
         }
         return later(300).then(function () { return makeToken(left - 1); });
     }
     function getWT(token, left) {
         var gen = globalThis.generateWT;
         if (typeof gen === 'function') {
-            try { return Promise.resolve(gen(token)); } catch (e) { return Promise.reject(e); }
+            try { mark('wt'); return Promise.resolve(gen(token)); } catch (e) { return Promise.reject(e); }
         }
-        if (left <= 0) {
-            return new Promise(function (resolve, reject) {
-                try {
-                    import('/js/core/wt.js').then(function (mm) {
-                        if (mm && typeof mm.generateWT === 'function') resolve(mm.generateWT(token));
-                        else if (typeof globalThis.generateWT === 'function') resolve(globalThis.generateWT(token));
-                        else reject(new Error('no wt'));
-                    }, function () { reject(new Error('no wt')); });
-                } catch (e2) { reject(new Error('no wt')); }
-            });
-        }
+        if (left <= 0) { mark('no-wt'); return Promise.reject(new Error('no wt')); }
         return later(200).then(function () { return getWT(token, left - 1); });
     }
     function pack(all, state, token) {
@@ -195,6 +190,7 @@ function gofileReadScript(code) {
         else if (state.gate === 'closed') text = 'closed';
         else if (state.gate === 'expired') text = 'expired';
         else if (state.notFound) text = 'not found';
+        mark(text ? ('gate-' + text.replace(' ', '-')) : 'api-ok');
         return { title: state.title || document.title, cookie: document.cookie, token: token, text: text, rows: rows, via: 'api' };
     }
     function loadPages(token, wt, page, all, state) {
@@ -203,6 +199,7 @@ function gofileReadScript(code) {
         var url = 'https://api.gofile.io/contents/' + encodeURIComponent(CODE) + '?' + q;
         var headers = { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': (navigator.language || '') };
         function attempt(n) {
+            if (page === 1 && n === 0) mark('fetch1');
             return fetchJson(url, { headers: headers }, 9000).then(function (r) {
                 var j = r.json || {};
                 var st = String(j.status || '');
@@ -246,6 +243,7 @@ function gofileReadScript(code) {
     function viaDom() {
         if (domStarted || done) return;
         domStarted = true;
+        mark('dom-start');
         var last = -1, same = 0, ticks = 0;
         var timer = setInterval(function () {
             ticks++;
@@ -1317,7 +1315,17 @@ class DefaultExtension extends MProvider {
         if (this.isPixeldrain(code)) return this.readPixeldrain(code);
         if (this.isEmbed(code)) return this.readEmbed(code);
         var data;
-        try { data = await this.readFolder(code); } catch (e) { return null; }
+        try { data = await this.readFolder(code); } catch (e) {
+            this.step("gf-catch:" + String((e && e.message) || e || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40));
+            data = null;
+        }
+        if (!data) {
+            try { data = await this.readWebFolder(code, listScript(), "old"); } catch (e2) {
+                this.step("gf-catch:" + String((e2 && e2.message) || e2 || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40));
+                return null;
+            }
+        }
+        if (!data) return null;
         var rows = data.rows || [];
         var notFound = !rows.length && /not found/i.test(String(data.text || ""));
         if (!rows.length && !notFound) return data;
@@ -1859,14 +1867,43 @@ class DefaultExtension extends MProvider {
     }
 
     async readFolder(code) {
+        return this.readWebFolder(code, gofileReadScript(code), "new");
+    }
+
+    // kind: "new" (script API+DOM) oppure "old" (listScript di prima della 1.34).
+    // Scrive sempre uno step, anche se la WebView non risponde.
+    async readWebFolder(code, script, kind) {
+        var t0 = Date.now();
+        var sec = function () { return String(Math.round((Date.now() - t0) / 100) / 10); };
+        var brief = function (e) { return String((e && e.message) || e || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40); };
+        var old = kind === "old";
         if (typeof evaluateJavascriptViaWebview !== "function") {
+            this.step("gf-err:no-webview:0s");
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
-        var raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [gofileReadScript(code)], 55);
+        var raw;
+        try { raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [script], old ? 40 : 55); }
+        catch (e) {
+            this.step((old ? "gf-old-err:" : "gf-err:") + brief(e) + ":" + sec() + "s");
+            throw e;
+        }
+        if (raw == null || raw === "") {
+            this.step((old ? "gf-old-null:" : "gf-null:") + sec() + "s");
+            return null;
+        }
         var data = null;
-        try { data = JSON.parse(raw || "null"); } catch (e) {}
-        if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
-        this.step("gf-" + (data.via || "?") + ":" + ((data.rows && data.rows.length) || 0));
+        if (typeof raw === "object") data = raw;
+        else { try { data = JSON.parse(String(raw)); } catch (e2) { data = null; } }
+        if (!data || typeof data !== "object") {
+            this.step((old ? "gf-old-nojson:" : "gf-nojson:") + String(raw).replace(/\s+/g, " ").slice(0, 40));
+            return null;
+        }
+        var n = (data.rows && data.rows.length) || 0;
+        if (old) this.step("gf-old:" + n);
+        else {
+            var trail = String(data.t || "").replace(/[^a-zA-Z0-9,._-]/g, "").slice(0, 80);
+            this.step("gf-" + (data.via || "?") + ":" + n + (trail ? "[" + trail + "]" : ""));
+        }
         var token = data.token || (String(data.cookie || "").match(/accountToken=([^;]+)/) || [])[1] || "";
         if (token) this.writeStore(STORE_TOKEN, token);
         return data;
