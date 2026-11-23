@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.32.0
+
+- **Nuova fonte: Gofile-douga.** Nei filtri «Cosa cerco» c'è «Gofile-douga (novità Gofile)»: sfoglia le novità di video Gofile raccolte da gofile-douga.com (classifica dei link Gofile di tendenza). Non cerca per parola — si scorre e basta — e ogni risultato si apre come un normale link Gofile. Resta attivo il filtro di sicurezza sui titoli.
+
 ## Gofile 1.31.5
 
 - **Togliere un link 🌐 non chiede un secondo OK.** La spunta in «Togli i link» e l'OK di quel riquadro mettono subito in coda la rimozione dalla lista condivisa. Resta il token, e resta «Annulla ultima rimozione».

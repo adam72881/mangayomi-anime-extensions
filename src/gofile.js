@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.5",
+        "version": "1.32.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1646,6 +1646,7 @@ class DefaultExtension extends MProvider {
         }
         var mode = this.searchMode(filters);
         if (!q) return this.homeSearch(mode, page || 1);
+        if (mode === "douga") return this.dougaHome(page || 1); // gofile-douga non cerca per parola: mostra le novità
         if (mode === "erome") return this.eromeSearch(q, page || 1);
         if (mode === "findr") return this.findrSearch(q, page || 1);
         if (mode === "all" || mode === "both") return this.allSearch(q, page || 1);
@@ -1656,6 +1657,7 @@ class DefaultExtension extends MProvider {
     // video singoli (così le due voci non mostrano la stessa cosa).
     async homeSearch(mode, page) {
         page = page || 1;
+        if (mode === "douga") return this.dougaHome(page);
         if (mode === "erome") return this.eromeHome(page);
         if (mode === "findr") return this.findrHome(page);
         if (mode === "all" || mode === "both") return this.allHome(page);
@@ -2129,9 +2131,10 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
                     { type_name: "SelectOption", name: "findr (tutti i servizi)", value: "findr" },
                     { type_name: "SelectOption", name: "Tutti (Bunkr + Erome + findr)", value: "all" },
+                    { type_name: "SelectOption", name: "Gofile-douga (novità Gofile)", value: "douga" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. Un link incollato si apre subito." },
+            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia le novità Gofile (non cerca per parola). Un link incollato si apre subito." },
         ];
     }
 
@@ -2144,7 +2147,7 @@ class DefaultExtension extends MProvider {
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
                     if (v && v.value === "both") return "all";
-                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "all" || v.value === "findr")) return v.value;
+                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "all" || v.value === "findr" || v.value === "douga")) return v.value;
                 }
             }
         } catch (e) {}
@@ -2270,6 +2273,36 @@ class DefaultExtension extends MProvider {
         if (!html) throw new Error(down);
         var parsed = this.eromeCards(html);
         return { list: parsed.list, hasNextPage: parsed.raw >= 36 };
+    }
+
+    // gofile-douga.com: classifica/novità di video Gofile presi da X (Twitter).
+    // Ogni voce è già un codice Gofile, quindi si apre con il flusso Gofile normale.
+    // Il sito non ha ricerca per parola: si sfoglia e basta (paginazione per offset).
+    async dougaHome(page) {
+        page = page || 1;
+        var down = "gofile-douga non risponde: forse è bloccato dall'operatore";
+        var limit = 25, offset = (page - 1) * limit, self = this, res;
+        try { res = await this.withTimeout(this.client.get("https://gofile-douga.com/api/new?offset=" + offset + "&limit=" + limit, { "User-Agent": UA, "Accept": "application/json" }), 20000); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var data = null;
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        var items = (data && data.items) || [];
+        var info = this.infoMap(), dirty = false, list = [];
+        items.forEach(function (it) {
+            var code = String((it && it.gofileCode) || "").trim();
+            if (!/^[A-Za-z0-9]{4,}$/.test(code)) return;
+            var title = String((it && it.contentTitle) || "").trim();
+            if (self.blockedTitle(title)) return;
+            var name = (title && title !== code) ? title : self.shortLink(code);
+            var thumb = self.absHttp((it && it.representativeThumbnailUrl) || "");
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        return { list: list, hasNextPage: !!(data && data.hasMore) };
     }
 
     // Indirizzo immagine sempre assoluto. //cdn/… diventa https://cdn/…
