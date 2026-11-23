@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.33.0
+
+- **Gofile-douga con ordinamenti.** Nel filtro «Cosa cerco» ora ci sono quattro voci Gofile-douga: «novità», «più visti (12h)», «più visti (24h)» e «più visti (3 giorni)». Così hai molti più video diversi da guardare, non solo gli ultimi. (Nota: Bunkr, Erome e findr offrono solo «recenti» — i loro indici pubblici non supportano altri ordinamenti.)
+
 ## Gofile 1.32.0
 
 - **Nuova fonte: Gofile-douga.** Nei filtri «Cosa cerco» c'è «Gofile-douga (novità Gofile)»: sfoglia le novità di video Gofile raccolte da gofile-douga.com (classifica dei link Gofile di tendenza). Non cerca per parola — si scorre e basta — e ogni risultato si apre come un normale link Gofile. Resta attivo il filtro di sicurezza sui titoli.
