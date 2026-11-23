@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.31.4
+
+- **La prima apertura ha i video, su ogni sito.** La lettura poteva riuscire e l'archivio non mostrarla ancora: la scheda usciva con l'indirizzo nudo e «Nessun file trovato», e i file comparivano solo ricaricando. Ora la lista si disegna con quello appena letto. Se la prima risposta non ha né titolo né schede (e non è un 404), si aspetta un secondo e si riprova, poi gli altri domini Bunkr, la modalità avanzata e la WebView.
+- **Diagnosi.** Se i file non ci sono, in fondo alla scheda c'è una riga con versione, host, stato HTTP, lunghezza e titolo della pagina, senza cookie. La versione c'è su ogni scheda.
+- **Togliere dalla lista condivisa.** La scrittura su GitHub partiva dalle impostazioni, che su iPhone non aspettano la risposta, e il tentativo restava bloccato: il file non cambiava. Ora parte aprendo Popolari, Recenti o una scheda, riprova una volta se GitHub risponde 409, e se fallisce lo dice. Una riga «link | nome» si riconosce anche se il dominio Bunkr non è lo stesso.
+
 ## Gofile 1.31.3
 
 - **Gli episodi ci sono alla prima apertura.** Bunkr mette già tutti i video nella prima pagina, con un indirizzo tipo `/f/Titolo---Nome.mp4`. Quel link veniva scartato (si accettavano solo lettere e cifre), quindi la scheda restava vuota e i video uscivano solo ricaricando. Ora si leggono da quella pagina. Se la prima risposta è la verifica e non un album, si riprova subito con il cookie, poi con la modalità avanzata e la WebView. Una lettura vuota che non è un 404 non viene salvata.
