@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.38.2
+
+- **Si vede dove si ferma la lettura Gofile.** Se la WebView non risponde, la Diagnosi dice `gf-null`, `gf-err` o `gf-nojson` con i secondi, non solo «attesa 1s · ripeti». Se lo script parte, accanto al numero di file ci sono le tappe (`gf-api:2[start,token,wt,fetch1,api-ok]`). Tolto `import()`, che su iPhone può impedire allo script di partire. Se la lettura nuova non torna nulla, si riprova una volta col metodo di prima (`gf-old:N`).
+
 ## Gofile 1.38.1
 
 - **Le cartelle Gofile vive si aprono.** Lo script nella WebView usava async/await e su iPhone moriva senza rispondere: la scheda diceva «vuota» e la Diagnosi restava su «attesa 1s · ripeti», senza `gf-api` né `gf-dom`. Ora lo script è solo con Promise e chiama sempre la risposta. Se l'API non arriva in 15 secondi si leggono le righe della pagina. Ogni richiesta ha un tetto di 9 secondi. Una cartella che non esiste o è scaduta lo dice, non risulta vuota.
