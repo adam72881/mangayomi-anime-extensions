@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.38.2",
+        "version": "1.38.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.38.2";
+const VERSION = "1.38.3";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -1314,14 +1314,19 @@ class DefaultExtension extends MProvider {
         if (this.isFilester(code)) return this.readFilester(code);
         if (this.isPixeldrain(code)) return this.readPixeldrain(code);
         if (this.isEmbed(code)) return this.readEmbed(code);
-        var data;
+        var data = null, err = "";
         try { data = await this.readFolder(code); } catch (e) {
-            this.step("gf-catch:" + String((e && e.message) || e || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40));
+            err = String((e && e.message) || e || "errore").replace(/\s+/g, " ");
+            this.step("gf-catch:" + err.slice(0, 160));
             data = null;
+        }
+        if (!data && /SocketException|ClientException/i.test(err)) {
+            await this.probeGofileHttp(code);
+            return { rows: [], text: "gofile-bridge", waited: true };
         }
         if (!data) {
             try { data = await this.readWebFolder(code, listScript(), "old"); } catch (e2) {
-                this.step("gf-catch:" + String((e2 && e2.message) || e2 || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40));
+                this.step("gf-catch:" + String((e2 && e2.message) || e2 || "errore").replace(/\s+/g, " ").slice(0, 160));
                 return null;
             }
         }
@@ -1418,7 +1423,7 @@ class DefaultExtension extends MProvider {
     diagText() {
         var bits = (this._steps || []).concat(this._saw || []);
         var s = bits.join(" · ").replace(/cookie\s*[:=]\s*[^;\s]+/gi, "").replace(/\s+/g, " ").trim();
-        if (s.length > 420) s = s.slice(0, 417) + "...";
+        if (s.length > 900) s = s.slice(0, 897) + "...";
         return "Diagnosi " + VERSION + (s ? ": " + s : "");
     }
 
@@ -1875,16 +1880,17 @@ class DefaultExtension extends MProvider {
     async readWebFolder(code, script, kind) {
         var t0 = Date.now();
         var sec = function () { return String(Math.round((Date.now() - t0) / 100) / 10); };
-        var brief = function (e) { return String((e && e.message) || e || "errore").replace(/\s+/g, " ").replace(/:/g, " ").slice(0, 40); };
+        var brief = function (e) { return String((e && e.message) || e || "errore").replace(/\s+/g, " ").slice(0, 160); };
         var old = kind === "old";
+        var pageUrl = old ? ("https://gofile.io/d/" + code) : "https://gofile.io/";
         if (typeof evaluateJavascriptViaWebview !== "function") {
             this.step("gf-err:no-webview:0s");
             throw new Error("Gofile: serve Mangayomi 0.9.96 o successivo (WebView per le estensioni).");
         }
         var raw;
-        try { raw = await evaluateJavascriptViaWebview("https://gofile.io/d/" + code, {}, [script], old ? 40 : 55); }
+        try { raw = await evaluateJavascriptViaWebview(pageUrl, { "User-Agent": UA }, [script], old ? 40 : 55); }
         catch (e) {
-            this.step((old ? "gf-old-err:" : "gf-err:") + brief(e) + ":" + sec() + "s");
+            this.step((old ? "gf-old-err:" : "gf-err:") + brief(e) + " url=" + pageUrl + " :" + sec() + "s");
             throw e;
         }
         if (raw == null || raw === "") {
@@ -1907,6 +1913,20 @@ class DefaultExtension extends MProvider {
         var token = data.token || (String(data.cookie || "").match(/accountToken=([^;]+)/) || [])[1] || "";
         if (token) this.writeStore(STORE_TOKEN, token);
         return data;
+    }
+
+    // Se il ponte della WebView cade subito, controlla se almeno il client HTTP
+    // dell'app arriva a Gofile. Non elenca i file: senza il token del sito l'API risponde no.
+    async probeGofileHttp(code) {
+        var url = "https://gofile.io/d/" + code;
+        try {
+            var res = await this.client.get(url, { "User-Agent": UA });
+            var status = res ? (res.statusCode || 0) : 0;
+            var len = String((res && res.body) || "").length;
+            this.step("gf-http:" + status + ":" + len + "b url=" + url);
+        } catch (e) {
+            this.step("gf-http-err:" + String((e && e.message) || e || "errore").replace(/\s+/g, " ").slice(0, 160) + " url=" + url);
+        }
     }
 
     episodeName(name) {
@@ -2050,6 +2070,7 @@ class DefaultExtension extends MProvider {
             if (/pd-unreachable/.test(why)) return "pixeldrain non risponde dal tuo telefono (ha dato una pagina di blocco, non i dati del file). Spesso in Italia pixeldrain.com è bloccato dall'operatore: prova a cambiare rete (dati mobili al posto del Wi-Fi o viceversa), oppure apri il link nel browser per controllare. Se si sblocca, trascina in basso la scheda.";
             if (/turbo-unreachable/.test(why)) return "turbo.cr non risponde in questo momento: riprova tra qualche secondo (trascina in basso la scheda).";
             if (/unreachable/i.test(why)) return "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
+            if (/^gofile-bridge$/.test(why)) return "La WebView interna non si apre: Mangayomi non raggiunge il suo server locale prima di Gofile. Sotto c'è l'errore completo.";
             if (/^expired$/i.test(why)) return "Questa cartella è scaduta e non esiste più su Gofile.";
             if (/^closed$/i.test(why)) return "Questa cartella non è pubblica: non si può aprire da qui.";
             if (/password/i.test(why)) return "Una cartella è protetta da password: aprila nel browser.";

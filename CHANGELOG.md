@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.38.3
+
+- **La WebView di Gofile non parte: si vede perché.** L'errore `ClientException / SocketException` in 0 secondi è la richiesta di Mangayomi verso `localhost` (il ponte che apre la WebView), non un blocco di Gofile: il browser del telefono apre la stessa cartella. La Diagnosi ora riporta il messaggio intero e l'indirizzo usato. La pagina aperta è `https://gofile.io/` con User-Agent da Safari, e lo script chiede i file all'API da lì. Se il ponte cade subito, un controllo HTTP diretto dice se l'app arriva comunque a Gofile (`gf-http`).
+
 ## Gofile 1.38.2
 
 - **Si vede dove si ferma la lettura Gofile.** Se la WebView non risponde, la Diagnosi dice `gf-null`, `gf-err` o `gf-nojson` con i secondi, non solo «attesa 1s · ripeti». Se lo script parte, accanto al numero di file ci sono le tappe (`gf-api:2[start,token,wt,fetch1,api-ok]`). Tolto `import()`, che su iPhone può impedire allo script di partire. Se la lettura nuova non torna nulla, si riprova una volta col metodo di prima (`gf-old:N`).
