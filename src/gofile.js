@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.1",
+        "version": "1.31.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1623,10 +1623,9 @@ class DefaultExtension extends MProvider {
         // Dall'ultimo al primo, come le altre sorgenti: così Mangayomi trova il successivo.
         chapters.reverse();
         if (codes.length === 1 && this.searchSaveKind(codes[0])) {
-            // Date fuori scala (non sono un giorno): sulla TV l'ordine degli episodi
-            // si legge dal primo e dall'ultimo. Queste due righe restano in cima e
-            // «Riprendi» continua a puntare all'episodio vero.
-            if (chapters.length && !chapters[chapters.length - 1].dateUpload) chapters[chapters.length - 1].dateUpload = "1e20";
+            // Le due righe «Salva» vanno in cima. Niente data finta sull'episodio
+            // reale: l'ordine è per numero e una data non valida (vedi saveRows)
+            // mandava in errore il rendering della lista.
             chapters = this.saveRows(codes[0]).concat(chapters);
         }
 
@@ -1795,9 +1794,16 @@ class DefaultExtension extends MProvider {
         var row = function (name, kind, have, date) {
             return { name: name, url: "save:" + kind + ":" + code + (have ? ":have" : ""), dateUpload: date };
         };
+        // Niente data su queste righe di controllo: Mangayomi mostra la data con
+        // DateTime.fromMillisecondsSinceEpoch(int.parse(dateUpload)) e int.parse
+        // accetta solo cifre. Un valore tipo «3e20» lanciava un'eccezione: la riga
+        // diventava un riquadro grigio e, nella lista a scorrimento, rompeva il
+        // calcolo dell'altezza (scroll grigio infinito sotto gli episodi). Stringa
+        // vuota = nessuna data mostrata, nessun errore. L'ordine degli episodi è
+        // comunque per numero, quindi queste date non servivano all'ordinamento.
         return [
-            row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, "3e20"),
-            row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, "2e20"),
+            row(local ? "✓ Già sul telefono" : "💾 Salva sul telefono", "local", local, ""),
+            row(remote ? "✓ Già nella lista condivisa" : "🌐 Salva nella lista condivisa", "remote", remote, ""),
         ];
     }
 
@@ -2248,11 +2254,17 @@ class DefaultExtension extends MProvider {
     async readErome(code) {
         var id = String(code).slice(3);
         var down = "Erome non risponde: forse è bloccato dall'operatore";
-        var res;
-        try { res = await this.client.get("https://www.erome.com/a/" + id, { "User-Agent": UA, "Referer": "https://www.erome.com/" }); } catch (e) { throw new Error(down); }
-        if (!res || res.statusCode !== 200) throw new Error(down);
-        var html = String(res.body || "");
-        if (!html) throw new Error(down);
+        // Come turbo: ritento qualche volta nello stesso giro (con timeout), così
+        // un intoppo alla prima richiesta sul telefono non fa fallire l'apertura.
+        var res, html = "", ok = false;
+        for (var attempt = 0; attempt < 4 && !ok; attempt++) {
+            if (attempt) await this.sleep(700);
+            try { res = await this.withTimeout(this.client.get("https://www.erome.com/a/" + id, { "User-Agent": UA, "Referer": "https://www.erome.com/" }), 20000); } catch (e) { res = null; }
+            if (res && res.statusCode === 404) throw new Error(down);
+            html = String((res && res.body) || "");
+            ok = res && res.statusCode === 200 && /media-group|album-title/i.test(html);
+        }
+        if (!ok) throw new Error(down);
         var title = this.decodeHtml((html.match(/class="album-title-page"[^>]*>([^<]*)</i) || html.match(/<title>([^<]*)/i) || [])[1] || "");
         if (this.blockedTitle(title)) throw new Error("Contenuto non disponibile");
         var groups = html.split(/<div class="media-group"/).slice(1);

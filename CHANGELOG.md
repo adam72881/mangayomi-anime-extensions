@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.31.2
+
+- **Niente più «muro grigio» sotto gli episodi:** su qualsiasi album (Bunkr, turbo, erome…) sotto l'ultimo video appariva una grande zona grigia vuota in cui la pagina continuava a scorrere all'infinito. Le righe «Salva sul telefono / Salva nella lista condivisa» usavano una data finta che Mangayomi non riusciva a leggere: la riga andava in errore (riquadro grigio) e rompeva l'altezza della lista. Ora quelle righe non hanno data e il problema sparisce.
+- **Erome: i video si vedono:** sugli album erome piccoli lo stesso problema del grigio nascondeva proprio le poche righe dei video, facendo sembrare l'album vuoto. Risolto. In più erome ora ritenta da solo se la prima richiesta sul telefono va a vuoto (come turbo), così l'album si apre al primo colpo.
+
 ## Gofile 1.31.1
 
 - **turbo.cr si apre alla prima:** gli album turbo (da findr o incollati direttamente) a volte dicevano «Nessun file trovato» alla prima apertura e si vedevano solo ricaricando. Ora la lettura ritenta da sola qualche volta nello stesso giro, così l'album si apre subito senza dover trascinare in basso. Se proprio turbo.cr non risponde, lo dice chiaramente («riprova tra qualche secondo») invece di sembrare vuoto.
