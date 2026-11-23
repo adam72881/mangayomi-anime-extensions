@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.26.4
+
+- **Nelle liste delle impostazioni si vede il nome, non l'indirizzo:** in «Togli i link», «Aggiungi alla lista condivisa» e «Nome…», un link senza nome che gli hai dato ora mostra il titolo letto dal sito (es. «asuna_love») invece dell'indirizzo, così lo riconosci. Solo se non c'è nemmeno quello appare l'indirizzo.
+
 ## Gofile 1.26.3
 
 - **Il link caricato nel documento si toglie dal telefono:** quando aggiungi un link alla lista condivisa (e la scrittura va a buon fine), il link viene tolto dai salvati del telefono. Così si «sposta» da Popolari a Recenti, senza restare doppio. Se la scrittura fallisce, il link resta sul telefono.
