@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.27.3
+
+- **Ricerca album su Erome, solo se la scegli:** nel filtro «Cosa cerco» c'è «Album su Erome», oltre a Bunkr. All'inizio resta «Album su Bunkr». I risultati sono album con almeno un video, da aprire come schede.
+- **Titoli esclusi:** in ricerca e nell'album si scartano i titoli che indicano minori oppure riprese non consensuali (leak, telecamere nascoste, e simili). Se apri un album con un titolo di quel tipo, compare «Contenuto non disponibile».
+- **I video Erome partono dal telefono:** serve il riferimento alla pagina di Erome. Sulla TV, che non lo manda, compare «I video Erome non partono sulla TV: servono sul telefono». Un link erome.com/a/… incollato si può salvare.
+
 ## Gofile 1.27.2
 
 - **La ricerca guarda solo Bunkr:** una parola cerca sempre su bunkrsearch.link, anche se hai schede salvate con lo stesso nome. Il filtro parte su «Album su Bunkr». «Le mie schede» non è più nel filtro: i link salvati restano in Popolari e Recenti.

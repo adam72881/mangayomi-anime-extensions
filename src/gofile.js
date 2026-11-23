@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.27.2",
+        "version": "1.27.3",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -255,7 +255,16 @@ class DefaultExtension extends MProvider {
     }
 
     linkCode(text) {
-        return this.bunkrCode(text) || this.filesterCode(text) || this.pixeldrainCode(text) || this.embedCode(text) || this.codeOf(text);
+        return this.bunkrCode(text) || this.eromeCode(text) || this.filesterCode(text) || this.pixeldrainCode(text) || this.embedCode(text) || this.codeOf(text);
+    }
+
+    eromeCode(text) {
+        var m = String(text || "").match(/erome\.com\/a\/([A-Za-z0-9]+)/i);
+        return m ? "er~" + m[1] : "";
+    }
+
+    isErome(code) {
+        return /^er~[A-Za-z0-9]+$/i.test(String(code || ""));
     }
 
     isBunkr(code) {
@@ -271,6 +280,7 @@ class DefaultExtension extends MProvider {
         if (this.isEmbed(code)) return String(code).slice(3);
         if (this.isFilester(code)) return "https://filester.me/d/" + String(code).slice(3);
         if (this.isPixeldrain(code)) { var p = this.pdParts(code); return "https://pixeldrain.com/" + (p.kind === "l" ? "l" : "u") + "/" + p.id; }
+        if (this.isErome(code)) return "https://www.erome.com/a/" + String(code).slice(3);
         if (!this.isBunkr(code)) return "https://gofile.io/d/" + code;
         var b = this.bunkrParts(code);
         return "https://" + b.host + "/" + b.kind + "/" + b.id;
@@ -337,7 +347,7 @@ class DefaultExtension extends MProvider {
         var out = [];
         var line = String(text || "").trim();
         if (!line) return out;
-        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.[a-z]{2,}\/d\/[A-Za-z0-9]+|pixeldrain\.com\/[ul]\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
+        var links = line.match(/(?:https?:\/\/)?(?:www\.)?(?:gofile\.io\/d\/[A-Za-z0-9]+|bunkr+\.[a-z]{2,}\/[afvi]\/[A-Za-z0-9]+|filester\.[a-z]{2,}\/d\/[A-Za-z0-9]+|pixeldrain\.com\/[ul]\/[A-Za-z0-9]+|erome\.com\/a\/[A-Za-z0-9]+|[A-Za-z0-9.-]+\.[a-z]{2,}\/[^\s|?]*\?[^\s|]*\bem=[A-Za-z0-9+\/=_%-]+[^\s|]*)/gi) || [];
         // Più link insieme: il testo che resta (es. «… | Asuna») è il nome di tutti.
         if (links.length > 1) {
             var common = line;
@@ -1026,6 +1036,7 @@ class DefaultExtension extends MProvider {
         if (this.isEmbed(code)) return "/em/" + encodeURIComponent(code);
         if (this.isFilester(code)) return "/fl/" + code;
         if (this.isPixeldrain(code)) return "/pd/" + code;
+        if (this.isErome(code)) return "/er/" + code;
         return (this.isBunkr(code) ? "/bk/" : "/d/") + code;
     }
 
@@ -1063,6 +1074,7 @@ class DefaultExtension extends MProvider {
     }
 
     async readOneRaw(code) {
+        if (this.isErome(code)) return this.readErome(code);
         if (this.isBunkr(code)) return this.readBunkr(code);
         if (this.isFilester(code)) return this.readFilester(code);
         if (this.isPixeldrain(code)) return this.readPixeldrain(code);
@@ -1372,7 +1384,7 @@ class DefaultExtension extends MProvider {
             // Una cartella «non trovata» si riprova dopo 6 ore.
             return /non trovata/.test(f.title || "") && Date.now() - (f.at || 0) > FILES_TTL;
         });
-        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isFilester(c) || self.isPixeldrain(c) || self.isEmbed(c); });
+        if (typeof evaluateJavascriptViaWebview !== "function") missing = missing.filter(function (c) { return self.isBunkr(c) || self.isErome(c) || self.isFilester(c) || self.isPixeldrain(c) || self.isEmbed(c); });
         if (missing.length) await this.readMany(missing);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
@@ -1454,10 +1466,12 @@ class DefaultExtension extends MProvider {
     // mai tra le schede salvate o la lista condivisa.
     async search(query, page, filters) {
         var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
+        var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|erome\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
         if (code) return { list: [this.card(code)], hasNextPage: false };
         if (!q) return { list: [], hasNextPage: false };
-        return this.bunkrSearch(q, page || 1, this.searchMode(filters));
+        var mode = this.searchMode(filters);
+        if (mode === "erome") return this.eromeSearch(q, page || 1);
+        return this.bunkrSearch(q, page || 1, mode === "video" ? "video" : "album");
     }
 
     async readFolder(code) {
@@ -1492,18 +1506,19 @@ class DefaultExtension extends MProvider {
             codes = g.codes;
         } else {
             var bk = raw.match(/\/bk\/(bk~[^?#\/]+)/);
+            var erm = raw.match(/\/er\/(er~[A-Za-z0-9]+)/i);
             var emm = raw.match(/\/em\/(em(?:~|%7E)[^#]+)/i);
             var flm = raw.match(/\/fl\/(fl~[A-Za-z0-9]+)/i);
             var pdm = raw.match(/\/pd\/(pd~[^?#\/]+)/i);
-            var code = pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
+            var code = erm ? erm[1] : pdm ? pdm[1] : flm ? flm[1] : emm ? decodeURIComponent(emm[1]) : bk ? this.normCode(decodeURIComponent(bk[1])) : (this.codeOf(raw) || this.codeOf(raw.replace(/^\/d\//, "")));
             if (!code) throw new Error("Gofile: link non valido.");
             codes = [code];
         }
         this._seen = this._seen || {};
         var again = this._seen[raw] && Date.now() - this._seen[raw] < 120000;
         this._seen[raw] = Date.now();
-        var fm = this.filesMap(), info = this.infoMap();
-        var need = codes.filter(function (c) { return again || !fm[c] || fm[c].v !== READ_V || Date.now() - (fm[c].at || 0) > FILES_TTL; });
+        var fm = this.filesMap(), info = this.infoMap(), isEr = this.isErome.bind(this);
+        var need = codes.filter(function (c) { return isEr(c) || again || !fm[c] || fm[c].v !== READ_V || Date.now() - (fm[c].at || 0) > FILES_TTL; });
         var problem = "";
         if (need.length) {
             for (var k = 0; k < need.length; k += 3) {
@@ -1547,6 +1562,10 @@ class DefaultExtension extends MProvider {
                 }
                 if (v.pd) {
                     chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + this.episodeName(v.n), url: "pixeldrain:" + v.pd, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
+                    continue;
+                }
+                if (v.er) {
+                    chapters.push({ name: "Episodio " + (chapters.length + 1) + " - " + v.n, url: "erome:" + codes[i] + ":" + j, thumbnailUrl: /^http/.test(v.img || "") ? v.img : undefined });
                     continue;
                 }
                 var base = /^https?:\/\/[^/]+\.gofile\.io\/download\/web\/[^/]+\//.test(v.img || "") ? v.img.replace(/[^/]+$/, "") : "";
@@ -1676,6 +1695,7 @@ class DefaultExtension extends MProvider {
         if (file.indexOf("embed:") === 0) return this.embedVideo(file.slice(6));
         if (file.indexOf("filester:") === 0) return this.filesterVideo(file.slice(9));
         if (file.indexOf("pixeldrain:") === 0) return this.pixeldrainVideo(file.slice(11));
+        if (file.indexOf("erome:") === 0) return this.eromeVideo(file.slice(6));
         var token = this.readStore(STORE_TOKEN);
         if (!token) throw new Error("Gofile: riapri la scheda della cartella (serve il permesso della visita).");
         var name = decodeURIComponent(file.split("/").pop() || "");
@@ -1696,9 +1716,10 @@ class DefaultExtension extends MProvider {
                 values: [
                     { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
                     { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
+                    { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "La ricerca guarda solo Bunkr (bunkrsearch.link): album con video, oppure i singoli video. Incolla un link Gofile, Bunkr, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
+            { type_name: "HeaderFilter", name: "La ricerca parte su Bunkr. «Album su Erome» cerca solo lì, se lo scegli. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
         ];
     }
 
@@ -1710,7 +1731,7 @@ class DefaultExtension extends MProvider {
                 var f = filters[i];
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
-                    if (v && v.value === "video") return "video";
+                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album")) return v.value;
                 }
             }
         } catch (e) {}
@@ -1761,6 +1782,119 @@ class DefaultExtension extends MProvider {
         var size = data.results.length;
         var pages = data.total ? Math.max(1, Math.ceil(data.total / Math.max(size, 1))) : page;
         return { list: list, hasNextPage: page < pages && size > 0 };
+    }
+
+    // Titoli da non mostrare: minori, oppure riprese non consensuali o di nascosto.
+    // Le parole corte valgono da sole («spy» non blocca «spicy»); «teen» vale anche dentro «teenager».
+    blockedTitle(s) {
+        var t = String(s || "").toLowerCase().replace(/&#0*39;|&apos;/g, "'").replace(/&amp;/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+        if (!t) return false;
+        var re = [
+            /(^| )teen/, /(^| )young/, /(^| )tiny/, /(^| )school/, /(^| )student/,
+            /(^| )under ?age/, /(^| )minors?( |$)/, /(^| )kids?( |$)/, /(^| )child(ren)?( |$)/,
+            /(^| )loli/, /(^| )shota/, /(^| )barely( |$)/, /(^| )1[89] ?yo( |$)/,
+            /(^| )leak(ed)?( |$)/, /(^| )caught( |$)/, /(^| )hidden/, /(^| )spy( |$)/, /spycam/,
+            /(^| )voyeur/, /upskirt/, /(^| )sleep/, /(^| )drunk/, /passed out/,
+            /(^| )forced( |$)/, /(^| )rap(e|ed|ing)( |$)/, /non ?consent/,
+            /(^| )revenge/, /(^| )stolen( |$)/, /(^| )ex ?gf( |$)/, /(^| )creep/,
+            /(^| )pre ?teen/, /(^| )toddler/, /(^| )infant/, /(^| )kindergarten/
+        ];
+        for (var i = 0; i < re.length; i++) if (re[i].test(t)) return true;
+        return false;
+    }
+
+    // Ricerca album su erome.com. Solo se il filtro è «Album su Erome».
+    async eromeSearch(q, page) {
+        page = page || 1;
+        var url = "https://www.erome.com/search?q=" + encodeURIComponent(q) + "&page=" + page;
+        var down = "Erome non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var html = String(res.body || "");
+        if (!html) throw new Error(down);
+        var blocks = html.split(/id="album-/).slice(1);
+        var self = this, info = this.infoMap(), dirty = false, list = [];
+        blocks.forEach(function (b) {
+            var href = (b.match(/class="album-link"[^>]*href="([^"]+)"/i) || b.match(/href="([^"]+)"[^>]*class="album-link"/i) || [])[1] || "";
+            var id = (href.match(/\/a\/([A-Za-z0-9]+)/) || [])[1];
+            if (!id) return;
+            var title = self.decodeHtml((b.match(/class="album-title"[^>]*>([^<]*)</i) || [])[1] || "");
+            if (!title || self.blockedTitle(title)) return;
+            var videos = parseInt(((b.match(/class="album-videos"[^>]*>[\s\S]*?<\/span>/i) || [""])[0].replace(/<[^>]+>/g, " ").match(/\d+/) || [])[0], 10) || 0;
+            if (videos < 1) return;
+            var thumb = (b.match(/class="album-thumbnail[^"]*"[^>]*src="([^"]+)"/i) || b.match(/src="([^"]+)"[^>]*class="album-thumbnail/i) || [])[1] || "";
+            if (!/^http/.test(thumb)) thumb = "";
+            var code = "er~" + id;
+            if (!info[code] || info[code].name !== title || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: title, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: title, imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        return { list: list, hasNextPage: /rel=["']next["']/i.test(html) };
+    }
+
+    // Pagina album Erome. Gli indirizzi dei video cambiano: si rilegge a ogni apertura.
+    async readErome(code) {
+        var id = String(code).slice(3);
+        var down = "Erome non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get("https://www.erome.com/a/" + id, { "User-Agent": UA, "Referer": "https://www.erome.com/" }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var html = String(res.body || "");
+        if (!html) throw new Error(down);
+        var title = this.decodeHtml((html.match(/class="album-title-page"[^>]*>([^<]*)</i) || html.match(/<title>([^<]*)/i) || [])[1] || "");
+        if (this.blockedTitle(title)) throw new Error("Contenuto non disponibile");
+        var groups = html.split(/<div class="media-group"/).slice(1);
+        var files = [], n = 0;
+        for (var i = 0; i < groups.length; i++) {
+            var g = groups[i];
+            var src = (g.match(/<source[^>]*src=["']([^"']+)["'][^>]*>/i) || [])[1] || "";
+            if (!/\.mp4(\?|$)/i.test(src)) continue;
+            n++;
+            var poster = (g.match(/poster=["']([^"']+)["']/i) || [])[1] || "";
+            var resN = (g.match(/\bres=["'](\d+)["']/i) || [])[1];
+            var label = (g.match(/\blabel=["']([^"']+)["']/i) || [])[1] || "";
+            files.push({ n: "Video " + n, img: /^http/.test(poster) ? poster : "", er: src, q: resN ? resN + "p" : (label || "720p") });
+        }
+        var fm = this.filesMap();
+        fm[code] = { title: title || id, files: files, folders: 0, at: Date.now(), v: READ_V };
+        this.writeStore(STORE_FILES, JSON.stringify(fm));
+        var map = this.infoMap();
+        var thumb = files.length && files[0].img ? files[0].img : ((map[code] && map[code].image) || "");
+        map[code] = { name: title || (map[code] && map[code].name) || id, image: thumb };
+        this.writeStore(STORE_INFO, JSON.stringify(map));
+        return { rows: files, text: "" };
+    }
+
+    async eromeVideo(spec) {
+        var bits = String(spec || "").split(":");
+        var code = bits[0];
+        var idx = parseInt(bits[1], 10) || 0;
+        var headers = { "Referer": "https://www.erome.com/", "User-Agent": UA };
+        var self = this;
+        var load = async function () {
+            await self.readErome(code);
+            var files = (self.filesMap()[code] || {}).files || [];
+            return files[idx] || files[0];
+        };
+        var file = await load();
+        if (!file || !file.er) throw new Error("Erome non risponde: forse è bloccato dall'operatore");
+        var playable = async function (url) {
+            try {
+                var res = await self.client.head(url, headers);
+                var sc = res && res.statusCode;
+                return sc === 200 || sc === 206 || sc === 302;
+            } catch (e) { return false; }
+        };
+        if (!await playable(file.er)) {
+            file = await load();
+            if (!file || !file.er || !await playable(file.er)) throw new Error("I video Erome non partono sulla TV: servono sul telefono");
+        }
+        var q = file.q || "720p";
+        return [{ url: file.er, originalUrl: file.er, quality: "Erome · " + q, headers: headers }];
     }
 
     getSourcePreferences() {
