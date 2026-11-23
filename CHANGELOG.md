@@ -1,5 +1,11 @@
 # Novità
 
+## Gofile 1.29.0
+
+- **findr.to nella ricerca:** nel filtro «Cosa cerco» c'è «findr (tutti i servizi)». «Bunkr + Erome» diventa «Tutti (Bunkr + Erome + findr)»: i tre partono insieme e i risultati si alternano, senza doppioni. Se uno non risponde restano gli altri. All'inizio il filtro resta «Album su Bunkr».
+- **Gli album di findr si aprono come le schede già note:** un album diventa la scheda del suo link (Bunkr, Gofile, pixeldrain o filester). Un file senza album si apre dal suo link. Se findr non risponde, compare «findr.to non risponde: forse è bloccato dall'operatore». Vale solo il filtro sui minori già usato da Bunkr ed Erome.
+- **Salva anche da findr:** le righe «Salva sul telefono» e «Salva nella lista condivisa» compaiono anche sulle schede aperte da findr.
+
 ## Gofile 1.28.0
 
 - **Salva dalla ricerca:** in cima alla scheda di un album Bunkr, di un video Bunkr o di un album Erome ci sono due righe. «💾 Salva sul telefono» mette il link solo tra i link di questo telefono (Popolari). «🌐 Salva nella lista condivisa» scrive solo il file condiviso, col titolo dell'album, e lo trovi in Recenti sul telefono e sulla TV. Le due azioni non si mescolano: se un link è già in un elenco, quella riga diventa «✓ Già …» e l'altra resta da salvare.
