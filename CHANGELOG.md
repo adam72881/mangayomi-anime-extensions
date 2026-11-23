@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.30.0
+
+- **Ricerca vuota, home del sito:** se il testo è vuoto (o solo spazi) e scegli un filtro in «Cosa cerco», compaiono gli ultimi album di quel sito. Con una parola la ricerca resta quella di prima. Un link incollato si apre ancora subito.
+- **Da dove arrivano:** Album e Video su Bunkr usano gli album di bunkrsearch (60 a pagina). Erome usa la pagina Explore. findr usa gli album più recenti. «Tutti» alterna i tre, senza doppioni, e mostra chi risponde. Vale solo il filtro sui minori.
+
 ## Gofile 1.29.0
 
 - **findr.to nella ricerca:** nel filtro «Cosa cerco» c'è «findr (tutti i servizi)». «Bunkr + Erome» diventa «Tutti (Bunkr + Erome + findr)»: i tre partono insieme e i risultati si alternano, senza doppioni. Se uno non risponde restano gli altri. All'inizio il filtro resta «Album su Bunkr».
