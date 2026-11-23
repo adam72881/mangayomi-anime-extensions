@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.31.0",
+        "version": "1.31.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1458,6 +1458,13 @@ class DefaultExtension extends MProvider {
         return true;
     }
 
+    // Pausa breve fra un ritentativo e l'altro. Se il timer non c'è (vecchie TV)
+    // torna subito: meglio riprovare senza attesa che non riprovare affatto.
+    sleep(ms) {
+        if (!this.timerOk()) return Promise.resolve();
+        return new Promise(function (r) { try { setTimeout(r, ms); } catch (e) { r(); } });
+    }
+
     withTimeout(p, ms) {
         var waited = Promise.resolve(p);
         if (!this.timerOk()) return waited;
@@ -1563,6 +1570,7 @@ class DefaultExtension extends MProvider {
                     var why = String(d.text || "");
                     if (/^bunkr-blocked/.test(why)) problem = "Bunkr non risponde dal tuo telefono: forse i suoi domini sono bloccati dal tuo operatore. Provati: " + why.replace(/^bunkr-blocked\s*/, "") + ". Se si sblocca, trascina in basso la scheda.";
                     else if (/pd-unreachable/.test(why)) problem = "pixeldrain non risponde dal tuo telefono (ha dato una pagina di blocco, non i dati del file). Spesso in Italia pixeldrain.com è bloccato dall'operatore: prova a cambiare rete (dati mobili al posto del Wi-Fi o viceversa), oppure apri il link nel browser per controllare. Se si sblocca, trascina in basso la scheda.";
+                    else if (/turbo-unreachable/.test(why)) problem = "turbo.cr non risponde in questo momento: riprova tra qualche secondo (trascina in basso la scheda).";
                     else if (/unreachable/i.test(why)) problem = "Gofile non risponde in questo momento: riprova tra qualche minuto (trascina in basso la scheda).";
                     else if (/password/i.test(why)) problem = "Una cartella è protetta da password: aprila nel browser.";
                     else if (/embed-cut/.test(why)) problem = "Il link si è tagliato quando l'hai incollato: toglilo da «Togli i link» e reincollalo per intero (tutto fino alla fine).";
@@ -2303,11 +2311,23 @@ class DefaultExtension extends MProvider {
         var id = String(code).slice(3);
         var single = id.indexOf("v~") === 0;
         if (single) id = id.slice(2);
-        var res;
-        try { res = await this.client.get(single ? "https://turbo.cr/d/" + id : "https://turbo.cr/a/" + id, { "User-Agent": UA }); } catch (e) { return null; }
-        var html = String((res && res.body) || "");
-        var status = res ? res.statusCode : 0;
-        if (status >= 500) return null;
+        var pageUrl = single ? "https://turbo.cr/d/" + id : "https://turbo.cr/a/" + id;
+        // turbo.cr al primo colpo può rispondere con una pagina interlocutoria senza
+        // i dati: serve il cookie di sessione che arriva con quella risposta. Ritento
+        // qualche volta nello stesso giro — la richiesta dopo riusa il cookie e porta
+        // il contenuto vero — così l'album si apre già alla prima apertura, senza
+        // dover trascinare in basso per ricaricare.
+        var res, html = "", status = 0, ok = false;
+        for (var attempt = 0; attempt < 4 && !ok; attempt++) {
+            if (attempt) await this.sleep(700);
+            try { res = await this.withTimeout(this.client.get(pageUrl, { "User-Agent": UA }), 20000); } catch (e) { res = null; }
+            html = String((res && res.body) || "");
+            status = res ? res.statusCode : 0;
+            if (status === 404) { ok = true; break; }
+            if (!res || status >= 500) continue;
+            ok = single ? /encId:\s*"/.test(html) : html.indexOf("const FILES") >= 0;
+        }
+        if (!ok && status !== 404) return { rows: [], text: "turbo-unreachable" };
         var unesc = function (s) { return String(s || "").replace(/\\\//g, "/"); };
         var files = [], title = "", notFound = false;
         if (single) {
