@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.29.0",
+        "version": "1.30.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1462,18 +1462,29 @@ class DefaultExtension extends MProvider {
         Promise.resolve(this.readMany(missing)).catch(function () {}).then(function () { self._prefetching = false; });
     }
 
-    // Un link incollato si apre subito. Una parola cerca solo su bunkrsearch.link,
-    // mai tra le schede salvate o la lista condivisa.
+    // Un link incollato si apre subito. Una parola cerca sul sito del filtro.
+    // Testo vuoto o solo spazi: la home di quel filtro (ultimi album), non una lista vuota.
     async search(query, page, filters) {
-        var q = String(query || "").trim();
-        var code = /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|erome\.com|[?&]em=/i.test(q) ? this.linkCode(q) : "";
-        if (code) return { list: [this.card(code)], hasNextPage: false };
-        if (!q) return { list: [], hasNextPage: false };
+        var q = String(query == null ? "" : query).trim();
+        if (q && /gofile\.io|bunkr+\.|filester\.[a-z]{2,}|pixeldrain\.com|erome\.com|[?&]em=/i.test(q)) {
+            var code = this.linkCode(q);
+            if (code) return { list: [this.card(code)], hasNextPage: false };
+        }
         var mode = this.searchMode(filters);
+        if (!q) return this.homeSearch(mode, page || 1);
         if (mode === "erome") return this.eromeSearch(q, page || 1);
         if (mode === "findr") return this.findrSearch(q, page || 1);
         if (mode === "all" || mode === "both") return this.allSearch(q, page || 1);
         return this.bunkrSearch(q, page || 1, mode === "video" ? "video" : "album");
+    }
+
+    // Home quando la ricerca è vuota. Album e Video Bunkr usano lo stesso elenco di album.
+    async homeSearch(mode, page) {
+        page = page || 1;
+        if (mode === "erome") return this.eromeHome(page);
+        if (mode === "findr") return this.findrHome(page);
+        if (mode === "all" || mode === "both") return this.allHome(page);
+        return this.bunkrHome(page);
     }
 
     async readFolder(code) {
@@ -1848,7 +1859,7 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Tutti (Bunkr + Erome + findr)", value: "all" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "La ricerca parte sugli album Bunkr. «findr (tutti i servizi)» cerca su findr.to. «Tutti» alterna Bunkr, Erome e findr. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo." },
+            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. Un link incollato si apre subito." },
         ];
     }
 
@@ -1915,6 +1926,37 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: page < pages && size > 0 };
     }
 
+    // Ultimi album di bunkrsearch (60 a pagina). Stesse schede della ricerca album.
+    async bunkrHome(page) {
+        page = page || 1;
+        var url = "https://" + BUNKR_SEARCH_HOST + "/api/albums?page=" + page;
+        var down = "Il sito di ricerca Bunkr (bunkrsearch.link) non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var data = null;
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        var rows = data && data.results;
+        if (!rows) throw new Error(down);
+        var self = this, info = this.infoMap(), dirty = false, list = [], seen = {};
+        rows.forEach(function (r) {
+            if (!r) return;
+            var code = (r.album_url && self.linkCode(r.album_url)) || (r.slug ? "bk~a~" + r.slug : "");
+            if (!code || seen[code]) return;
+            var name = String(r.name || r.slug || "").trim();
+            if (self.blockedTitle(name)) return;
+            seen[code] = 1;
+            var thumb = self.absHttp(r.thumbnail);
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name || self.shortLink(code), imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        return { list: list, hasNextPage: rows.length >= 60 };
+    }
+
     // Bunkr ed Erome usano la stessa lista: solo termini inequivocabili di minori.
     // Teen, 18yo, 19yo, young, school, leak, hidden e caught non entrano.
     // I confini di parola evitano «minority», «kidney» e «grandchild».
@@ -1943,12 +1985,19 @@ class DefaultExtension extends MProvider {
         if (!res || res.statusCode !== 200) throw new Error(down);
         var html = String(res.body || "");
         if (!html) throw new Error(down);
-        var blocks = html.split(/id="album-/).slice(1);
-        var self = this, info = this.infoMap(), dirty = false, list = [];
+        var parsed = this.eromeCards(html);
+        return { list: parsed.list, hasNextPage: /rel=["']next["']/i.test(html) };
+    }
+
+    // Schede album Erome, uguali in ricerca e in Explore. raw = album trovati prima del filtro.
+    eromeCards(html) {
+        var blocks = String(html || "").split(/id="album-/).slice(1);
+        var self = this, info = this.infoMap(), dirty = false, list = [], raw = 0;
         blocks.forEach(function (b) {
             var href = (b.match(/class="album-link"[^>]*href="([^"]+)"/i) || b.match(/href="([^"]+)"[^>]*class="album-link"/i) || [])[1] || "";
             var id = (href.match(/\/a\/([A-Za-z0-9]+)/) || [])[1];
             if (!id) return;
+            raw++;
             var title = self.decodeHtml((b.match(/class="album-title"[^>]*>([^<]*)</i) || [])[1] || "");
             if (!title || self.blockedTitle(title)) return;
             var videos = parseInt(((b.match(/class="album-videos"[^>]*>[\s\S]*?<\/span>/i) || [""])[0].replace(/<[^>]+>/g, " ").match(/\d+/) || [])[0], 10) || 0;
@@ -1963,7 +2012,21 @@ class DefaultExtension extends MProvider {
             list.push({ name: title, imageUrl: thumb, link: self.cardPath(code) });
         });
         if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
-        return { list: list, hasNextPage: /rel=["']next["']/i.test(html) };
+        return { list: list, raw: raw };
+    }
+
+    // Explore di Erome: una pagina piena è di 36 album.
+    async eromeHome(page) {
+        page = page || 1;
+        var url = "https://www.erome.com/explore?page=" + page;
+        var down = "Erome non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var html = String(res.body || "");
+        if (!html) throw new Error(down);
+        var parsed = this.eromeCards(html);
+        return { list: parsed.list, hasNextPage: parsed.raw >= 36 };
     }
 
     // Indirizzo immagine sempre assoluto. //cdn/… diventa https://cdn/…
@@ -2064,6 +2127,80 @@ class DefaultExtension extends MProvider {
         return { list: list, hasNextPage: !!data.has_more };
     }
 
+    findrThumbList(thumbs) {
+        if (!thumbs) return "";
+        if (typeof thumbs === "string") return this.findrThumb(thumbs);
+        for (var i = 0; i < thumbs.length; i++) {
+            var item = thumbs[i];
+            var raw = item && item.url ? item.url : (item && item.thumbnail_path ? item.thumbnail_path : item);
+            var u = this.findrThumb(raw);
+            if (u) return u;
+        }
+        return "";
+    }
+
+    // Ultimi album di findr (24). original_url è già nella lista: si ricorda e,
+    // se manca, si chiede come in ricerca, al massimo 3 alla volta.
+    async findrHome(page) {
+        page = page || 1;
+        var url = "https://findr.to/api/albums?page=" + page + "&limit=24&sort=latest";
+        var down = "findr.to non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var data = null;
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        var albums = data && data.albums;
+        if (!albums) throw new Error(down);
+        var self = this;
+        this._findrAlbum = this._findrAlbum || {};
+        var need = [];
+        albums.forEach(function (a) {
+            if (!a || !a.id || self.blockedTitle(a.name)) return;
+            if (a.original_url) self._findrAlbum[String(a.id)] = String(a.original_url);
+            else if (!Object.prototype.hasOwnProperty.call(self._findrAlbum, String(a.id))) need.push(a.id);
+        });
+        for (var i = 0; i < need.length; i += 3) {
+            await Promise.all(need.slice(i, i + 3).map(function (id) { return self.findrAlbumUrl(id); }));
+        }
+        var info = this.infoMap(), dirty = false, list = [], seen = {};
+        albums.forEach(function (a) {
+            if (!a || self.blockedTitle(a.name)) return;
+            var original = a.original_url || self._findrAlbum[String(a.id)] || "";
+            var code = original ? self.linkCode(original) : "";
+            if (!code || seen[code]) return;
+            seen[code] = 1;
+            var name = String(a.name || "").trim() || self.shortLink(code);
+            var thumb = self.findrThumbList(a.thumbnails);
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        return { list: list, hasNextPage: albums.length >= 24 };
+    }
+
+    // Tre elenchi insieme: si alternano, i doppioni (stesso link) si tolgono.
+    mixThree(lists) {
+        var list = [], seen = {}, idx = [0, 0, 0], more = true;
+        while (more) {
+            more = false;
+            for (var s = 0; s < lists.length; s++) {
+                var arr = lists[s] || [];
+                while (idx[s] < arr.length && (!arr[idx[s]] || seen[arr[idx[s]].link])) idx[s]++;
+                if (idx[s] < arr.length) {
+                    seen[arr[idx[s]].link] = 1;
+                    list.push(arr[idx[s]]);
+                    idx[s]++;
+                    more = true;
+                }
+            }
+        }
+        return list;
+    }
+
     // Tre ricerche insieme: partono in parallelo, poi si alternano, senza doppioni.
     // Se uno non risponde restano gli altri. Errore solo se non risponde nessuno.
     async allSearch(q, page) {
@@ -2074,21 +2211,20 @@ class DefaultExtension extends MProvider {
         var bunkr = await bunkrP, erome = await eromeP, findr = await findrP;
         if (!bunkr.ok && !erome.ok && !findr.ok) throw new Error("Bunkr, Erome e findr non rispondono: forse sono bloccati dall'operatore");
         var lists = [bunkr.ok ? bunkr.r.list : [], erome.ok ? erome.r.list : [], findr.ok ? findr.r.list : []];
-        var list = [], seen = {}, idx = [0, 0, 0], more = true;
-        while (more) {
-            more = false;
-            for (var s = 0; s < lists.length; s++) {
-                while (idx[s] < lists[s].length && (!lists[s][idx[s]] || seen[lists[s][idx[s]].link])) idx[s]++;
-                if (idx[s] < lists[s].length) {
-                    seen[lists[s][idx[s]].link] = 1;
-                    list.push(lists[s][idx[s]]);
-                    idx[s]++;
-                    more = true;
-                }
-            }
-        }
         var next = (bunkr.ok && bunkr.r.hasNextPage) || (erome.ok && erome.r.hasNextPage) || (findr.ok && findr.r.hasNextPage);
-        return { list: list, hasNextPage: !!next };
+        return { list: this.mixThree(lists), hasNextPage: !!next };
+    }
+
+    async allHome(page) {
+        var wrap = function (p) { return p.then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; }); };
+        var bunkrP = wrap(this.bunkrHome(page));
+        var eromeP = wrap(this.eromeHome(page));
+        var findrP = wrap(this.findrHome(page));
+        var bunkr = await bunkrP, erome = await eromeP, findr = await findrP;
+        if (!bunkr.ok && !erome.ok && !findr.ok) throw new Error("Bunkr, Erome e findr non rispondono: forse sono bloccati dall'operatore");
+        var lists = [bunkr.ok ? bunkr.r.list : [], erome.ok ? erome.r.list : [], findr.ok ? findr.r.list : []];
+        var next = (bunkr.ok && bunkr.r.hasNextPage) || (erome.ok && erome.r.hasNextPage) || (findr.ok && findr.r.hasNextPage);
+        return { list: this.mixThree(lists), hasNextPage: !!next };
     }
 
     // Pagina album Erome. Gli indirizzi dei video cambiano: si rilegge a ogni apertura.
