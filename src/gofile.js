@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.28.0",
+        "version": "1.29.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1471,7 +1471,8 @@ class DefaultExtension extends MProvider {
         if (!q) return { list: [], hasNextPage: false };
         var mode = this.searchMode(filters);
         if (mode === "erome") return this.eromeSearch(q, page || 1);
-        if (mode === "both") return this.bothSearch(q, page || 1);
+        if (mode === "findr") return this.findrSearch(q, page || 1);
+        if (mode === "all" || mode === "both") return this.allSearch(q, page || 1);
         return this.bunkrSearch(q, page || 1, mode === "video" ? "video" : "album");
     }
 
@@ -1608,7 +1609,7 @@ class DefaultExtension extends MProvider {
 
         // Stesso filtro dei titoli, solo se il Bunkr non è già tra i link salvati
         // (Popolari o Recenti). Una scheda aperta dalla ricerca si ferma qui.
-        if (!g && codes.length === 1 && this.isBunkr(codes[0]) && !this.onPhone(codes[0]) && !this.inShared(codes[0])) {
+        if (!g && codes.length === 1 && this.searchSaveKind(codes[0]) && !this.onPhone(codes[0]) && !this.inShared(codes[0])) {
             var infoName = (info[codes[0]] || {}).name || "";
             if (this.blockedTitle(title) || this.blockedTitle(infoName) || this.blockedTitle(single && single.title)) {
                 throw new Error("Contenuto non disponibile");
@@ -1706,12 +1707,15 @@ class DefaultExtension extends MProvider {
         return [{ url: finalUrl, originalUrl: finalUrl, quality: "Gofile · " + ext, headers: headers }];
     }
 
-    // Schede aperte dalla ricerca: album Bunkr, video Bunkr, album Erome.
+    // Schede di un solo link (ricerca Bunkr, Erome o findr). Non le raccolte con nome.
     searchSaveKind(code) {
-        if (this.isErome(code)) return true;
-        if (!this.isBunkr(code)) return false;
-        var k = this.bunkrParts(code).kind;
-        return k === "a" || k === "f";
+        if (!code || this.isEmbed(code)) return false;
+        if (this.isErome(code) || this.isFilester(code) || this.isPixeldrain(code)) return true;
+        if (this.isBunkr(code)) {
+            var k = this.bunkrParts(code).kind;
+            return k === "a" || k === "f";
+        }
+        return /^[A-Za-z0-9]+$/.test(String(code));
     }
 
     onPhone(code) {
@@ -1840,10 +1844,11 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
                     { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
                     { type_name: "SelectOption", name: "Album su Erome", value: "erome" },
-                    { type_name: "SelectOption", name: "Bunkr + Erome (album)", value: "both" },
+                    { type_name: "SelectOption", name: "findr (tutti i servizi)", value: "findr" },
+                    { type_name: "SelectOption", name: "Tutti (Bunkr + Erome + findr)", value: "all" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "La ricerca parte sugli album Bunkr. «Album su Erome» cerca solo lì. «Bunkr + Erome (album)» alterna i due. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo. Per tenerlo, salvalo in «➕ Salva un link»." },
+            { type_name: "HeaderFilter", name: "La ricerca parte sugli album Bunkr. «findr (tutti i servizi)» cerca su findr.to. «Tutti» alterna Bunkr, Erome e findr. Incolla un link Gofile, Bunkr, Erome, filester o pixeldrain per aprirlo." },
         ];
     }
 
@@ -1855,7 +1860,8 @@ class DefaultExtension extends MProvider {
                 var f = filters[i];
                 if (f && f.type_name === "SelectFilter" && f.values && typeof f.state === "number") {
                     var v = f.values[f.state];
-                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "both")) return v.value;
+                    if (v && v.value === "both") return "all";
+                    if (v && (v.value === "video" || v.value === "erome" || v.value === "album" || v.value === "all" || v.value === "findr")) return v.value;
                 }
             }
         } catch (e) {}
@@ -1968,21 +1974,121 @@ class DefaultExtension extends MProvider {
         return "";
     }
 
-    // Album Bunkr ed Erome insieme: partono in parallelo, poi si alternano.
-    // Se uno dei due non risponde restano i risultati dell'altro.
-    async bothSearch(q, page) {
-        var bunkrP = this.bunkrSearch(q, page, "album").then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; });
-        var eromeP = this.eromeSearch(q, page).then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; });
-        var bunkr = await bunkrP, erome = await eromeP;
-        if (!bunkr.ok && !erome.ok) throw new Error("Bunkr e Erome non rispondono: forse sono bloccati dall'operatore");
-        var a = bunkr.ok ? bunkr.r.list : [], b = erome.ok ? erome.r.list : [];
-        var list = [], seen = {}, i = 0;
-        while (i < a.length || i < b.length) {
-            if (i < a.length && a[i] && !seen[a[i].link]) { seen[a[i].link] = 1; list.push(a[i]); }
-            if (i < b.length && b[i] && !seen[b[i].link]) { seen[b[i].link] = 1; list.push(b[i]); }
-            i++;
+    findrThumb(p) {
+        var s = this.absHttp(p);
+        if (s) return s;
+        s = String(p || "").trim();
+        if (s.charAt(0) === "/") return "https://findr.to" + s;
+        return "";
+    }
+
+    // original_url dell'album findr, ricordato per non richiederlo due volte.
+    async findrAlbumUrl(id) {
+        var key = String(id || "");
+        if (!key) return "";
+        this._findrAlbum = this._findrAlbum || {};
+        if (Object.prototype.hasOwnProperty.call(this._findrAlbum, key)) return this._findrAlbum[key];
+        var url = "";
+        try {
+            var res = await this.client.get("https://findr.to/api/albums/" + encodeURIComponent(key), { "User-Agent": UA });
+            if (res && res.statusCode === 200) {
+                var data = JSON.parse(String(res.body || ""));
+                url = data && data.original_url ? String(data.original_url) : "";
+            }
+        } catch (e) { url = ""; }
+        this._findrAlbum[key] = url;
+        return url;
+    }
+
+    // Ricerca su findr.to. Gli album diventano una scheda sola (il link è original_url).
+    // Un file senza album si apre dal suo link, se è un percorso che già conosciamo.
+    async findrSearch(q, page) {
+        page = page || 1;
+        var url = "https://findr.to/api/search?q=" + encodeURIComponent(q) + "&page=" + page + "&limit=60";
+        var down = "findr.to non risponde: forse è bloccato dall'operatore";
+        var res;
+        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
+        if (!res || res.statusCode !== 200) throw new Error(down);
+        var data = null;
+        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
+        var files = data && data.files;
+        if (!files) throw new Error(down);
+        var self = this, albums = [], byId = {}, singles = [];
+        files.forEach(function (f) {
+            if (!f) return;
+            var aid = f.album_id;
+            if (aid) {
+                var g = byId[aid];
+                if (!g) {
+                    g = { id: aid, name: String(f.album_name || "").trim(), thumb: self.findrThumb(f.thumbnail_path), files: [] };
+                    byId[aid] = g;
+                    albums.push(g);
+                } else if (!g.thumb) g.thumb = self.findrThumb(f.thumbnail_path);
+                if (!g.name && f.album_name) g.name = String(f.album_name).trim();
+                g.files.push(f);
+            } else singles.push(f);
+        });
+        albums = albums.filter(function (g) { return !self.blockedTitle(g.name); });
+        for (var i = 0; i < albums.length; i += 3) {
+            await Promise.all(albums.slice(i, i + 3).map(function (g) { return self.findrAlbumUrl(g.id); }));
         }
-        return { list: list, hasNextPage: !!((bunkr.ok && bunkr.r.hasNextPage) || (erome.ok && erome.r.hasNextPage)) };
+        var info = this.infoMap(), dirty = false, list = [], seen = {};
+        var pushCard = function (code, name, thumb) {
+            if (!code || seen[code] || self.blockedTitle(name)) return;
+            seen[code] = 1;
+            thumb = thumb || "";
+            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                info[code] = { name: name, image: thumb };
+                dirty = true;
+            }
+            list.push({ name: name || self.shortLink(code), imageUrl: thumb, link: self.cardPath(code) });
+        };
+        albums.forEach(function (g) {
+            if (self.blockedTitle(g.name)) return;
+            var original = self._findrAlbum[String(g.id)] || "";
+            var code = original ? self.linkCode(original) : "";
+            if (code) { pushCard(code, g.name || self.shortLink(code), g.thumb); return; }
+            g.files.forEach(function (f) {
+                var one = self.linkCode(f.source_link);
+                if (!one) return;
+                var fname = self.episodeName(f.filename || "");
+                pushCard(one, fname, self.findrThumb(f.thumbnail_path) || g.thumb);
+            });
+        });
+        singles.forEach(function (f) {
+            var one = self.linkCode(f.source_link);
+            if (!one) return;
+            pushCard(one, self.episodeName(f.filename || ""), self.findrThumb(f.thumbnail_path));
+        });
+        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
+        return { list: list, hasNextPage: !!data.has_more };
+    }
+
+    // Tre ricerche insieme: partono in parallelo, poi si alternano, senza doppioni.
+    // Se uno non risponde restano gli altri. Errore solo se non risponde nessuno.
+    async allSearch(q, page) {
+        var wrap = function (p) { return p.then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; }); };
+        var bunkrP = wrap(this.bunkrSearch(q, page, "album"));
+        var eromeP = wrap(this.eromeSearch(q, page));
+        var findrP = wrap(this.findrSearch(q, page));
+        var bunkr = await bunkrP, erome = await eromeP, findr = await findrP;
+        if (!bunkr.ok && !erome.ok && !findr.ok) throw new Error("Bunkr, Erome e findr non rispondono: forse sono bloccati dall'operatore");
+        var lists = [bunkr.ok ? bunkr.r.list : [], erome.ok ? erome.r.list : [], findr.ok ? findr.r.list : []];
+        var list = [], seen = {}, idx = [0, 0, 0], more = true;
+        while (more) {
+            more = false;
+            for (var s = 0; s < lists.length; s++) {
+                while (idx[s] < lists[s].length && (!lists[s][idx[s]] || seen[lists[s][idx[s]].link])) idx[s]++;
+                if (idx[s] < lists[s].length) {
+                    seen[lists[s][idx[s]].link] = 1;
+                    list.push(lists[s][idx[s]]);
+                    idx[s]++;
+                    more = true;
+                }
+            }
+        }
+        var next = (bunkr.ok && bunkr.r.hasNextPage) || (erome.ok && erome.r.hasNextPage) || (findr.ok && findr.r.hasNextPage);
+        return { list: list, hasNextPage: !!next };
     }
 
     // Pagina album Erome. Gli indirizzi dei video cambiano: si rilegge a ogni apertura.
