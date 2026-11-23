@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.26.1",
+        "version": "1.26.2",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1321,12 +1321,11 @@ class DefaultExtension extends MProvider {
         // Invio e modifiche al file partono in sottofondo: le schede non li aspettano.
         try { Promise.resolve(this.flushPush()).catch(function () {}); } catch (e) {}
         try { Promise.resolve(this.flushRemoteEdits()).catch(function () {}); } catch (e) {}
-        // Come Recenti: subito dalla copia salvata. Solo la prima volta, se è vuota,
-        // si aspetta al massimo 8 secondi lo scaricamento del file.
-        var cached = this.cachedRemote();
-        if (!cached.length) { try { await this.withTimeout(this.refreshRemote(true), 8000); } catch (e) {} }
-        else { try { Promise.resolve(this.refreshRemote()).catch(function () {}); } catch (e) {} }
-        var groups = this.groupsFrom(this.allLinks()), self = this;
+        // Popolari mostra SOLO i link salvati su questo telefono; la lista condivisa (il
+        // documento) sta in Recenti. Qui il documento si riscarica solo in sottofondo
+        // (serve a Recenti e a «Togli i link»), così Popolari non aspetta la rete.
+        try { Promise.resolve(this.refreshRemote()).catch(function () {}); } catch (e) {}
+        var groups = this.groupsFrom(this.savedLinks()), self = this;
         this.prefetch(groups);
         return { list: groups.map(function (g) { return self.groupCard(g); }), hasNextPage: false };
     }
