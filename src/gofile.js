@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.30.0",
+        "version": "1.30.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -1478,13 +1478,16 @@ class DefaultExtension extends MProvider {
         return this.bunkrSearch(q, page || 1, mode === "video" ? "video" : "album");
     }
 
-    // Home quando la ricerca è vuota. Album e Video Bunkr usano lo stesso elenco di album.
+    // Home quando la ricerca è vuota. Album Bunkr = ultimi album; Video Bunkr = ultimi
+    // video singoli (così le due voci non mostrano la stessa cosa).
     async homeSearch(mode, page) {
         page = page || 1;
         if (mode === "erome") return this.eromeHome(page);
         if (mode === "findr") return this.findrHome(page);
         if (mode === "all" || mode === "both") return this.allHome(page);
-        return this.bunkrHome(page);
+        if (mode === "video") return this.bunkrSearch("", page, "video");
+        // Album Bunkr: solo album con video (come la ricerca), non le gallerie di foto.
+        return this.bunkrSearch("", page, "album");
     }
 
     async readFolder(code) {
@@ -1927,35 +1930,6 @@ class DefaultExtension extends MProvider {
     }
 
     // Ultimi album di bunkrsearch (60 a pagina). Stesse schede della ricerca album.
-    async bunkrHome(page) {
-        page = page || 1;
-        var url = "https://" + BUNKR_SEARCH_HOST + "/api/albums?page=" + page;
-        var down = "Il sito di ricerca Bunkr (bunkrsearch.link) non risponde: forse è bloccato dall'operatore";
-        var res;
-        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
-        if (!res || res.statusCode !== 200) throw new Error(down);
-        var data = null;
-        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
-        var rows = data && data.results;
-        if (!rows) throw new Error(down);
-        var self = this, info = this.infoMap(), dirty = false, list = [], seen = {};
-        rows.forEach(function (r) {
-            if (!r) return;
-            var code = (r.album_url && self.linkCode(r.album_url)) || (r.slug ? "bk~a~" + r.slug : "");
-            if (!code || seen[code]) return;
-            var name = String(r.name || r.slug || "").trim();
-            if (self.blockedTitle(name)) return;
-            seen[code] = 1;
-            var thumb = self.absHttp(r.thumbnail);
-            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
-                info[code] = { name: name, image: thumb };
-                dirty = true;
-            }
-            list.push({ name: name || self.shortLink(code), imageUrl: thumb, link: self.cardPath(code) });
-        });
-        if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
-        return { list: list, hasNextPage: rows.length >= 60 };
-    }
 
     // Bunkr ed Erome usano la stessa lista: solo termini inequivocabili di minori.
     // Teen, 18yo, 19yo, young, school, leak, hidden e caught non entrano.
@@ -2141,45 +2115,56 @@ class DefaultExtension extends MProvider {
 
     // Ultimi album di findr (24). original_url è già nella lista: si ricorda e,
     // se manca, si chiede come in ricerca, al massimo 3 alla volta.
+    // Ultimi album di findr. Gli album recenti sono spesso di provider che non apriamo
+    // (es. turbo): scorriamo più pagine finché raccogliamo abbastanza album apribili,
+    // così l'home non resta vuota. Il cursore prosegue tra una pagina Mangayomi e l'altra.
     async findrHome(page) {
         page = page || 1;
-        var url = "https://findr.to/api/albums?page=" + page + "&limit=24&sort=latest";
         var down = "findr.to non risponde: forse è bloccato dall'operatore";
-        var res;
-        try { res = await this.client.get(url, { "User-Agent": UA }); } catch (e) { throw new Error(down); }
-        if (!res || res.statusCode !== 200) throw new Error(down);
-        var data = null;
-        try { data = JSON.parse(String(res.body || "")); } catch (e) { throw new Error(down); }
-        var albums = data && data.albums;
-        if (!albums) throw new Error(down);
         var self = this;
         this._findrAlbum = this._findrAlbum || {};
-        var need = [];
-        albums.forEach(function (a) {
-            if (!a || !a.id || self.blockedTitle(a.name)) return;
-            if (a.original_url) self._findrAlbum[String(a.id)] = String(a.original_url);
-            else if (!Object.prototype.hasOwnProperty.call(self._findrAlbum, String(a.id))) need.push(a.id);
-        });
-        for (var i = 0; i < need.length; i += 3) {
-            await Promise.all(need.slice(i, i + 3).map(function (id) { return self.findrAlbumUrl(id); }));
-        }
-        var info = this.infoMap(), dirty = false, list = [], seen = {};
-        albums.forEach(function (a) {
-            if (!a || self.blockedTitle(a.name)) return;
-            var original = a.original_url || self._findrAlbum[String(a.id)] || "";
-            var code = original ? self.linkCode(original) : "";
-            if (!code || seen[code]) return;
-            seen[code] = 1;
-            var name = String(a.name || "").trim() || self.shortLink(code);
-            var thumb = self.findrThumbList(a.thumbnails);
-            if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
-                info[code] = { name: name, image: thumb };
-                dirty = true;
+        if (page === 1) { this._findrCursor = 0; this._findrSeen = {}; }
+        var seen = this._findrSeen || (this._findrSeen = {});
+        var info = this.infoMap(), dirty = false, list = [];
+        var target = 18, fetched = 0, maxFetch = 6, moreOnSite = true, anyResponse = false;
+        while (list.length < target && fetched < maxFetch && moreOnSite) {
+            this._findrCursor = (this._findrCursor || 0) + 1;
+            fetched++;
+            var res;
+            try { res = await this.client.get("https://findr.to/api/albums?page=" + this._findrCursor + "&limit=24&sort=latest", { "User-Agent": UA }); } catch (e) { break; }
+            if (!res || res.statusCode !== 200) break;
+            var data = null;
+            try { data = JSON.parse(String(res.body || "")); } catch (e) { break; }
+            var albums = (data && data.albums) || [];
+            anyResponse = true;
+            if (albums.length < 24) moreOnSite = false;
+            var need = [];
+            albums.forEach(function (a) {
+                if (!a || !a.id || self.blockedTitle(a.name)) return;
+                if (a.original_url) self._findrAlbum[String(a.id)] = String(a.original_url);
+                else if (!Object.prototype.hasOwnProperty.call(self._findrAlbum, String(a.id))) need.push(a.id);
+            });
+            for (var i = 0; i < need.length; i += 3) {
+                await Promise.all(need.slice(i, i + 3).map(function (id) { return self.findrAlbumUrl(id); }));
             }
-            list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
-        });
+            albums.forEach(function (a) {
+                if (!a || self.blockedTitle(a.name)) return;
+                var original = a.original_url || self._findrAlbum[String(a.id)] || "";
+                var code = original ? self.linkCode(original) : "";
+                if (!code || seen[code]) return;
+                seen[code] = 1;
+                var name = String(a.name || "").trim() || self.shortLink(code);
+                var thumb = self.findrThumbList(a.thumbnails);
+                if (!info[code] || info[code].name !== name || (thumb && info[code].image !== thumb)) {
+                    info[code] = { name: name, image: thumb };
+                    dirty = true;
+                }
+                list.push({ name: name, imageUrl: thumb, link: self.cardPath(code) });
+            });
+        }
         if (dirty) this.writeStore(STORE_INFO, JSON.stringify(info));
-        return { list: list, hasNextPage: albums.length >= 24 };
+        if (!anyResponse && page === 1) throw new Error(down);
+        return { list: list, hasNextPage: moreOnSite };
     }
 
     // Tre elenchi insieme: si alternano, i doppioni (stesso link) si tolgono.
@@ -2217,7 +2202,7 @@ class DefaultExtension extends MProvider {
 
     async allHome(page) {
         var wrap = function (p) { return p.then(function (r) { return { ok: true, r: r }; }, function () { return { ok: false }; }); };
-        var bunkrP = wrap(this.bunkrHome(page));
+        var bunkrP = wrap(this.bunkrSearch("", page, "album"));
         var eromeP = wrap(this.eromeHome(page));
         var findrP = wrap(this.findrHome(page));
         var bunkr = await bunkrP, erome = await eromeP, findr = await findrP;

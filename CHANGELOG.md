@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.30.1
+
+- **Album e Video Bunkr ora diversi anche a ricerca vuota:** prima, senza testo, «Album su Bunkr» e «Video su Bunkr» mostravano la stessa lista. Ora «Album» mostra gli ultimi album (con video), «Video» gli ultimi video singoli.
+- **findr non mostra più la pagina vuota:** gli ultimi album di findr sono spesso di provider non apribili (es. turbo), quindi l'home restava vuota. Ora scorre più pagine finché trova abbastanza album apribili (Bunkr, Gofile, pixeldrain, filester).
+
 ## Gofile 1.30.0
 
 - **Ricerca vuota, home del sito:** se il testo è vuoto (o solo spazi) e scegli un filtro in «Cosa cerco», compaiono gli ultimi album di quel sito. Con una parola la ricerca resta quella di prima. Un link incollato si apre ancora subito.
