@@ -1,5 +1,10 @@
 # Novità
 
+## Gofile 1.38.0
+
+- **Lettura cartelle Gofile più robusta.** La lettura via API ora: crea un suo token se quello del sito non è ancora pronto (prima a volte partiva troppo presto e falliva), aspetta che il generatore del token del sito sia caricato, manda la lingua giusta e riprova se il sito risponde «troppe richieste». Inoltre distingue i casi: cartella **inesistente/scaduta** → «non esiste più» (chiaro), protetta da **password** → messaggio apposito, invece del generico «vuota».
+- Nota tecnica: due link provati di recente (kV9aOGC5, r8e5hWus) erano **cartelle morte lato Gofile**, quindi non apribili da nessuna app — non era un difetto dell'estensione.
+
 ## Gofile 1.37.0
 
 - **Gofile-douga: niente più link morti.** Alcuni video non si aprivano perché la cartella Gofile era scaduta/rotta (lo stesso sito la segna «broken»). Ora quelle voci vengono nascoste dall'elenco, così quello che vedi è apribile.

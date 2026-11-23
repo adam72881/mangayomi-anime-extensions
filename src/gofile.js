@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.37.0",
+        "version": "1.38.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.37.0";
+const VERSION = "1.38.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -117,41 +117,70 @@ function gofileReadScript(code) {
     return `(function () {
     var done = false;
     function send(o) { if (done) return; done = true; try { window.flutter_inappwebview.callHandler('setResponse', JSON.stringify(o)); } catch (e) {} }
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    // Il token del sito sta in gofile.accounts -> accounts[activeId].token (il sito lo
+    // crea in modo asincrono). Provo anche il cookie.
     function tokenNow() {
         try {
             var raw = localStorage.getItem('gofile.accounts');
-            if (raw) { var p = JSON.parse(raw); var accs = p && p.accounts; if (accs) { var k = Object.keys(accs); for (var i = 0; i < k.length; i++) { if (accs[k[i]] && accs[k[i]].token) return accs[k[i]].token; } } }
+            if (raw) {
+                var p = JSON.parse(raw), accs = p && p.accounts;
+                if (accs) {
+                    if (p.activeId && accs[p.activeId] && accs[p.activeId].token) return accs[p.activeId].token;
+                    var k = Object.keys(accs);
+                    for (var i = 0; i < k.length; i++) if (accs[k[i]] && accs[k[i]].token) return accs[k[i]].token;
+                }
+            }
         } catch (e) {}
         return (document.cookie.match(/accountToken=([^;]+)/) || [])[1] || '';
     }
-    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-    async function viaApi() {
+    // Aspetto il token del sito per qualche secondo; se non arriva, me ne creo uno mio
+    // (stesso User-Agent della pagina, così il wt combacia).
+    async function makeToken() {
         var token = '';
-        for (var i = 0; i < 24 && !token; i++) { token = tokenNow(); if (!token) await sleep(300); }
-        if (!token) throw new Error('no token');
+        for (var i = 0; i < 16 && !token; i++) { token = tokenNow(); if (!token) await sleep(300); }
+        if (token) return token;
+        try { var r = await fetch('https://api.gofile.io/accounts', { method: 'POST' }); var j = await r.json(); token = (j && j.data && j.data.token) || ''; } catch (e) {}
+        return token;
+    }
+    async function getWT(token) {
         var gen = globalThis.generateWT;
+        for (var i = 0; i < 20 && typeof gen !== 'function'; i++) { await sleep(200); gen = globalThis.generateWT; }
         if (typeof gen !== 'function') { try { var mm = await import('/js/core/wt.js'); gen = mm.generateWT; } catch (e) {} }
         if (typeof gen !== 'function') throw new Error('no wt');
-        var wt = await gen(token);
-        var all = {}, title = '', gate = '', total = null;
+        return gen(token);
+    }
+    async function viaApi() {
+        var token = await makeToken();
+        if (!token) throw new Error('no token');
+        var wt = await getWT(token);
+        var CODE = ${JSON.stringify(code)};
+        var all = {}, title = '', gate = '', notFound = false;
         for (var page = 1; page <= 40; page++) {
             var q = 'page=' + page + '&pageSize=100&sortField=name&sortDirection=1';
-            var res = await fetch('https://api.gofile.io/contents/' + encodeURIComponent(${JSON.stringify(code)}) + '?' + q, { headers: { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': navigator.language || '' } });
-            var j = await res.json();
+            var res, j;
+            for (var tn = 0; tn < 3; tn++) {
+                res = await fetch('https://api.gofile.io/contents/' + encodeURIComponent(CODE) + '?' + q, { headers: { 'Authorization': 'Bearer ' + token, 'X-Website-Token': wt, 'X-BL': navigator.language || '' } });
+                j = await res.json();
+                if (res.status === 429 || (j && j.status === 'error-rateLimit')) { await sleep(1200); continue; }
+                break;
+            }
+            if (j && /error-not(found|content)/i.test(String(j.status || ''))) { notFound = true; break; }
             var d = j && j.data;
-            if (!d) throw new Error('no data');
+            if (!d || typeof d !== 'object' || !d.type) { if (page === 1) throw new Error('no data'); break; }
             title = d.name || title;
-            if (d.canAccess === false) { gate = d.password ? 'password' : 'noaccess'; break; }
+            if (d.canAccess === false) { gate = d.password ? 'password' : 'closed'; break; }
             if (d.type === 'file') { all[d.id] = d; break; }
             var ch = d.children || {};
             var ks = Object.keys(ch);
             for (var a = 0; a < ks.length; a++) all[ks[a]] = ch[ks[a]];
-            total = (d.childrenCount != null) ? d.childrenCount : Object.keys(all).length;
+            var total = (d.childrenCount != null) ? d.childrenCount : Object.keys(all).length;
             if (!ks.length || Object.keys(all).length >= total) break;
         }
         var rows = [], ak = Object.keys(all);
         for (var b = 0; b < ak.length; b++) { var it = all[ak[b]]; rows.push({ id: it.id, type: it.type, name: it.name || '', img: it.thumbnail || '', dl: it.link || '' }); }
-        return { title: title || document.title, cookie: document.cookie, token: token, text: gate === 'password' ? 'password' : (gate === 'noaccess' ? 'not found' : ''), rows: rows };
+        var text = gate === 'password' ? 'password' : ((notFound || gate) ? 'not found' : '');
+        return { title: title || document.title, cookie: document.cookie, token: token, text: text, rows: rows, via: 'api' };
     }
     function viaDom() {
         var last = -1, same = 0, ticks = 0;
@@ -169,7 +198,7 @@ function gofileReadScript(code) {
             var single = !rows.length && /gofile\\.io\\/download\\//.test(vsrc);
             if (!(complete || single || same >= 3 || stop || ticks > 50)) return;
             clearInterval(timer);
-            var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [] };
+            var out = { title: document.title, cookie: document.cookie, text: body.slice(0, 300), rows: [], via: 'dom' };
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i], p = r.querySelector('p'), img = r.querySelector('img');
                 out.rows.push({ id: r.getAttribute('data-id'), type: r.getAttribute('data-type'), name: p ? p.textContent.trim() : '', img: img ? img.src : '' });
@@ -1753,6 +1782,7 @@ class DefaultExtension extends MProvider {
         var data = null;
         try { data = JSON.parse(raw || "null"); } catch (e) {}
         if (!data) throw new Error("Gofile: la pagina non ha risposto in tempo. Riprova.");
+        this.step("gf-" + (data.via || "?") + ":" + ((data.rows && data.rows.length) || 0));
         var token = data.token || (String(data.cookie || "").match(/accountToken=([^;]+)/) || [])[1] || "";
         if (token) this.writeStore(STORE_TOKEN, token);
         return data;
