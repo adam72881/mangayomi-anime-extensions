@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.39.0
+
+- **Recenti più veloce, con le copertine prima.** Appena la prima pagina di un album Bunkr ha un video, titolo e copertina si salvano subito; le pagine dopo continuano in seguito. Un dominio Bunkr che non risponde si lascia dopo 9 secondi, così non blocca l'elenco. I link turbo.cr della lista condivisa compaiono in Recenti.
+
 ## Gofile 1.38.2
 
 - **Si vede dove si ferma la lettura Gofile.** Se la WebView non risponde, la Diagnosi dice `gf-null`, `gf-err` o `gf-nojson` con i secondi, non solo «attesa 1s · ripeti». Se lo script parte, accanto al numero di file ci sono le tappe (`gf-api:2[start,token,wt,fetch1,api-ok]`). Tolto `import()`, che su iPhone può impedire allo script di partire. Se la lettura nuova non torna nulla, si riprova una volta col metodo di prima (`gf-old:N`).
