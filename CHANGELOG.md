@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.46.0
+
+- **«Consigliati»: +8 termini cosplay di gioco + showgirl.** Aggiunti showgirl (modelle da fiera/booth), 星铁 (Honkai Star Rail), 妮姬 (Nikke), 碧蓝航线 (Azur Lane), FGO, 甘雨 (Genshin), 制服诱惑cos, 精品cos. I personaggi di gioco rendono molto (cosplay sexy). Menu da 73 a 81 termini.
+
 ## Gofile 1.45.0
 
 - **«Consigliati»: +9 termini cosplay.** Aggiunti coser, 女仆 (maid), 兔女郎 (bunny girl), 原神 (Genshin cosplay), cos福利 (cosplay sexy), 私影 (scatti privati), 露出cos (cosplay esibizionismo), 和服 (kimono) e 漫展 (fiera/convention cosplay). Menu da 64 a 73 termini.
