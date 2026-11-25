@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.44.0
+
+- **«Consigliati»: +6 termini (belle ragazze / balli).** Aggiunti 女神 (dea), 女神范 (stile da dea), 性感舞 e 热舞 (balli sexy), 诱惑 (seduzione), 颜值 (bella presenza). Sono i più vicini allo stile Douyin che danno risultati veri sui nostri host. Menu da 58 a 64 termini.
+
 ## Gofile 1.43.0
 
 - **«Consigliati»: 7 termini in più (esibizionismo/pubblico + sissy).** Aggiunti 人前露出 (esibizionismo in pubblico), 露出挑战 (sfida esibizionismo), 户外露出 e 户外 (all'aperto), 街拍 (scatti per strada), 全裸 (nudo integrale) e sissy (crossdresser). Menu da 51 a 58 termini.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.43.0",
+        "version": "1.44.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.43.0";
+const VERSION = "1.44.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2488,6 +2488,12 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "56. 街拍 · scatti per strada", value: "街拍" },
                     { type_name: "SelectOption", name: "57. 全裸 · nudo integrale", value: "全裸" },
                     { type_name: "SelectOption", name: "58. sissy · sissy / crossdresser", value: "sissy" },
+                    { type_name: "SelectOption", name: "59. 女神 · dea / bella ragazza", value: "女神" },
+                    { type_name: "SelectOption", name: "60. 女神范 · «stile da dea»", value: "女神范" },
+                    { type_name: "SelectOption", name: "61. 性感舞 · ballo sexy", value: "性感舞" },
+                    { type_name: "SelectOption", name: "62. 热舞 · ballo caldo", value: "热舞" },
+                    { type_name: "SelectOption", name: "63. 诱惑 · seduzione", value: "诱惑" },
+                    { type_name: "SelectOption", name: "64. 颜值 · bella presenza / viso", value: "颜值" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
