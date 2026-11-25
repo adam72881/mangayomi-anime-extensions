@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.44.0",
+        "version": "1.45.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.44.0";
+const VERSION = "1.45.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2494,6 +2494,15 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "62. 热舞 · ballo caldo", value: "热舞" },
                     { type_name: "SelectOption", name: "63. 诱惑 · seduzione", value: "诱惑" },
                     { type_name: "SelectOption", name: "64. 颜值 · bella presenza / viso", value: "颜值" },
+                    { type_name: "SelectOption", name: "65. coser · cosplayer", value: "coser" },
+                    { type_name: "SelectOption", name: "66. 女仆 · cameriera (maid)", value: "女仆" },
+                    { type_name: "SelectOption", name: "67. 兔女郎 · bunny girl", value: "兔女郎" },
+                    { type_name: "SelectOption", name: "68. 原神 · Genshin (cosplay)", value: "原神" },
+                    { type_name: "SelectOption", name: "69. cos福利 · cosplay sexy", value: "cos福利" },
+                    { type_name: "SelectOption", name: "70. 私影 · scatti privati (cos)", value: "私影" },
+                    { type_name: "SelectOption", name: "71. 露出cos · cosplay esibizionismo", value: "露出cos" },
+                    { type_name: "SelectOption", name: "72. 和服 · kimono", value: "和服" },
+                    { type_name: "SelectOption", name: "73. 漫展 · fiera / convention cosplay", value: "漫展" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },

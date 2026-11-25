@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.45.0
+
+- **«Consigliati»: +9 termini cosplay.** Aggiunti coser, 女仆 (maid), 兔女郎 (bunny girl), 原神 (Genshin cosplay), cos福利 (cosplay sexy), 私影 (scatti privati), 露出cos (cosplay esibizionismo), 和服 (kimono) e 漫展 (fiera/convention cosplay). Menu da 64 a 73 termini.
+
 ## Gofile 1.44.0
 
 - **«Consigliati»: +6 termini (belle ragazze / balli).** Aggiunti 女神 (dea), 女神范 (stile da dea), 性感舞 e 热舞 (balli sexy), 诱惑 (seduzione), 颜值 (bella presenza). Sono i più vicini allo stile Douyin che danno risultati veri sui nostri host. Menu da 58 a 64 termini.
