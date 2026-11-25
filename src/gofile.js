@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.40.1",
+        "version": "1.41.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.40.1";
+const VERSION = "1.41.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2458,6 +2458,23 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "32. 国产 · cinese / domestico", value: "国产" },
                     { type_name: "SelectOption", name: "33. 伪娘 · femboy / crossdresser", value: "伪娘" },
                     { type_name: "SelectOption", name: "34. 女装 · crossdressing", value: "女装" },
+                    { type_name: "SelectOption", name: "35. 黑丝高跟 · calze nere + tacchi", value: "黑丝高跟" },
+                    { type_name: "SelectOption", name: "36. 高跟丝袜 · tacchi + calze", value: "高跟丝袜" },
+                    { type_name: "SelectOption", name: "37. 高跟美腿 · tacchi + belle gambe", value: "高跟美腿" },
+                    { type_name: "SelectOption", name: "38. 黑丝长腿 · calze nere + gambe lunghe", value: "黑丝长腿" },
+                    { type_name: "SelectOption", name: "39. 长腿丝袜 · gambe lunghe + calze", value: "长腿丝袜" },
+                    { type_name: "SelectOption", name: "40. 大长腿 · gambe lunghissime", value: "大长腿" },
+                    { type_name: "SelectOption", name: "41. 白丝高跟 · calze bianche + tacchi", value: "白丝高跟" },
+                    { type_name: "SelectOption", name: "42. 肉丝高跟 · collant carne + tacchi", value: "肉丝高跟" },
+                    { type_name: "SelectOption", name: "43. 黑色丝袜 · calze nere (variante)", value: "黑色丝袜" },
+                    { type_name: "SelectOption", name: "44. 性感美腿 · gambe sexy", value: "性感美腿" },
+                    { type_name: "SelectOption", name: "45. 腿控 · feticismo gambe", value: "腿控" },
+                    { type_name: "SelectOption", name: "46. 丝袜诱惑 · calze «seduzione»", value: "丝袜诱惑" },
+                    { type_name: "SelectOption", name: "47. 包臀裙 · gonna a tubino", value: "包臀裙" },
+                    { type_name: "SelectOption", name: "48. 蕾丝 · pizzo", value: "蕾丝" },
+                    { type_name: "SelectOption", name: "49. 吊带 · spalline / reggicalze", value: "吊带" },
+                    { type_name: "SelectOption", name: "50. 制服诱惑 · uniforme «seduzione»", value: "制服诱惑" },
+                    { type_name: "SelectOption", name: "51. 粉丝袜 · calze rosa", value: "粉丝袜" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
