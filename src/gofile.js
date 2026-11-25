@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.42.0",
+        "version": "1.42.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.42.0";
+const VERSION = "1.42.1";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2190,7 +2190,13 @@ class DefaultExtension extends MProvider {
         var unq = function (v) { return String(v || "").replace(/\\\//g, "/"); };
         var cdn = unq((html.match(/var\s+jsCDN\s*=\s*"([^"]+)"/) || [])[1]);
         var signer = unq((html.match(/var\s+signUrl\s*=\s*"([^"]+)"/) || [])[1]);
-        if (!cdn) throw new Error("Bunkr: il file non è più disponibile.");
+        if (!cdn) {
+            // Bunkr a volte mette un server CDN «in manutenzione»: il file c'è ancora, è solo
+            // temporaneamente non riproducibile. Lo distinguo dal file davvero rimosso.
+            if (/under maintenance|maintenance is in progress|temporarily unavailable|Download unavailable/i.test(html))
+                throw new Error("Bunkr: questo file è temporaneamente non disponibile (server in manutenzione). Riprova più tardi. Gli altri video dell'album di solito funzionano.");
+            throw new Error("Bunkr: il file non è più disponibile.");
+        }
         var out = cdn;
         if (signer) {
             var path = decodeURIComponent(cdn.replace(/^https?:\/\/[^/]+/, "").split("?")[0]);

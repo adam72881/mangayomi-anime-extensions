@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.42.1
+
+- **Bunkr «in manutenzione»: messaggio più chiaro.** Quando un video Bunkr non parte perché il suo server è temporaneamente in manutenzione, ora l'estensione lo dice («temporaneamente non disponibile, riprova più tardi») invece di «il file non è più disponibile» (che faceva pensare fosse sparito). Gli altri video dello stesso album di solito funzionano lo stesso.
+
 ## Gofile 1.42.0
 
 - **La ricerca parte già su «Tutti».** Prima «Cosa cerco» era preimpostato su «Album su Bunkr»; ora parte su **«Tutti» (Bunkr + Erome + findr)**, così ogni ricerca (e ogni termine «Consigliati») dà subito il massimo. Puoi sempre cambiarlo con l'altra sorgente quando vuoi.
