@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.43.0
+
+- **«Consigliati»: 7 termini in più (esibizionismo/pubblico + sissy).** Aggiunti 人前露出 (esibizionismo in pubblico), 露出挑战 (sfida esibizionismo), 户外露出 e 户外 (all'aperto), 街拍 (scatti per strada), 全裸 (nudo integrale) e sissy (crossdresser). Menu da 51 a 58 termini.
+
 ## Gofile 1.42.1
 
 - **Bunkr «in manutenzione»: messaggio più chiaro.** Quando un video Bunkr non parte perché il suo server è temporaneamente in manutenzione, ora l'estensione lo dice («temporaneamente non disponibile, riprova più tardi») invece di «il file non è più disponibile» (che faceva pensare fosse sparito). Gli altri video dello stesso album di solito funzionano lo stesso.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.42.1",
+        "version": "1.43.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.42.1";
+const VERSION = "1.43.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2481,6 +2481,13 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "49. 吊带 · spalline / reggicalze", value: "吊带" },
                     { type_name: "SelectOption", name: "50. 制服诱惑 · uniforme «seduzione»", value: "制服诱惑" },
                     { type_name: "SelectOption", name: "51. 粉丝袜 · calze rosa", value: "粉丝袜" },
+                    { type_name: "SelectOption", name: "52. 人前露出 · esibizionismo in pubblico", value: "人前露出" },
+                    { type_name: "SelectOption", name: "53. 露出挑战 · sfida esibizionismo", value: "露出挑战" },
+                    { type_name: "SelectOption", name: "54. 户外露出 · esibizionismo all'aperto", value: "户外露出" },
+                    { type_name: "SelectOption", name: "55. 户外 · all'aperto", value: "户外" },
+                    { type_name: "SelectOption", name: "56. 街拍 · scatti per strada", value: "街拍" },
+                    { type_name: "SelectOption", name: "57. 全裸 · nudo integrale", value: "全裸" },
+                    { type_name: "SelectOption", name: "58. sissy · sissy / crossdresser", value: "sissy" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
