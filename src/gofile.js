@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.45.0",
+        "version": "1.46.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.45.0";
+const VERSION = "1.46.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2503,6 +2503,14 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "71. 露出cos · cosplay esibizionismo", value: "露出cos" },
                     { type_name: "SelectOption", name: "72. 和服 · kimono", value: "和服" },
                     { type_name: "SelectOption", name: "73. 漫展 · fiera / convention cosplay", value: "漫展" },
+                    { type_name: "SelectOption", name: "74. showgirl · modelle da fiera / booth", value: "showgirl" },
+                    { type_name: "SelectOption", name: "75. 星铁 · Honkai Star Rail (cosplay)", value: "星铁" },
+                    { type_name: "SelectOption", name: "76. 妮姬 · Nikke (cosplay)", value: "妮姬" },
+                    { type_name: "SelectOption", name: "77. 碧蓝航线 · Azur Lane (cosplay)", value: "碧蓝航线" },
+                    { type_name: "SelectOption", name: "78. FGO · Fate/Grand Order (cosplay)", value: "FGO" },
+                    { type_name: "SelectOption", name: "79. 甘雨 · Ganyu / Genshin (cosplay)", value: "甘雨" },
+                    { type_name: "SelectOption", name: "80. 制服诱惑cos · cosplay uniforme", value: "制服诱惑cos" },
+                    { type_name: "SelectOption", name: "81. 精品cos · cosplay premium", value: "精品cos" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
