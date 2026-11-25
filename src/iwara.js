@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/iwara.js",
@@ -110,25 +110,29 @@ class DefaultExtension extends MProvider {
         return (page0 + 1) * PER < total;
     }
 
-    async browse(sort, rating, page) {
+    // tags: id di una categoria/tag (opzionale). La virgola sarebbe un AND, qui
+    // ne passiamo una sola. La ricerca per parola non accetta tags, solo lo sfoglio.
+    async browse(sort, rating, tags, page) {
         var p = (page || 1) - 1;
-        var data = await this.getJson("/videos?sort=" + encodeURIComponent(sort) + "&rating=" + encodeURIComponent(rating) + "&page=" + p + "&limit=" + PER);
+        var url = "/videos?sort=" + encodeURIComponent(sort) + "&rating=" + encodeURIComponent(rating) + "&page=" + p + "&limit=" + PER;
+        if (tags) url += "&tags=" + encodeURIComponent(tags);
+        var data = await this.getJson(url);
         return { list: this.mapList(data), hasNextPage: this.hasNext(data, p) };
     }
 
     async getPopular(page) {
-        return this.browse("trending", "all", page);
+        return this.browse("trending", "all", "", page);
     }
 
     async getLatestUpdates(page) {
-        return this.browse("date", "all", page);
+        return this.browse("date", "all", "", page);
     }
 
     async search(query, page, filters) {
         var q = String(query == null ? "" : query).trim();
         var p = (page || 1) - 1;
         if (!q) {
-            return this.browse(this.sortOf(filters), this.ratingOf(filters), page);
+            return this.browse(this.sortOf(filters), this.ratingOf(filters), this.categoryOf(filters), page);
         }
         // La ricerca per parola vuole type=videos (plurale) e non accetta sort/rating.
         var data = await this.getJson("/search?type=videos&query=" + encodeURIComponent(q) + "&page=" + p + "&limit=" + PER);
@@ -220,6 +224,10 @@ class DefaultExtension extends MProvider {
         return (v === "ecchi" || v === "general") ? v : "all";
     }
 
+    categoryOf(filters) {
+        return this.selectVal(filters, "Categoria", "") || "";
+    }
+
     getFilterList() {
         return [
             {
@@ -244,7 +252,24 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Solo soft (general)", value: "general" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "Senza testo vedi l'elenco secondo «Ordine» e «Contenuti». Con una parola cerchi (la ricerca mostra tutti i tipi)." },
+            {
+                type_name: "SelectFilter",
+                name: "Categoria",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "Tutte", value: "" },
+                    { type_name: "SelectOption", name: "Cosplay", value: "cosplay" },
+                    { type_name: "SelectOption", name: "MMD", value: "mikumikudance" },
+                    { type_name: "SelectOption", name: "Koikatsu", value: "koikatsu" },
+                    { type_name: "SelectOption", name: "Honey Select", value: "honey_select" },
+                    { type_name: "SelectOption", name: "Virt-a-Mate", value: "virt_a_mate" },
+                    { type_name: "SelectOption", name: "Blender", value: "blender" },
+                    { type_name: "SelectOption", name: "SFM (Source Filmmaker)", value: "sfm" },
+                    { type_name: "SelectOption", name: "AI generato", value: "ai_generated" },
+                    { type_name: "SelectOption", name: "HMV", value: "hmv" },
+                ],
+            },
+            { type_name: "HeaderFilter", name: "Senza testo vedi l'elenco secondo «Ordine», «Contenuti» e «Categoria». Con una parola cerchi (la ricerca ignora i filtri e mostra tutti i tipi)." },
         ];
     }
 
