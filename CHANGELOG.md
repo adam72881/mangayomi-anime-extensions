@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.40.1
+
+- **«Consigliati» ora segue «Cosa cerco».** Prima un termine consigliato cercava solo su findr; adesso usa il motore che scegli: «Album su Bunkr», «Tutti», «findr», «Erome»… Con «Gofile-douga» o «Bunkr: ultimi» (che non cercano per parola) passa automaticamente a «Tutti», così il termine non viene ignorato.
+
 ## Gofile 1.40.0
 
 - **Nuovo filtro «Consigliati».** Nei filtri c'è un menu con 34 termini di ricerca già pronti (in cinese, con la traduzione accanto: calze, piedi, tacchi, cosplay, modelle, uniformi, ecc.). Scegline uno senza scrivere niente e cerca automaticamente su **findr** (tutti gli host insieme). Comodo per trovare subito il tipo di contenuto senza dover scrivere il termine cinese a mano.

@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.40.0",
+        "version": "1.40.1",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.40.0";
+const VERSION = "1.40.1";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -1855,13 +1855,15 @@ class DefaultExtension extends MProvider {
             var code = this.linkCode(q);
             if (code) return { list: [this.card(code)], hasNextPage: false };
         }
-        // «Consigliati»: se non hai scritto niente e scegli un termine suggerito, cerca
-        // quel termine su findr (che copre più host: tutti i link e gli album insieme).
+        var mode = this.searchMode(filters);
+        // «Consigliati»: se non hai scritto niente e scegli un termine suggerito, quel
+        // termine diventa la ricerca e va sul motore scelto in «Cosa cerco» (Album su
+        // Bunkr, Tutti, findr, Erome…). Con «Gofile-douga» e «Bunkr: ultimi» (che non
+        // cercano per parola) passo a «Tutti», così il termine non viene ignorato.
         if (!q) {
             var rec = this.selectValue(filters, "Consigliati");
-            if (rec) return this.findrSearch(rec, page || 1);
+            if (rec) { q = rec; if (mode === "douga" || mode === "bunkr-new") mode = "all"; }
         }
-        var mode = this.searchMode(filters);
         // gofile-douga non cerca per parola: mostra sempre novità/più visti (l'ordine
         // è nel filtro «Ordine Gofile-douga»), con o senza testo.
         if (mode === "douga") return this.dougaHome(this.dougaOrder(filters), page || 1);
@@ -2458,7 +2460,7 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "34. 女装 · crossdressing", value: "女装" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca su findr. Un link incollato si apre subito." },
+            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
         ];
     }
 
