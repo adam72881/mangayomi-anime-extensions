@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.39.0",
+        "version": "1.40.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.39.0";
+const VERSION = "1.40.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -1855,6 +1855,12 @@ class DefaultExtension extends MProvider {
             var code = this.linkCode(q);
             if (code) return { list: [this.card(code)], hasNextPage: false };
         }
+        // «Consigliati»: se non hai scritto niente e scegli un termine suggerito, cerca
+        // quel termine su findr (che copre più host: tutti i link e gli album insieme).
+        if (!q) {
+            var rec = this.selectValue(filters, "Consigliati");
+            if (rec) return this.findrSearch(rec, page || 1);
+        }
         var mode = this.searchMode(filters);
         // gofile-douga non cerca per parola: mostra sempre novità/più visti (l'ordine
         // è nel filtro «Ordine Gofile-douga»), con o senza testo.
@@ -2410,7 +2416,49 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "Più visti (3 giorni)", value: "3d" },
                 ],
             },
-            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. Un link incollato si apre subito." },
+            {
+                type_name: "SelectFilter",
+                name: "Consigliati",
+                state: 0,
+                values: [
+                    { type_name: "SelectOption", name: "— nessuno —", value: "" },
+                    { type_name: "SelectOption", name: "1. 黑丝 · calze nere", value: "黑丝" },
+                    { type_name: "SelectOption", name: "2. 白丝 · calze bianche", value: "白丝" },
+                    { type_name: "SelectOption", name: "3. 肉丝 · collant color carne", value: "肉丝" },
+                    { type_name: "SelectOption", name: "4. 灰丝 · collant grigi", value: "灰丝" },
+                    { type_name: "SelectOption", name: "5. 丝袜 · calze / collant", value: "丝袜" },
+                    { type_name: "SelectOption", name: "6. 网袜 · calze a rete", value: "网袜" },
+                    { type_name: "SelectOption", name: "7. 美腿 · belle gambe", value: "美腿" },
+                    { type_name: "SelectOption", name: "8. 长腿 · gambe lunghe", value: "长腿" },
+                    { type_name: "SelectOption", name: "9. 腿模 · modella di gambe", value: "腿模" },
+                    { type_name: "SelectOption", name: "10. 高跟 · tacchi alti", value: "高跟" },
+                    { type_name: "SelectOption", name: "11. 玉足 · bei piedi", value: "玉足" },
+                    { type_name: "SelectOption", name: "12. 美足 · bei piedi", value: "美足" },
+                    { type_name: "SelectOption", name: "13. 丝足 · piedi con calze", value: "丝足" },
+                    { type_name: "SelectOption", name: "14. 足控 · feticismo piedi", value: "足控" },
+                    { type_name: "SelectOption", name: "15. 夹趾袜 · calze infradito", value: "夹趾袜" },
+                    { type_name: "SelectOption", name: "16. 足交 · footjob", value: "足交" },
+                    { type_name: "SelectOption", name: "17. 女王 · mistress / padrona", value: "女王" },
+                    { type_name: "SelectOption", name: "18. 御姐 · donna matura / dominante", value: "御姐" },
+                    { type_name: "SelectOption", name: "19. 调教 · femdom / addestramento", value: "调教" },
+                    { type_name: "SelectOption", name: "20. 踩踏 · trampling (calpestare)", value: "踩踏" },
+                    { type_name: "SelectOption", name: "21. 榨精 · spremitura", value: "榨精" },
+                    { type_name: "SelectOption", name: "22. 网红 · influencer", value: "网红" },
+                    { type_name: "SelectOption", name: "23. 模特 · modella", value: "模特" },
+                    { type_name: "SelectOption", name: "24. 主播 · streamer", value: "主播" },
+                    { type_name: "SelectOption", name: "25. 写真 · servizio fotografico", value: "写真" },
+                    { type_name: "SelectOption", name: "26. cosplay · cosplay", value: "cosplay" },
+                    { type_name: "SelectOption", name: "27. 露出 · esibizionismo", value: "露出" },
+                    { type_name: "SelectOption", name: "28. 情趣内衣 · lingerie sexy", value: "情趣内衣" },
+                    { type_name: "SelectOption", name: "29. 制服 · uniforme", value: "制服" },
+                    { type_name: "SelectOption", name: "30. 空姐 · hostess", value: "空姐" },
+                    { type_name: "SelectOption", name: "31. 旗袍 · qipao (abito cinese)", value: "旗袍" },
+                    { type_name: "SelectOption", name: "32. 国产 · cinese / domestico", value: "国产" },
+                    { type_name: "SelectOption", name: "33. 伪娘 · femboy / crossdresser", value: "伪娘" },
+                    { type_name: "SelectOption", name: "34. 女装 · crossdressing", value: "女装" },
+                ],
+            },
+            { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca su findr. Un link incollato si apre subito." },
         ];
     }
 

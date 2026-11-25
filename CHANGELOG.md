@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.40.0
+
+- **Nuovo filtro «Consigliati».** Nei filtri c'è un menu con 34 termini di ricerca già pronti (in cinese, con la traduzione accanto: calze, piedi, tacchi, cosplay, modelle, uniformi, ecc.). Scegline uno senza scrivere niente e cerca automaticamente su **findr** (tutti gli host insieme). Comodo per trovare subito il tipo di contenuto senza dover scrivere il termine cinese a mano.
+
 ## Gofile 1.39.0
 
 - **Recenti più veloce, con le copertine prima.** Appena la prima pagina di un album Bunkr ha un video, titolo e copertina si salvano subito; le pagine dopo continuano in seguito. Un dominio Bunkr che non risponde si lascia dopo 9 secondi, così non blocca l'elenco. I link turbo.cr della lista condivisa compaiono in Recenti.
