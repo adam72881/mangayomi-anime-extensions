@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.42.0
+
+- **La ricerca parte già su «Tutti».** Prima «Cosa cerco» era preimpostato su «Album su Bunkr»; ora parte su **«Tutti» (Bunkr + Erome + findr)**, così ogni ricerca (e ogni termine «Consigliati») dà subito il massimo. Puoi sempre cambiarlo con l'altra sorgente quando vuoi.
+
 ## Gofile 1.41.0
 
 - **«Consigliati» più ricco (17 termini in più, da 34 a 51).** Aggiunti termini "combo" centrati sullo stile gambe/calze/tacchi: 黑丝高跟 (calze nere + tacchi), 高跟丝袜, 高跟美腿, 黑丝长腿, 长腿丝袜, 大长腿, 白丝高跟, 肉丝高跟, 性感美腿, 腿控, 丝袜诱惑, 包臀裙, 蕾丝, 吊带, 制服诱惑, 粉丝袜, 黑色丝袜. Come gli altri, seguono la sorgente scelta in «Cosa cerco» (su «Tutti» o «findr» rendono di più).

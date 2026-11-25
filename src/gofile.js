@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.41.0",
+        "version": "1.42.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.41.0";
+const VERSION = "1.42.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2396,7 +2396,7 @@ class DefaultExtension extends MProvider {
             {
                 type_name: "SelectFilter",
                 name: "Cosa cerco",
-                state: 0,
+                state: 4, // predefinito: «Tutti» (Bunkr + Erome + findr), non il solo Bunkr
                 values: [
                     { type_name: "SelectOption", name: "Album su Bunkr (con video)", value: "album" },
                     { type_name: "SelectOption", name: "Video su Bunkr (singoli)", value: "video" },
@@ -2500,7 +2500,7 @@ class DefaultExtension extends MProvider {
         var v = this.selectValue(filters, "Cosa cerco");
         if (v === "both") return "all";
         if (v === "video" || v === "erome" || v === "album" || v === "all" || v === "findr" || v === "douga" || v === "bunkr-new") return v;
-        return "album";
+        return "all"; // predefinito: «Tutti»
     }
 
     // «Ordine Gofile-douga»: new (novità) o 12h/24h/3d (più visti).
