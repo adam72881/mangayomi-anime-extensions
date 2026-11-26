@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.47.0",
+        "version": "1.48.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.47.0";
+const VERSION = "1.48.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2527,6 +2527,22 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "95. urethral · uretrale", value: "urethral" },
                     { type_name: "SelectOption", name: "96. heel fetish · feticismo tacchi", value: "heel fetish" },
                     { type_name: "SelectOption", name: "97. shoejob · shoejob", value: "shoejob" },
+                    { type_name: "SelectOption", name: "98. 反差 · doppia vita", value: "反差" },
+                    { type_name: "SelectOption", name: "99. 反差婊 · doppia vita (volgare)", value: "反差婊" },
+                    { type_name: "SelectOption", name: "100. 福利姬 · creator sexy a pagamento", value: "福利姬" },
+                    { type_name: "SelectOption", name: "101. 韩国女主播 · streamer coreana", value: "韩国女主播" },
+                    { type_name: "SelectOption", name: "102. 女主播 · streamer donna", value: "女主播" },
+                    { type_name: "SelectOption", name: "103. 黑丝诱惑 · seduzione calze nere", value: "黑丝诱惑" },
+                    { type_name: "SelectOption", name: "104. 吊带袜 · calze con reggicalze", value: "吊带袜" },
+                    { type_name: "SelectOption", name: "105. 过膝袜 · calze sopra il ginocchio", value: "过膝袜" },
+                    { type_name: "SelectOption", name: "106. 渔网 · rete / fishnet", value: "渔网" },
+                    { type_name: "SelectOption", name: "107. 皮衣 · pelle", value: "皮衣" },
+                    { type_name: "SelectOption", name: "108. 内衣秀 · sfilata lingerie", value: "内衣秀" },
+                    { type_name: "SelectOption", name: "109. 羞辱 · umiliazione", value: "羞辱" },
+                    { type_name: "SelectOption", name: "110. 催眠 · ipnosi", value: "催眠" },
+                    { type_name: "SelectOption", name: "111. 洗脑 · lavaggio del cervello (hypno)", value: "洗脑" },
+                    { type_name: "SelectOption", name: "112. 野外 · all'aperto", value: "野外" },
+                    { type_name: "SelectOption", name: "113. 车震 · sesso in macchina", value: "车震" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },

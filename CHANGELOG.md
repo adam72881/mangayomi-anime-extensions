@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.48.0
+
+- **«Consigliati»: +16 termini (doppia vita, streamer, calze, hypno, outdoor).** Aggiunti 反差, 反差婊, 福利姬, 韩国女主播, 女主播, 黑丝诱惑, 吊带袜, 过膝袜, 渔网, 皮衣, 内衣秀, 羞辱, 催眠, 洗脑, 野外, 车震. Menu da 97 a 113 termini.
+
 ## Gofile 1.47.0
 
 - **«Consigliati»: +16 termini (tacchi/scarpe + sounding).** Aggiunti 高跟鞋, 红底鞋, 恋鞋, 鞋交, 尖头高跟, 漆皮高跟, 插马眼, 马眼扩张, 尿道, 尿道棒, 尿道调教, 马眼, sounding, urethral, heel fetish, shoejob. Saltato 踩踏 (già presente). Menu da 81 a 97 termini.
