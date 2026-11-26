@@ -1,5 +1,9 @@
 # Novità
 
+## Gofile 1.47.0
+
+- **«Consigliati»: +16 termini (tacchi/scarpe + sounding).** Aggiunti 高跟鞋, 红底鞋, 恋鞋, 鞋交, 尖头高跟, 漆皮高跟, 插马眼, 马眼扩张, 尿道, 尿道棒, 尿道调教, 马眼, sounding, urethral, heel fetish, shoejob. Saltato 踩踏 (già presente). Menu da 81 a 97 termini.
+
 ## Gofile 1.46.0
 
 - **«Consigliati»: +8 termini cosplay di gioco + showgirl.** Aggiunti showgirl (modelle da fiera/booth), 星铁 (Honkai Star Rail), 妮姬 (Nikke), 碧蓝航线 (Azur Lane), FGO, 甘雨 (Genshin), 制服诱惑cos, 精品cos. I personaggi di gioco rendono molto (cosplay sexy). Menu da 73 a 81 termini.
