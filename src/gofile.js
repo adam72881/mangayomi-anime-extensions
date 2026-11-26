@@ -8,7 +8,7 @@ const mangayomiSources = [
         "typeSource": "single",
         "isNsfw": true,
         "itemType": 1,
-        "version": "1.46.0",
+        "version": "1.47.0",
         "dateFormat": "",
         "dateFormatLocale": "",
         "pkgPath": "anime/src/it/gofile.js",
@@ -65,7 +65,7 @@ const FILES_TTL = 6 * 3600000;
 const READ_V = 2;
 const VIDEO_EXT = /\.(mp4|mkv|webm|mov|m4v|avi|ts|m3u8)$/i;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-const VERSION = "1.46.0";
+const VERSION = "1.47.0";
 
 // La lista di una cartella la disegna il JavaScript di Gofile: la pagina si apre
 // nella WebView nascosta di Mangayomi, come nel browser, e lo script legge le righe.
@@ -2511,6 +2511,22 @@ class DefaultExtension extends MProvider {
                     { type_name: "SelectOption", name: "79. 甘雨 · Ganyu / Genshin (cosplay)", value: "甘雨" },
                     { type_name: "SelectOption", name: "80. 制服诱惑cos · cosplay uniforme", value: "制服诱惑cos" },
                     { type_name: "SelectOption", name: "81. 精品cos · cosplay premium", value: "精品cos" },
+                    { type_name: "SelectOption", name: "82. 高跟鞋 · scarpe coi tacchi", value: "高跟鞋" },
+                    { type_name: "SelectOption", name: "83. 红底鞋 · tacchi suola rossa", value: "红底鞋" },
+                    { type_name: "SelectOption", name: "84. 恋鞋 · feticismo scarpe", value: "恋鞋" },
+                    { type_name: "SelectOption", name: "85. 鞋交 · shoejob", value: "鞋交" },
+                    { type_name: "SelectOption", name: "86. 尖头高跟 · tacchi a punta", value: "尖头高跟" },
+                    { type_name: "SelectOption", name: "87. 漆皮高跟 · tacchi vernice lucida", value: "漆皮高跟" },
+                    { type_name: "SelectOption", name: "88. 插马眼 · sounding glande", value: "插马眼" },
+                    { type_name: "SelectOption", name: "89. 马眼扩张 · dilatazione uretra", value: "马眼扩张" },
+                    { type_name: "SelectOption", name: "90. 尿道 · uretra", value: "尿道" },
+                    { type_name: "SelectOption", name: "91. 尿道棒 · sonda uretrale", value: "尿道棒" },
+                    { type_name: "SelectOption", name: "92. 尿道调教 · addestramento uretra", value: "尿道调教" },
+                    { type_name: "SelectOption", name: "93. 马眼 · buco del glande", value: "马眼" },
+                    { type_name: "SelectOption", name: "94. sounding · sounding", value: "sounding" },
+                    { type_name: "SelectOption", name: "95. urethral · uretrale", value: "urethral" },
+                    { type_name: "SelectOption", name: "96. heel fetish · feticismo tacchi", value: "heel fetish" },
+                    { type_name: "SelectOption", name: "97. shoejob · shoejob", value: "shoejob" },
                 ],
             },
             { type_name: "HeaderFilter", name: "Senza testo vedi gli ultimi album del filtro scelto. Con una parola cerchi. «Tutti» alterna Bunkr, Erome e findr. «Gofile-douga» sfoglia i video Gofile (non cerca per parola) e usa l'ordine qui sotto. «Consigliati»: scegli un termine (senza scrivere niente) e cerca con il motore impostato in «Cosa cerco» (Album su Bunkr, Tutti, findr…). Un link incollato si apre subito." },
